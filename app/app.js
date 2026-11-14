@@ -244,6 +244,11 @@ function buildStyle() {
 
   layers.push(
     {
+      id: 'tracks-highlight', type: 'line', source: 'tracks', filter: ['==', ['get', 'id'], '__keiner__'],
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': dark ? '#FFFFFF' : '#15191D', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 9, 14, 15], 'line-opacity': 0.35, 'line-blur': 2 }
+    },
+    {
       id: 'tracks-casing', type: 'line', source: 'tracks',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: { 'line-color': dark ? '#0B0F12' : '#FFFFFF', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 4, 14, 8], 'line-opacity': 0.9 }
@@ -252,6 +257,10 @@ function buildStyle() {
       id: 'tracks-line', type: 'line', source: 'tracks',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: { 'line-color': ['get', 'color'], 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 2.2, 14, 4.5] }
+    },
+    {
+      id: 'tracks-hit', type: 'line', source: 'tracks',
+      paint: { 'line-color': '#000000', 'line-width': 22, 'line-opacity': 0.001 }
     },
     {
       id: 'tracks-label', type: 'symbol', source: 'tracks', minzoom: 11,
@@ -659,6 +668,7 @@ async function renderPhotos() {
 }
 
 function openEditor(place, at) {
+  closeTrackInfo();
   closeSheet();
   gps.follow = false;
   $('#btn-locate').classList.remove('active');
@@ -971,7 +981,7 @@ async function updateStorage() {
 /* ---------- Bedienelemente ---------- */
 function setupUI() {
   const sheet = $('#sheet');
-  $('#btn-layers').onclick = () => { if (editor.open) closeEditor(); closeSearch(); renderRegions(); updateStorage(); closeCatPage(); renderDataCats(); sheet.hidden = false; };
+  $('#btn-layers').onclick = () => { closeTrackInfo(); if (editor.open) closeEditor(); closeSearch(); renderRegions(); updateStorage(); closeCatPage(); renderDataCats(); sheet.hidden = false; };
   $('#sheet-close').onclick = closeSheet;
   $('#cat-close').onclick = closeSheet;
   $('#cat-back').onclick = closeCatPage;
@@ -1013,6 +1023,7 @@ function setupUI() {
   $('#fab').onclick = newPlaceHere;
   setupEditorUI();
   setupSearchAndImport();
+  setupTrackInfoUI();
   $('#btn-gpx').onclick = exportGPX;
   savePlaces();
   updateCompassButton();
@@ -1254,6 +1265,7 @@ async function runSearch() {
 }
 
 function openSearch() {
+  closeTrackInfo();
   if (editor.open) closeEditor();
   closeSheet();
   $('#search').hidden = false;
@@ -1316,14 +1328,7 @@ function buildTrackRow(t) {
   row.querySelector('.ti-color').style.background = t.color;
   row.querySelector('b').textContent = t.name;
   row.querySelector('small').textContent = fmtDist(t.length) + (t.source ? ' · ' + t.source : '');
-  row.querySelector('.ti-main').onclick = () => {
-    closeSheet();
-    if (!t.visible) { t.visible = true; saveTrack(t); }
-    if (settings.hidden.includes('tracks')) setCatHidden('tracks', false);
-    updateTracksSource();
-    gps.follow = false; $('#btn-locate').classList.remove('active');
-    map.fitBounds(trackBounds(t), { padding: 80, maxZoom: 15 });
-  };
+  row.querySelector('.ti-main').onclick = () => openTrackInfo(t);
   const sw = row.querySelector('.switch');
   sw.checked = !!t.visible;
   sw.onchange = () => { t.visible = sw.checked; saveTrack(t); updateTracksSource(); };
@@ -1421,6 +1426,221 @@ function refreshCatPage() {
     b.onclick = () => { closeSheet(); openEditor(p); };
     box.appendChild(b);
   }
+}
+
+/* ---------- Track-Infos ---------- */
+const trackInfo = { open: false, track: null, confirmDelete: false };
+const demTileCache = new Map();
+
+async function demPixels(z, x, y) {
+  const key = `${z}/${x}/${y}`;
+  if (demTileCache.has(key)) return demTileCache.get(key);
+  let out = null;
+  try {
+    const data = await Tiles.tile('dem', z, x, y);
+    if (data) {
+      const bmp = await createImageBitmap(new Blob([data], { type: 'image/webp' }));
+      const cv = document.createElement('canvas');
+      cv.width = bmp.width; cv.height = bmp.height;
+      const g = cv.getContext('2d', { willReadFrequently: true });
+      g.drawImage(bmp, 0, 0);
+      out = { size: bmp.width, px: g.getImageData(0, 0, bmp.width, bmp.height).data };
+    }
+  } catch (e) { out = null; }
+  if (demTileCache.size > 60) demTileCache.delete(demTileCache.keys().next().value);
+  demTileCache.set(key, out);
+  return out;
+}
+
+async function demElevation(lon, lat) {
+  const z = DEM_MAXZOOM, n = Math.pow(2, z);
+  const fx = (lon + 180) / 360 * n;
+  const r = lat * Math.PI / 180;
+  const fy = (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n;
+  const x = Math.floor(fx), y = Math.floor(fy);
+  const t = await demPixels(z, x, y);
+  if (!t) return null;
+  const px = Math.min(t.size - 1, Math.floor((fx - x) * t.size)), py = Math.min(t.size - 1, Math.floor((fy - y) * t.size));
+  const i = (py * t.size + px) * 4;
+  return t.px[i] * 256 + t.px[i + 1] + t.px[i + 2] / 256 - 32768;
+}
+
+/* Höhenprofil: Punkte gleichmäßig über die Strecke verteilt */
+async function trackProfile(t) {
+  const pts = [];
+  let dist = 0;
+  for (const seg of t.segments) {
+    for (let i = 0; i < seg.length; i++) {
+      if (i > 0) dist += distance({ lat: seg[i - 1][1], lon: seg[i - 1][0] }, { lat: seg[i][1], lon: seg[i][0] });
+      pts.push({ lon: seg[i][0], lat: seg[i][1], ele: seg[i][2], d: dist });
+    }
+  }
+  const step = Math.max(1, Math.floor(pts.length / 300));
+  const sample = pts.filter((p, i) => i % step === 0 || i === pts.length - 1);
+  const withEle = sample.filter((p) => typeof p.ele === 'number' && isFinite(p.ele)).length;
+  let source = 'aus der GPX-Datei';
+  if (withEle < sample.length * 0.6) {
+    source = 'aus dem Höhenmodell';
+    for (const p of sample) p.ele = await demElevation(p.lon, p.lat);
+  }
+  const valid = sample.filter((p) => typeof p.ele === 'number' && isFinite(p.ele));
+  if (valid.length < 2) return { points: [], source: null, length: dist };
+  const sm = valid.map((p, i) => {
+    let s = 0, c = 0;
+    for (let k = Math.max(0, i - 2); k <= Math.min(valid.length - 1, i + 2); k++) { s += valid[k].ele; c++; }
+    return { ...p, ele: s / c };
+  });
+  let up = 0, down = 0;
+  for (let i = 1; i < sm.length; i++) {
+    const dh = sm[i].ele - sm[i - 1].ele;
+    if (dh > 0) up += dh; else down -= dh;
+  }
+  const eles = sm.map((p) => p.ele);
+  return { points: sm, source, length: dist, up, down, max: Math.max(...eles), min: Math.min(...eles) };
+}
+
+function drawProfile(prof, marker) {
+  const box = $('#ti-profile');
+  if (!prof.points.length) { box.innerHTML = '<p class="muted small">Keine Höhendaten verfügbar. Mit Internet oder geladenem Land klappt es.</p>'; return; }
+  const W = 400, H = 130, P = 4;
+  const maxD = prof.points[prof.points.length - 1].d || 1;
+  const lo = prof.min - (prof.max - prof.min) * 0.08 - 5, hi = prof.max + (prof.max - prof.min) * 0.08 + 5;
+  const X = (d) => P + (W - 2 * P) * d / maxD;
+  const Y = (e) => H - P - (H - 2 * P) * (e - lo) / (hi - lo);
+  const line = prof.points.map((p, i) => `${i ? 'L' : 'M'}${X(p.d).toFixed(1)} ${Y(p.ele).toFixed(1)}`).join(' ');
+  const area = `${line} L${X(maxD).toFixed(1)} ${H - P} L${X(0).toFixed(1)} ${H - P} Z`;
+  const color = (trackInfo.track && trackInfo.track.color) || '#4F6FE0';
+  let mark = '';
+  if (marker) mark = `<line x1="${X(marker.d)}" y1="${P}" x2="${X(marker.d)}" y2="${H - P}" class="pf-mark"/><circle cx="${X(marker.d)}" cy="${Y(marker.ele)}" r="5" class="pf-dot"/>`;
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Höhenprofil"><path d="${area}" fill="${color}" fill-opacity="0.18" stroke="none"/><path d="${line}" fill="none" stroke="${color}" stroke-width="2.2" vector-effect="non-scaling-stroke"/>${mark}</svg><div class="pf-axis"><span>${Math.round(prof.max).toLocaleString('de-DE')} m</span><span>${Math.round(prof.min).toLocaleString('de-DE')} m</span></div><div class="pf-x"><span>0</span><span>${fmtDist(maxD)}</span></div>`;
+}
+
+function highlightTrack(id) {
+  if (!map.getLayer('tracks-highlight')) return;
+  map.setFilter('tracks-highlight', ['==', ['get', 'id'], id || '__keiner__']);
+  map.setPaintProperty('tracks-line', 'line-opacity', id ? ['case', ['==', ['get', 'id'], id], 1, 0.35] : 1);
+}
+
+function setSheetPadding(sheet) {
+  let pad = { top: 0, left: 0, right: 0, bottom: 0 };
+  if (sheet && !sheet.hidden) {
+    if (wideLayout()) pad.right = sheet.offsetWidth; else pad.bottom = sheet.offsetHeight;
+  }
+  return pad;
+}
+
+async function openTrackInfo(t) {
+  if (editor.open) closeEditor();
+  closeSearch();
+  closeSheet();
+  trackInfo.open = true;
+  trackInfo.track = t;
+  trackInfo.confirmDelete = false;
+  if (!t.visible) { t.visible = true; saveTrack(t); }
+  if (settings.hidden.includes('tracks')) setCatHidden('tracks', false);
+  updateTracksSource();
+  highlightTrack(t.id);
+
+  $('#ti-name').value = t.name;
+  $('#ti-delete').textContent = 'Track löschen';
+  $('#ti-len').textContent = fmtDist(t.length);
+  for (const id of ['#ti-up', '#ti-down', '#ti-max', '#ti-min']) $(id).textContent = '…';
+  $('#ti-src').textContent = (t.source ? 'Importiert aus ' + t.source + '. ' : '') + `${t.segments.reduce((s, g) => s + g.length, 0).toLocaleString('de-DE')} Punkte`;
+  $('#ti-profile').innerHTML = '<p class="muted small">Höhenprofil wird berechnet …</p>';
+
+  // Abstand zu mir
+  let near = null;
+  if (gps.pos) {
+    for (const seg of t.segments) for (const c of seg) {
+      const d = distance(gps.pos, { lat: c[1], lon: c[0] });
+      if (!near || d < near.d) near = { d, lon: c[0], lat: c[1] };
+    }
+  }
+  $('#ti-dist').textContent = near ? fmtDist(near.d) : 'kein GPS';
+
+  const colors = $('#ti-colors');
+  colors.innerHTML = '';
+  for (const c of TRACK_COLORS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'color-dot' + (c === t.color ? ' on' : '');
+    b.dataset.color = c;
+    b.style.background = c;
+    b.setAttribute('aria-label', 'Farbe ' + c);
+    b.onclick = () => { t.color = c; saveTrack(t); updateTracksSource(); openTrackInfoColors(t); drawProfile(trackInfo.prof || { points: [] }); };
+    colors.appendChild(b);
+  }
+
+  const sheet = $('#trackinfo');
+  sheet.hidden = false;
+  sheet.querySelector('.sheet-body').scrollTop = 0;
+  requestAnimationFrame(() => {
+    gps.follow = false; $('#btn-locate').classList.remove('active');
+    map.fitBounds(trackBounds(t), { padding: { ...setSheetPadding(sheet), top: 70, left: 60, right: setSheetPadding(sheet).right + 60, bottom: setSheetPadding(sheet).bottom + 60 }, maxZoom: 15, duration: 700 });
+  });
+
+  const prof = await trackProfile(t);
+  if (trackInfo.track !== t) return;
+  trackInfo.prof = prof;
+  const m = (v) => (v === undefined || v === null || !isFinite(v)) ? '–' : Math.round(v).toLocaleString('de-DE') + ' m';
+  $('#ti-up').textContent = prof.points.length ? '+' + m(prof.up) : '–';
+  $('#ti-down').textContent = prof.points.length ? '−' + m(prof.down) : '–';
+  $('#ti-max').textContent = m(prof.max);
+  $('#ti-min').textContent = m(prof.min);
+  let marker = null;
+  if (near && near.d < 300 && prof.points.length) {
+    let best = null;
+    for (const p of prof.points) { const d = distance(p, near); if (!best || d < best.dd) best = { ...p, dd: d }; }
+    marker = best;
+  }
+  drawProfile(prof, marker);
+  if (prof.source) $('#ti-src').textContent += ` · Höhen ${prof.source}`;
+}
+
+function openTrackInfoColors(t) {
+  document.querySelectorAll('#ti-colors .color-dot').forEach((b) => b.classList.toggle('on', b.dataset.color === t.color));
+}
+
+function closeTrackInfo() {
+  if (!trackInfo.open) return;
+  const t = trackInfo.track;
+  const name = $('#ti-name').value.trim();
+  if (t && name && name !== t.name) { t.name = name; saveTrack(t); updateTracksSource(); }
+  trackInfo.open = false;
+  trackInfo.track = null;
+  $('#trackinfo').hidden = true;
+  highlightTrack(null);
+}
+
+function setupTrackInfoUI() {
+  $('#ti-close').onclick = closeTrackInfo;
+  $('#ti-done').onclick = closeTrackInfo;
+  $('#ti-fit').onclick = () => { const t = trackInfo.track; if (t) map.fitBounds(trackBounds(t), { padding: 60, maxZoom: 15 }); };
+  $('#ti-hide').onclick = () => {
+    const t = trackInfo.track;
+    if (!t) return;
+    t.visible = false; saveTrack(t);
+    closeTrackInfo();
+    updateTracksSource();
+    toast('Track ausgeblendet. Einblenden im Menü unter Tracks.');
+  };
+  $('#ti-delete').onclick = async () => {
+    const t = trackInfo.track;
+    if (!t) return;
+    if (!trackInfo.confirmDelete) { trackInfo.confirmDelete = true; $('#ti-delete').textContent = 'Wirklich löschen? Nochmal tippen'; return; }
+    await DB.run('tracks', 'readwrite', (st) => st.delete(t.id));
+    tracks = tracks.filter((x) => x !== t);
+    trackInfo.open = false; trackInfo.track = null;
+    $('#trackinfo').hidden = true;
+    highlightTrack(null);
+    updateTracksSource();
+    toast('Track gelöscht');
+  };
+  $('#ti-name').addEventListener('change', () => {
+    const t = trackInfo.track;
+    const name = $('#ti-name').value.trim();
+    if (t && name) { t.name = name; saveTrack(t); updateTracksSource(); }
+  });
 }
 
 /* ---------- Import: GPX, KML, KMZ, ZIP ---------- */
@@ -1686,6 +1906,15 @@ async function main() {
     const p = f && places.find((x) => x.id === f.properties.id);
     if (p) openEditor(p);
   });
+  map.on('click', 'tracks-hit', (e) => {
+    if (editor.moving || editor.open) return;
+    if (map.queryRenderedFeatures(e.point, { layers: ['places-icon'] }).length) return;
+    const f = e.features && e.features[0];
+    const t = f && tracks.find((x) => x.id === f.properties.id);
+    if (t) openTrackInfo(t);
+  });
+  map.on('mouseenter', 'tracks-hit', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'tracks-hit', () => { map.getCanvas().style.cursor = ''; });
   map.on('mouseenter', 'places-icon', () => { map.getCanvas().style.cursor = 'pointer'; });
   map.on('mouseleave', 'places-icon', () => { map.getCanvas().style.cursor = ''; });
   map.on('move', () => { if (editor.open && editor.moving) updateEditorCoords(); });

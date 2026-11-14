@@ -146,6 +146,35 @@
   </div>
 </aside>
 
+<aside class="sheet spot" id="trackinfo" aria-label="Track-Infos" hidden>
+  <div class="sheet-head">
+    <h1>Track</h1>
+    <button class="round" id="ti-close" aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </div>
+  <div class="sheet-body">
+    <label class="field ti-namefield"><span>Name</span><input id="ti-name" type="text" autocomplete="off" enterkeyhint="done"></label>
+    <div class="stats">
+      <div><span class="lbl">Länge</span><b id="ti-len">–</b></div>
+      <div><span class="lbl">Anstieg</span><b id="ti-up">–</b></div>
+      <div><span class="lbl">Abstieg</span><b id="ti-down">–</b></div>
+      <div><span class="lbl">Höchster Punkt</span><b id="ti-max">–</b></div>
+      <div><span class="lbl">Tiefster Punkt</span><b id="ti-min">–</b></div>
+      <div><span class="lbl">Abstand zu dir</span><b id="ti-dist">–</b></div>
+    </div>
+    <h2>Höhenprofil</h2>
+    <div class="profile" id="ti-profile"></div>
+    <p class="muted small" id="ti-src"></p>
+    <h2>Farbe</h2>
+    <div class="colors" id="ti-colors"></div>
+    <button class="btn wide" id="ti-fit">Ganzen Track zeigen</button>
+    <div class="spot-actions">
+      <button class="btn" id="ti-hide">Ausblenden</button>
+      <button class="btn primary" id="ti-done">Fertig</button>
+    </div>
+    <button class="btn danger wide" id="ti-delete">Track löschen</button>
+  </div>
+</aside>
+
 <div class="crosshair" id="crosshair" hidden aria-hidden="true">
   <svg viewBox="0 0 24 24"><path d="M12 22.5s7.5-6.4 7.5-12.5a7.5 7.5 0 0 0-15 0c0 6.1 7.5 12.5 7.5 12.5Z"/><circle cx="12" cy="10" r="2.8"/></svg>
 </div>
