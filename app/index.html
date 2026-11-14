@@ -75,11 +75,49 @@
     <p class="muted small" id="storage"></p>
 
     <h2>Meine Plätze</h2>
-    <div class="row static"><span><b id="places-count">0 Plätze</b><small>Mit „Platz hier“ gespeichert</small></span><button class="btn" id="btn-gpx">Als GPX teilen</button></div>
+    <div class="row static"><span><b id="places-count">0 Plätze</b><small>Antippen zum Bearbeiten</small></span><button class="btn" id="btn-gpx">Als GPX teilen</button></div>
+    <div class="place-list" id="place-list"></div>
+    <p class="muted small">Neuer Platz: „Platz hier“ oder lange auf die Karte drücken.</p>
 
     <p class="muted small foot">Kartendaten © OpenStreetMap-Mitwirkende · Protomaps · Höhen: Mapterhorn<br>Version __BUILD__</p>
   </div>
 </aside>
+
+
+<aside class="sheet spot" id="spot" aria-label="Platz bearbeiten" hidden>
+  <div class="sheet-head">
+    <h1 id="spot-title">Neuer Platz</h1>
+    <button class="round" id="spot-close" aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </div>
+  <div class="sheet-body">
+    <div class="photos" id="spot-photos">
+      <label class="photo-add" id="spot-photo-add">
+        <input type="file" accept="image/*" multiple id="spot-file">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4Z"/><circle cx="12" cy="13" r="3.5"/></svg>
+        <span>Foto</span>
+      </label>
+    </div>
+    <h2>Kategorie</h2>
+    <div class="chips" id="spot-cats"></div>
+    <label class="field"><span>Name</span><input id="spot-name" type="text" placeholder="z. B. Seeufer, windgeschützt" enterkeyhint="done" autocomplete="off"></label>
+    <div class="rating-row"><h2>Bewertung</h2><div class="stars" id="spot-stars"></div></div>
+    <h2>Merkmale</h2>
+    <div class="chips" id="spot-feats"></div>
+    <label class="field"><span>Notiz</span><textarea id="spot-note" rows="4" placeholder="Untergrund, Zufahrt, Wasser, Hinweise für später …"></textarea></label>
+    <p class="coords" id="spot-coords"></p>
+    <button class="btn wide" id="spot-move">Position verschieben</button>
+    <div class="spot-actions">
+      <button class="btn" id="spot-cancel">Abbrechen</button>
+      <button class="btn primary" id="spot-save">Speichern</button>
+    </div>
+    <button class="btn danger wide" id="spot-delete">Platz löschen</button>
+  </div>
+</aside>
+
+<div class="crosshair" id="crosshair" hidden aria-hidden="true">
+  <svg viewBox="0 0 24 24"><path d="M12 22.5s7.5-6.4 7.5-12.5a7.5 7.5 0 0 0-15 0c0 6.1 7.5 12.5 7.5 12.5Z"/><circle cx="12" cy="10" r="2.8"/></svg>
+</div>
+<div class="move-hint panel" id="move-hint" hidden>Karte verschieben, bis die Nadel genau auf dem Platz sitzt</div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="fatal" id="fatal" hidden></div>

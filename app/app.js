@@ -182,13 +182,6 @@ function applyThemeClass() {
 let demSource = null;
 let map = null;
 
-function placesGeoJSON() {
-  return {
-    type: 'FeatureCollection',
-    features: places.map((p) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [p.lon, p.lat] }, properties: { name: p.name } }))
-  };
-}
-
 function buildStyle() {
   const dark = isDark();
   const flavorName = dark ? 'dark' : 'light';
@@ -226,12 +219,12 @@ function buildStyle() {
 
   layers.push(
     {
-      id: 'places-dot', type: 'circle', source: 'places',
-      paint: { 'circle-radius': 9, 'circle-color': '#FF7A1A', 'circle-stroke-color': dark ? '#0B0F12' : '#FFFFFF', 'circle-stroke-width': 3 }
+      id: 'places-icon', type: 'symbol', source: 'places',
+      layout: { 'icon-image': ['concat', 'cat-', ['get', 'cat']], 'icon-allow-overlap': true, 'icon-ignore-placement': true }
     },
     {
       id: 'places-label', type: 'symbol', source: 'places',
-      layout: { 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Medium'], 'text-size': 13, 'text-offset': [0, 1.3], 'text-anchor': 'top' },
+      layout: { 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Medium'], 'text-size': 13, 'text-offset': [0, 1.5], 'text-anchor': 'top', 'text-optional': true },
       paint: { 'text-color': dark ? '#EEF2F4' : '#15191D', 'text-halo-color': dark ? '#0B0F12' : '#FFFFFF', 'text-halo-width': 1.5 }
     }
   );
@@ -271,7 +264,7 @@ function refreshStyle() {
 }
 
 /* ---------- GPS ---------- */
-const gps = { pos: null, last: null, heading: null, speed: null, follow: true, watch: null };
+const gps = { pos: null, last: null, heading: null, speed: null, alt: null, follow: true, watch: null };
 let meMarker = null;
 
 function compassText(deg) {
@@ -307,6 +300,7 @@ function onPosition(p) {
   if (heading !== null && (speed === null || speed > 0.8)) gps.heading = heading;
   gps.speed = speed;
   gps.pos = cur;
+  gps.alt = (c.altitude === null || c.altitude === undefined) ? null : c.altitude;
 
   $('#spd').textContent = speed === null ? '0' : Math.round(speed * 3.6);
   $('#crs').textContent = gps.heading === null ? '–' : compassText(gps.heading);
@@ -326,9 +320,9 @@ function onPosition(p) {
 
   if (!gps.hadFix) {
     gps.hadFix = true;
-    if (gps.follow) map.jumpTo({ center: [cur.lon, cur.lat], zoom: Math.max(map.getZoom(), 14) });
+    if (gps.follow && !editor.open) map.jumpTo({ center: [cur.lon, cur.lat], zoom: Math.max(map.getZoom(), 14) });
   }
-  if (gps.follow) {
+  if (gps.follow && !editor.open) {
     const moving = speed !== null && speed > 1.5;
     const opts = { center: [cur.lon, cur.lat], duration: 700, essential: true };
     if (settings.headingUp && moving && gps.heading !== null) opts.bearing = gps.heading;
@@ -361,6 +355,7 @@ function startGPS() {
 }
 
 function locateNow() {
+  if (editor.open) closeEditor();
   gps.follow = true;
   $('#btn-locate').classList.add('active');
   if (gps.pos) {
@@ -413,27 +408,358 @@ window.addEventListener('online', () => { Tiles.reset(); updateChip(); });
 window.addEventListener('offline', () => { Tiles.reset(); updateChip(); });
 
 /* ---------- Plätze ---------- */
+const CATS = [
+  { id: 'wild', label: 'Wildcamping', color: '#FF7A1A', ink: '#140A02', d: 'M2 20h20M4 20 12 5l8 15M12 20l-3-5M12 20l3-5' },
+  { id: 'camp', label: 'Campingplatz', color: '#2F9E44', ink: '#FFFFFF', d: 'M3 20h18M5 20V10l7-6 7 6v10M10 20v-5h4v5' },
+  { id: 'water', label: 'Wasser', color: '#1C7ED6', ink: '#FFFFFF', d: 'M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z' },
+  { id: 'mech', label: 'Werkstatt', color: '#6741D9', ink: '#FFFFFF', d: 'M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4Z' },
+  { id: 'fuel', label: 'Diesel', color: '#495057', ink: '#FFFFFF', d: 'M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12M4 10h10M14 8l3 3v6a1.5 1.5 0 0 0 3 0V9l-3-3' },
+  { id: 'border', label: 'Grenze', color: '#C2255C', ink: '#FFFFFF', d: 'M5 21V4M5 4h11l-2 4 2 4H5' },
+  { id: 'warn', label: 'Warnung', color: '#F59F00', ink: '#2A1E00', d: 'M12 4 2.5 20h19ZM12 10v4M12 17h.01' },
+  { id: 'other', label: 'Sonstiges', color: '#868E96', ink: '#FFFFFF', d: 'M12 21s6-5.4 6-10.5a6 6 0 0 0-12 0C6 15.6 12 21 12 21ZM12 10.5h.01' }
+];
+const CAT = Object.fromEntries(CATS.map((c) => [c.id, c]));
+const FEATS = [
+  ['eben', 'Eben'], ['wind', 'Windgeschützt'], ['wasser', 'Wasser in der Nähe'],
+  ['netz', 'Handynetz'], ['ruhig', 'Ruhig'], ['allrad', 'Nur mit Allrad'], ['schatten', 'Schatten']
+];
+
+// ältere Einträge auf das neue Format bringen
+places = places.map((p, i) => ({
+  id: p.id || Date.now() + i,
+  name: p.name || 'Platz ' + (i + 1),
+  cat: CAT[p.cat] ? p.cat : 'wild',
+  rating: p.rating || 0,
+  feats: Array.isArray(p.feats) ? p.feats : [],
+  note: p.note || '',
+  photos: Array.isArray(p.photos) ? p.photos : [],
+  lat: p.lat, lon: p.lon,
+  ele: typeof p.ele === 'number' ? p.ele : (parseInt(String(p.ele || '').replace(/\D/g, ''), 10) || null),
+  time: p.time || new Date().toISOString(),
+  updated: p.updated || p.time || new Date().toISOString()
+}));
+
+function placesGeoJSON() {
+  return {
+    type: 'FeatureCollection',
+    features: places.map((p) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
+      properties: { id: p.id, name: p.name, cat: p.cat }
+    }))
+  };
+}
+
+function placeIconImage(cat) {
+  const c = CAT[cat] || CAT.other;
+  const ratio = 2, size = 44;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = size * ratio;
+  const g = cv.getContext('2d');
+  g.scale(ratio, ratio);
+  g.beginPath();
+  g.arc(size / 2, size / 2, 18, 0, Math.PI * 2);
+  g.fillStyle = c.color;
+  g.fill();
+  g.lineWidth = 3;
+  g.strokeStyle = isDark() ? '#0B0F12' : '#FFFFFF';
+  g.stroke();
+  g.translate(size / 2 - 10.8, size / 2 - 10.8);
+  g.scale(0.9, 0.9);
+  g.strokeStyle = c.ink;
+  g.lineWidth = 2.4;
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  g.stroke(new Path2D(c.d));
+  return { image: g.getImageData(0, 0, size * ratio, size * ratio), ratio };
+}
+
 function savePlaces() {
   store.set('places', places);
   const src = map && map.getSource('places');
   if (src) src.setData(placesGeoJSON());
   $('#places-count').textContent = places.length + (places.length === 1 ? ' Platz' : ' Plätze');
+  renderPlaceList();
 }
 
-function addPlaceHere() {
-  const p = gps.pos ? { lat: gps.pos.lat, lon: gps.pos.lon } : (() => { const c = map.getCenter(); return { lat: c.lat, lon: c.lng }; })();
-  const alt = $('#alt').textContent;
-  const n = places.length + 1;
-  const now = new Date();
-  places.push({ id: now.getTime(), name: 'Platz ' + n, lat: +p.lat.toFixed(6), lon: +p.lon.toFixed(6), ele: alt, time: now.toISOString() });
+/* Fotos: verkleinert in IndexedDB */
+const PhotoDB = {
+  db: null,
+  open() {
+    if (this.db) return Promise.resolve(this.db);
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open('overland', 1);
+      req.onupgradeneeded = () => req.result.createObjectStore('photos');
+      req.onsuccess = () => { this.db = req.result; resolve(this.db); };
+      req.onerror = () => reject(req.error);
+    });
+  },
+  async run(mode, fn) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('photos', mode);
+      const r = fn(tx.objectStore('photos'));
+      tx.oncomplete = () => resolve(r && r.result);
+      tx.onerror = () => reject(tx.error);
+    });
+  },
+  put(id, blob) { return this.run('readwrite', (s) => s.put(blob, id)); },
+  get(id) { return this.run('readonly', (s) => s.get(id)); },
+  del(id) { return this.run('readwrite', (s) => s.delete(id)); }
+};
+
+async function shrinkPhoto(file) {
+  try {
+    const bmp = await createImageBitmap(file);
+    const max = 1600;
+    const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    const cv = document.createElement('canvas');
+    cv.width = Math.round(bmp.width * k);
+    cv.height = Math.round(bmp.height * k);
+    cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+    return await new Promise((res) => cv.toBlob((b) => res(b || file), 'image/jpeg', 0.82));
+  } catch (e) { return file; }
+}
+
+/* Bearbeiten-Fenster */
+const editor = { open: false, id: null, draft: null, moving: false, newPhotos: [], removedPhotos: [], confirmDelete: false };
+
+function wideLayout() { return window.innerWidth > 600; }
+
+function setEditorPadding() {
+  const sheet = $('#spot');
+  let pad = { top: 0, left: 0, right: 0, bottom: 0 };
+  if (editor.open) {
+    if (wideLayout()) pad.right = sheet.offsetWidth;
+    else pad.bottom = sheet.offsetHeight;
+  }
+  document.documentElement.style.setProperty('--pad-r', pad.right + 'px');
+  document.documentElement.style.setProperty('--pad-b', pad.bottom + 'px');
+  return pad;
+}
+
+function editorCenter() {
+  if (editor.moving) { const c = map.getCenter(); return { lat: c.lat, lon: c.lng }; }
+  return { lat: editor.draft.lat, lon: editor.draft.lon };
+}
+
+function updateEditorCoords() {
+  if (!editor.open) return;
+  const c = editorCenter();
+  const ele = editor.draft.ele ? ' · ' + editor.draft.ele.toLocaleString('de-DE') + ' m' : '';
+  $('#spot-coords').textContent = `${c.lat.toFixed(5).replace('.', ',')}° N · ${c.lon.toFixed(5).replace('.', ',')}° O${ele}`;
+}
+
+function setMoving(on) {
+  editor.moving = on;
+  $('#crosshair').hidden = !on;
+  $('#move-hint').hidden = !on;
+  $('#spot-move').textContent = on ? 'Position wird verschoben …' : 'Position verschieben';
+  $('#spot-move').disabled = on;
+  if (map.getLayer('places-icon')) {
+    const f = on && editor.id ? ['!=', ['get', 'id'], editor.id] : null;
+    map.setFilter('places-icon', f);
+    map.setFilter('places-label', f);
+  }
+  updateEditorCoords();
+}
+
+function renderChips() {
+  const cats = $('#spot-cats');
+  cats.innerHTML = '';
+  for (const c of CATS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip-btn' + (editor.draft.cat === c.id ? ' on' : '');
+    b.setAttribute('aria-pressed', String(editor.draft.cat === c.id));
+    b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${c.d}"/></svg><span></span>`;
+    b.querySelector('span').textContent = c.label;
+    b.onclick = () => { editor.draft.cat = c.id; renderChips(); };
+    cats.appendChild(b);
+  }
+  const feats = $('#spot-feats');
+  feats.innerHTML = '';
+  for (const [id, label] of FEATS) {
+    const on = editor.draft.feats.includes(id);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip-btn small' + (on ? ' on-soft' : '');
+    b.setAttribute('aria-pressed', String(on));
+    b.textContent = label;
+    b.onclick = () => {
+      const f = editor.draft.feats;
+      editor.draft.feats = on ? f.filter((x) => x !== id) : [...f, id];
+      renderChips();
+    };
+    feats.appendChild(b);
+  }
+  const stars = $('#spot-stars');
+  stars.innerHTML = '';
+  for (let n = 1; n <= 5; n++) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'star' + (n <= editor.draft.rating ? ' on' : '');
+    b.setAttribute('aria-label', n + (n === 1 ? ' Stern' : ' Sterne'));
+    b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.8 6.2.9-4.5 4.4 1 6.2L12 17.4 6.5 20.3l1-6.2L3 9.7l6.2-.9Z"/></svg>';
+    b.onclick = () => { editor.draft.rating = editor.draft.rating === n ? 0 : n; renderChips(); };
+    stars.appendChild(b);
+  }
+}
+
+async function renderPhotos() {
+  const box = $('#spot-photos');
+  box.querySelectorAll('.thumb').forEach((t) => { URL.revokeObjectURL(t.dataset.url); t.remove(); });
+  const add = $('#spot-photo-add');
+  const all = [...editor.draft.photos.filter((id) => !editor.removedPhotos.includes(id)).map((id) => ({ id })), ...editor.newPhotos];
+  for (const ph of all) {
+    let blob = ph.blob;
+    if (!blob) { try { blob = await PhotoDB.get(ph.id); } catch (e) { blob = null; } }
+    if (!blob) continue;
+    const url = URL.createObjectURL(blob);
+    const div = document.createElement('div');
+    div.className = 'thumb';
+    div.dataset.url = url;
+    div.style.backgroundImage = `url("${url}")`;
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'thumb-del';
+    del.setAttribute('aria-label', 'Foto entfernen');
+    del.textContent = '×';
+    del.onclick = () => {
+      if (ph.blob) editor.newPhotos = editor.newPhotos.filter((x) => x !== ph);
+      else editor.removedPhotos.push(ph.id);
+      renderPhotos();
+    };
+    div.appendChild(del);
+    box.insertBefore(div, add);
+  }
+}
+
+function openEditor(place, at) {
+  $('#sheet').hidden = true;
+  gps.follow = false;
+  $('#btn-locate').classList.remove('active');
+  const isNew = !place;
+  let ele = null;
+  if (isNew && gps.pos && gps.alt !== null && at && distance(gps.pos, at) < 60) ele = Math.round(gps.alt);
+  editor.open = true;
+  editor.id = isNew ? null : place.id;
+  editor.draft = isNew
+    ? { name: '', cat: 'wild', rating: 0, feats: [], note: '', photos: [], lat: at.lat, lon: at.lon, ele }
+    : JSON.parse(JSON.stringify(place));
+  editor.newPhotos = [];
+  editor.removedPhotos = [];
+  editor.confirmDelete = false;
+
+  $('#spot-title').textContent = isNew ? 'Neuer Platz' : 'Platz bearbeiten';
+  $('#spot-name').value = editor.draft.name;
+  $('#spot-note').value = editor.draft.note;
+  $('#spot-delete').hidden = isNew;
+  $('#spot-delete').textContent = 'Platz löschen';
+  $('#spot-move').hidden = isNew;
+  renderChips();
+  renderPhotos();
+
+  const sheet = $('#spot');
+  sheet.hidden = false;
+  sheet.querySelector('.sheet-body').scrollTop = 0;
+  requestAnimationFrame(() => {
+    const padding = setEditorPadding();
+    map.easeTo({ center: [editor.draft.lon, editor.draft.lat], zoom: Math.max(map.getZoom(), 15), padding, duration: 500 });
+    setMoving(isNew);
+  });
+}
+
+function closeEditor() {
+  editor.open = false;
+  $('#spot').hidden = true;
+  $('#crosshair').hidden = true;
+  $('#move-hint').hidden = true;
+  editor.moving = false;
+  if (map.getLayer('places-icon')) { map.setFilter('places-icon', null); map.setFilter('places-label', null); }
+  map.easeTo({ padding: setEditorPadding(), duration: 300 });
+}
+
+async function saveEditor() {
+  const d = editor.draft;
+  const c = editorCenter();
+  d.lat = +c.lat.toFixed(6);
+  d.lon = +c.lon.toFixed(6);
+  d.note = $('#spot-note').value.trim();
+  const now = new Date().toISOString();
+  if (!editor.id) {
+    const n = places.filter((p) => p.cat === d.cat).length + 1;
+    d.name = $('#spot-name').value.trim() || `${CAT[d.cat].label} ${n}`;
+  } else {
+    d.name = $('#spot-name').value.trim() || d.name;
+  }
+  for (const id of editor.removedPhotos) { try { await PhotoDB.del(id); } catch (e) { /* egal */ } }
+  d.photos = d.photos.filter((id) => !editor.removedPhotos.includes(id));
+  for (const ph of editor.newPhotos) {
+    const id = 'ph-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+    try { await PhotoDB.put(id, ph.blob); d.photos.push(id); } catch (e) { toast('Foto konnte nicht gespeichert werden.'); }
+  }
+  d.updated = now;
+  if (editor.id) {
+    places = places.map((p) => (p.id === editor.id ? d : p));
+  } else {
+    d.id = Date.now();
+    d.time = now;
+    places.push(d);
+  }
   savePlaces();
-  toast(gps.pos ? `Platz ${n} gespeichert` : `Platz ${n} in der Kartenmitte gespeichert (kein GPS)`);
+  toast(`„${d.name}“ gespeichert`);
+  closeEditor();
+}
+
+async function deleteEditorPlace() {
+  if (!editor.confirmDelete) {
+    editor.confirmDelete = true;
+    $('#spot-delete').textContent = 'Wirklich löschen? Nochmal tippen';
+    return;
+  }
+  const p = places.find((x) => x.id === editor.id);
+  if (p) for (const id of p.photos) { try { await PhotoDB.del(id); } catch (e) { /* egal */ } }
+  places = places.filter((x) => x.id !== editor.id);
+  savePlaces();
+  toast('Platz gelöscht');
+  closeEditor();
+}
+
+function newPlaceHere() {
+  const at = gps.pos ? { lat: gps.pos.lat, lon: gps.pos.lon } : (() => { const c = map.getCenter(); return { lat: c.lat, lon: c.lng }; })();
+  if (!gps.pos) toast('Kein GPS – Platz startet in der Kartenmitte');
+  openEditor(null, at);
+}
+
+function renderPlaceList() {
+  const box = $('#place-list');
+  if (!box) return;
+  box.innerHTML = '';
+  const ref = gps.pos || (map ? { lat: map.getCenter().lat, lon: map.getCenter().lng } : null);
+  const list = places.map((p) => ({ p, d: ref ? distance(ref, p) : 0 })).sort((a, b) => a.d - b.d);
+  for (const { p, d } of list) {
+    const c = CAT[p.cat] || CAT.other;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'place-item';
+    b.innerHTML = `<span class="pi-icon" style="background:${c.color};color:${c.ink}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${c.d}"/></svg></span><span class="pi-txt"><b></b><small></small></span>`;
+    b.querySelector('b').textContent = p.name;
+    const km = d >= 1000 ? (d / 1000).toFixed(1).replace('.', ',') + ' km' : Math.round(d) + ' m';
+    b.querySelector('small').textContent = `${c.label}${p.rating ? ' · ' + '★'.repeat(p.rating) : ''}${ref ? ' · ' + km : ''}`;
+    b.onclick = () => openEditor(p);
+    box.appendChild(b);
+  }
 }
 
 function exportGPX() {
   if (!places.length) { toast('Noch keine Plätze gespeichert.'); return; }
   const esc = (s) => String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
-  const wpts = places.map((p) => `  <wpt lat="${p.lat}" lon="${p.lon}"><time>${p.time}</time><name>${esc(p.name)}</name></wpt>`).join('\n');
+  const wpts = places.map((p) => {
+    const feats = p.feats.map((f) => (FEATS.find((x) => x[0] === f) || [f, f])[1]);
+    const desc = [p.rating ? p.rating + '/5 Sterne' : '', feats.join(', '), p.note].filter(Boolean).join('\n');
+    return `  <wpt lat="${p.lat}" lon="${p.lon}">${p.ele ? `<ele>${p.ele}</ele>` : ''}<time>${p.time}</time><name>${esc(p.name)}</name>${desc ? `<desc>${esc(desc)}</desc>` : ''}<type>${esc((CAT[p.cat] || CAT.other).label)}</type></wpt>`;
+  }).join('\n');
   const gpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Overland-Navi" xmlns="http://www.topografix.com/GPX/1/1">\n${wpts}\n</gpx>\n`;
   const file = new File([gpx], 'overland-plaetze.gpx', { type: 'application/gpx+xml' });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -445,6 +771,46 @@ function exportGPX() {
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   }
+}
+
+function setupEditorUI() {
+  $('#spot-close').onclick = closeEditor;
+  $('#spot-cancel').onclick = closeEditor;
+  $('#spot-save').onclick = saveEditor;
+  $('#spot-delete').onclick = deleteEditorPlace;
+  $('#spot-move').onclick = () => {
+    map.easeTo({ center: [editor.draft.lon, editor.draft.lat], duration: 300 });
+    setMoving(true);
+  };
+  $('#spot-file').onchange = async (e) => {
+    const files = [...e.target.files];
+    e.target.value = '';
+    for (const f of files) editor.newPhotos.push({ blob: await shrinkPhoto(f) });
+    renderPhotos();
+  };
+  window.addEventListener('resize', () => { if (editor.open) map.easeTo({ padding: setEditorPadding(), duration: 0 }); });
+}
+
+/* Langes Drücken auf die Karte legt einen Platz an */
+function setupLongPress() {
+  let timer = null, start = null;
+  const cancel = () => { clearTimeout(timer); timer = null; };
+  map.on('touchstart', (e) => {
+    cancel();
+    if (editor.open || !e.originalEvent || e.originalEvent.touches.length !== 1) return;
+    start = e.point;
+    const ll = e.lngLat;
+    timer = setTimeout(() => {
+      timer = null;
+      if (navigator.vibrate) navigator.vibrate(20);
+      openEditor(null, { lat: ll.lat, lon: ll.lng });
+    }, 650);
+  });
+  map.on('touchmove', (e) => { if (timer && start && (Math.abs(e.point.x - start.x) > 10 || Math.abs(e.point.y - start.y) > 10)) cancel(); });
+  map.on('touchend', cancel);
+  map.on('touchcancel', cancel);
+  map.on('movestart', (e) => { if (e.originalEvent) cancel(); });
+  map.on('contextmenu', (e) => { if (!editor.open) openEditor(null, { lat: e.lngLat.lat, lon: e.lngLat.lng }); });
 }
 
 /* ---------- Offline-Karten herunterladen ---------- */
@@ -577,7 +943,7 @@ async function updateStorage() {
 /* ---------- Bedienelemente ---------- */
 function setupUI() {
   const sheet = $('#sheet');
-  $('#btn-layers').onclick = () => { renderRegions(); updateStorage(); sheet.hidden = false; };
+  $('#btn-layers').onclick = () => { if (editor.open) closeEditor(); renderRegions(); updateStorage(); renderPlaceList(); sheet.hidden = false; };
   $('#sheet-close').onclick = () => { sheet.hidden = true; };
 
   document.querySelectorAll('.seg button').forEach((b) => {
@@ -614,7 +980,8 @@ function setupUI() {
   $('#btn-locate').onclick = locateNow;
   $('#zin').onclick = () => map.zoomIn();
   $('#zout').onclick = () => map.zoomOut();
-  $('#fab').onclick = addPlaceHere;
+  $('#fab').onclick = newPlaceHere;
+  setupEditorUI();
   $('#btn-gpx').onclick = exportGPX;
   savePlaces();
   updateCompassButton();
@@ -695,6 +1062,21 @@ async function main() {
     updateChip();
   });
   map.on('load', updateChip);
+  map.on('styleimagemissing', (e) => {
+    if (!e.id || !e.id.startsWith('cat-') || map.hasImage(e.id)) return;
+    const { image, ratio } = placeIconImage(e.id.slice(4));
+    map.addImage(e.id, image, { pixelRatio: ratio });
+  });
+  map.on('click', 'places-icon', (e) => {
+    if (editor.moving) return;
+    const f = e.features && e.features[0];
+    const p = f && places.find((x) => x.id === f.properties.id);
+    if (p) openEditor(p);
+  });
+  map.on('mouseenter', 'places-icon', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'places-icon', () => { map.getCanvas().style.cursor = ''; });
+  map.on('move', () => { if (editor.open && editor.moving) updateEditorCoords(); });
+  setupLongPress();
   map.on('error', (e) => { if (e && e.error) console.warn('Karte:', e.error.message || e.error); });
 
   setupUI();
