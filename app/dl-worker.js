@@ -1,44 +1,68 @@
-/* Lädt Kartendateien in den privaten App-Speicher (Origin Private File System). */
+/* Lädt ein Kartengebiet: schneidet Karte und Höhenmodell direkt aus den großen Online-Archiven aus
+ * und speichert alles im privaten App-Speicher (Origin Private File System). */
 'use strict';
+importScripts('extract.js');
+
+async function writeWhole(root, name, bytes) {
+  const fh = await root.getFileHandle(name, { create: true });
+  const h = await fh.createSyncAccessHandle();
+  try { h.truncate(0); h.write(bytes, { at: 0 }); h.flush(); } finally { h.close(); }
+}
+
+async function remove(root, name) {
+  try { await root.removeEntry(name); } catch (e) { /* gab es nicht */ }
+}
 
 self.onmessage = async (e) => {
-  const files = e.data.files || [];
-  let before = 0;
-  let lastPost = 0;
+  const { id, boxes, maxzoom, demMaxzoom, sources, searchUrl } = e.data;
+  const post = (m) => self.postMessage(m);
   try {
     const root = await navigator.storage.getDirectory();
-    for (const f of files) {
-      try { await root.removeEntry(f.name + '.ok'); } catch (err) { /* gab es noch nicht */ }
-      const handle = await root.getFileHandle(f.name, { create: true });
-      const access = await handle.createSyncAccessHandle();
+    for (const layer of ['base', 'dem']) await remove(root, `${id}-${layer}.idx.ok`);
+
+    const layers = [['base', sources.base, maxzoom], ['dem', sources.dem, demMaxzoom]];
+    const plans = [];
+    for (const [layer, url, mz] of layers) {
+      const src = OvlExtract.httpSource(url);
+      const plan = await OvlExtract.planExtract(src, boxes, mz, (s) => post({ type: 'scan', layer, tiles: s.tiles }));
+      plans.push({ layer, src, plan });
+    }
+    const total = plans.reduce((s, p) => s + p.plan.bytes, 0);
+    let before = 0;
+    let lastPost = 0;
+    for (const { layer, src, plan } of plans) {
+      const fh = await root.getFileHandle(`${id}-${layer}.dat`, { create: true });
+      const access = await fh.createSyncAccessHandle();
+      let index;
       try {
         access.truncate(0);
-        const resp = await fetch(f.url, { cache: 'no-store' });
-        if (!resp.ok || !resp.body) throw new Error('Server antwortet mit ' + resp.status);
-        const reader = resp.body.getReader();
-        let pos = 0;
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          access.write(value, { at: pos });
-          pos += value.byteLength;
+        index = await OvlExtract.runExtract(src, plan, async (bytes, pos) => { access.write(bytes, { at: pos }); }, (s) => {
           const now = Date.now();
-          if (now - lastPost > 250) {
-            lastPost = now;
-            self.postMessage({ type: 'progress', loaded: before + pos });
-          }
-        }
+          if (now - lastPost > 300) { lastPost = now; post({ type: 'progress', loaded: before + s.loaded, total }); }
+        });
         access.flush();
-        if (f.size && pos !== f.size) throw new Error('Datei unvollständig (' + pos + ' von ' + f.size + ' Bytes)');
-        before += pos;
       } finally {
         access.close();
       }
-      await root.getFileHandle(f.name + '.ok', { create: true });
-      self.postMessage({ type: 'progress', loaded: before });
+      await writeWhole(root, `${id}-${layer}.idx`, index);
+      await root.getFileHandle(`${id}-${layer}.idx.ok`, { create: true });
+      before += plan.bytes;
+      post({ type: 'progress', loaded: before, total });
     }
-    self.postMessage({ type: 'done' });
+
+    if (searchUrl) {
+      try {
+        const r = await fetch(searchUrl);
+        if (r.ok) await writeWhole(root, `${id}-search.json`, new Uint8Array(await r.arrayBuffer()));
+      } catch (err) { /* Suche bleibt online */ }
+    }
+    // ältere Fassung dieses Gebiets aufräumen
+    for (const layer of ['base', 'dem']) {
+      await remove(root, `${id}-${layer}.pmtiles.ok`);
+      await remove(root, `${id}-${layer}.pmtiles`);
+    }
+    post({ type: 'done' });
   } catch (err) {
-    self.postMessage({ type: 'error', message: err && err.message ? err.message : String(err) });
+    post({ type: 'error', message: err && err.message ? err.message : String(err) });
   }
 };

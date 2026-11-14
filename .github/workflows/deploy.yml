@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    # jeden Montag: aktuellen Kartenstand und Suchindex erneuern
+    - cron: '23 4 * * 1'
 
 permissions:
   contents: read
@@ -38,45 +41,69 @@ jobs:
           gh release download -R protomaps/go-pmtiles -p '*Linux_x86_64.tar.gz' -O pmtiles.tgz
           tar xzf pmtiles.tgz pmtiles
           sudo mv pmtiles /usr/local/bin/
-          pmtiles version || true
+
+      - name: Aktuellen Protomaps-Stand suchen
+        id: build
+        run: |
+          for i in $(seq 0 21); do
+            d=$(date -u -d "-$i day" +%Y%m%d)
+            if curl -sfI "https://build.protomaps.com/$d.pmtiles" > /dev/null; then echo "date=$d" >> "$GITHUB_OUTPUT"; echo "Protomaps-Build: $d"; exit 0; fi
+          done
+          echo "Kein Protomaps-Build gefunden"; exit 1
+
+      - name: Ausschneider der App gegen das offizielle Werkzeug testen
+        env:
+          BASE_URL: https://build.protomaps.com/${{ steps.build.outputs.date }}.pmtiles
+          DEM_URL: https://download.mapterhorn.com/planet.pmtiles
+        run: |
+          set -e
+          B=13.35,52.48,13.42,52.53
+          pmtiles extract "$BASE_URL" ref-base.pmtiles --bbox=$B --maxzoom=13
+          node scripts/test_extract.js "$BASE_URL" ref-base.pmtiles "$B" 13
+          pmtiles extract "$DEM_URL" ref-dem.pmtiles --bbox=$B --maxzoom=10
+          node scripts/test_extract.js "$DEM_URL" ref-dem.pmtiles "$B" 10
 
       - name: Kalenderwoche bestimmen
         id: week
         run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
 
-      - name: Kartendaten aus dem Cache holen
+      - name: Suchdaten aus dem Cache holen
         uses: actions/cache@v4
         with:
           path: data-cache
-          key: data-${{ hashFiles('regions.json') }}-${{ steps.week.outputs.week }}
+          key: data2-${{ hashFiles('regions.json', 'scripts/build_search.py') }}-${{ steps.week.outputs.week }}
 
-      - name: Kartendaten schneiden (OpenStreetMap + Höhenmodell)
+      - name: Downloadgrößen der Länder ermitteln
+        env:
+          BASE_URL: https://build.protomaps.com/${{ steps.build.outputs.date }}.pmtiles
+          DEM_URL: https://download.mapterhorn.com/planet.pmtiles
         run: |
           set -euo pipefail
           mkdir -p data-cache
-          BUILD=""
-          for i in $(seq 0 21); do
-            d=$(date -u -d "-$i day" +%Y%m%d)
-            if curl -sfI "https://build.protomaps.com/$d.pmtiles" > /dev/null; then BUILD=$d; break; fi
-          done
-          if [ -z "$BUILD" ]; then echo "Kein Protomaps-Build gefunden"; exit 1; fi
-          echo "Protomaps-Build: $BUILD"
-          [ -f data-cache/build.txt ] || echo "$BUILD" > data-cache/build.txt
-          for id in $(jq -r '.[].id' regions.json); do
-            bbox=$(jq -r ".[] | select(.id==\"$id\") | .bbox | map(tostring) | join(\",\")" regions.json)
-            mz=$(jq -r ".[] | select(.id==\"$id\") | .maxzoom" regions.json)
-            dmz=$(jq -r ".[] | select(.id==\"$id\") | .demMaxzoom" regions.json)
-            mkdir -p "data-cache/$id"
-            if [ ! -s "data-cache/$id/base.pmtiles" ]; then
-              echo "== $id: Karte (bis Zoom $mz)"
-              pmtiles extract "https://build.protomaps.com/$BUILD.pmtiles" "data-cache/$id/base.pmtiles" --bbox="$bbox" --maxzoom="$mz" --download-threads=8
-            fi
-            if [ ! -s "data-cache/$id/dem.pmtiles" ]; then
-              echo "== $id: Höhenmodell (bis Zoom $dmz)"
-              pmtiles extract "https://download.mapterhorn.com/planet.pmtiles" "data-cache/$id/dem.pmtiles" --bbox="$bbox" --maxzoom="$dmz" --download-threads=8
-            fi
-          done
-          du -sh data-cache/*
+          python3 - << 'PY'
+          import json, os, re, subprocess
+          regions = json.load(open('regions.json', encoding='utf-8'))
+          def size(url, geo, mz):
+              p = subprocess.run(['pmtiles', 'extract', url, '/tmp/dry.pmtiles', f'--region={geo}', f'--maxzoom={mz}', '--dry-run'],
+                                 capture_output=True, text=True)
+              out = p.stdout + p.stderr
+              print(out.strip()[-400:] if out.strip() else '(keine Ausgabe)')
+              m = re.findall(r'archive size of ([0-9.]+)\s*([kKMGT]?B)', out) or re.findall(r'([0-9.]+)\s*([kMGT]B)', out)
+              if not m:
+                  return None
+              v, u = m[-1]
+              return int(float(v) * {'B': 1, 'kB': 1e3, 'KB': 1e3, 'MB': 1e6, 'GB': 1e9, 'TB': 1e12}[u])
+          for r in regions:
+              cache = f"data-cache/sizes-{r['id']}.json"
+              if os.path.exists(cache):
+                  continue
+              geo = f"/tmp/{r['id']}.geojson"
+              polys = [[[[w, s], [e, s], [e, n], [w, n], [w, s]]] for w, s, e, n in r['boxes']]
+              json.dump({'type': 'MultiPolygon', 'coordinates': polys}, open(geo, 'w'))
+              print('==', r['name'])
+              sizes = {'base': size(os.environ['BASE_URL'], geo, r['maxzoom']), 'dem': size(os.environ['DEM_URL'], geo, r['demMaxzoom'])}
+              json.dump(sizes, open(cache, 'w'))
+          PY
 
       - name: Suchindex erstellen (Orte, Gipfel, Pässe, Seen aus OpenStreetMap)
         run: python3 scripts/build_search.py
@@ -85,6 +112,8 @@ jobs:
         run: git clone --depth 1 https://github.com/protomaps/basemaps-assets assets-tmp
 
       - name: Seite zusammenbauen
+        env:
+          BUILD_DATE: ${{ steps.build.outputs.date }}
         run: |
           set -euo pipefail
           mkdir -p site/vendor site/data
@@ -104,38 +133,34 @@ jobs:
           pick site/vendor/maplibre-contour.js $N/maplibre-contour/dist/index.min.js $N/maplibre-contour/dist/index.js
           cp -r assets-tmp/fonts site/fonts
           cp -r assets-tmp/sprites site/sprites
-          for id in $(jq -r '.[].id' regions.json); do
-            mkdir -p "site/data/$id"
-            cp "data-cache/$id/base.pmtiles" "data-cache/$id/dem.pmtiles" "data-cache/$id/search.json" "site/data/$id/"
-          done
           python3 - << 'PY'
-          import json, os
-          regions = json.load(open('regions.json'))
-          build = open('data-cache/build.txt').read().strip()
+          import json, os, shutil
+          regions = json.load(open('regions.json', encoding='utf-8'))
+          build = os.environ['BUILD_DATE']
           for r in regions:
-              r['files'] = []
-              for layer, ext in (('base', 'pmtiles'), ('dem', 'pmtiles'), ('search', 'json')):
-                  p = f"site/data/{r['id']}/{layer}.{ext}"
-                  r['files'].append({'layer': layer, 'path': f"data/{r['id']}/{layer}.{ext}", 'size': os.path.getsize(p)})
-              r['version'] = build
-          json.dump({'build': build, 'regions': regions}, open('site/data/regions.json', 'w'), ensure_ascii=False, indent=1)
+              os.makedirs(f"site/data/{r['id']}", exist_ok=True)
+              shutil.copy(f"data-cache/{r['id']}/search.json", f"site/data/{r['id']}/search.json")
+              sizes = json.load(open(f"data-cache/sizes-{r['id']}.json"))
+              sizes['search'] = os.path.getsize(f"site/data/{r['id']}/search.json")
+              r['sizes'] = sizes
+              r['search'] = f"data/{r['id']}/search.json"
+              ws, ss, es, ns = zip(*r['boxes'])
+              r['bbox'] = [min(ws), min(ss), max(es), max(ns)]
+          out = {
+              'build': build,
+              'sources': {
+                  'base': f'https://build.protomaps.com/{build}.pmtiles',
+                  'dem': 'https://download.mapterhorn.com/planet.pmtiles'
+              },
+              'regions': regions
+          }
+          json.dump(out, open('site/data/regions.json', 'w'), ensure_ascii=False, indent=1)
+          for r in regions:
+              s = r['sizes']
+              print(f"{r['name']:<22} Karte {((s['base'] or 0)/1e6):8.0f} MB  Höhen {((s['dem'] or 0)/1e6):8.0f} MB  Suche {s['search']/1e6:5.1f} MB")
           PY
           sed -i "s/__BUILD__/${GITHUB_SHA::7}/g" site/sw.js site/index.html
           du -sh site
-          du -sh site/*
-
-      - name: Bibliotheken prüfen
-        run: |
-          node -e '
-          const vm = require("vm"), fs = require("fs");
-          for (const f of ["pmtiles", "basemaps", "maplibre-contour"]) {
-            const ctx = { self: {}, window: {}, console };
-            ctx.globalThis = ctx;
-            vm.createContext(ctx);
-            try { vm.runInContext(fs.readFileSync("site/vendor/" + f + ".js", "utf8"), ctx); } catch (e) { console.log(f, "Fehler:", e.message); }
-            const names = Object.keys(ctx).filter((k) => !["self", "window", "globalThis", "console"].includes(k));
-            console.log(f, "->", names, Object.keys(ctx.self), Object.keys(ctx.window));
-          }'
 
       - uses: actions/configure-pages@v5
 

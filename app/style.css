@@ -330,3 +330,5 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
   .sheet-page { padding-top: 6px; border-radius: 28px 28px 0 0; }
   .sheet-page[hidden] { transform: translateX(105%); }
 }
+.region-group { margin: 14px 0 2px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.region-group:first-child { margin-top: 0; }

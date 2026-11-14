@@ -85,17 +85,18 @@ def fetch(bbox):
 
 def build(region):
     out = f"data-cache/{region['id']}/search.json"
-    if os.path.exists(out) and os.path.getsize(out) > 20:
+    if os.path.exists(out) and os.path.getsize(out) > 200:
         print(f"{region['id']}: Suchindex aus dem Cache")
         return
     print(f"{region['id']}: lade Suchdaten …", flush=True)
-    try:
-        res = fetch(region["bbox"])
-    except Exception as ex:  # noqa: BLE001
-        print(f"WARNUNG: {ex} – Suche für {region['id']} bleibt leer", flush=True)
-        res = {"elements": []}
+    elements = []
+    for box in region["boxes"]:
+        try:
+            elements += fetch(box).get("elements", [])
+        except Exception as ex:  # noqa: BLE001
+            print(f"WARNUNG: {ex} – Teil der Suche für {region['id']} fehlt", flush=True)
     items, seen = [], set()
-    for el in res.get("elements", []):
+    for el in elements:
         t = el.get("tags", {})
         typ = classify(t)
         name = t.get("name") or DEFAULT_NAMES.get(typ)
@@ -108,7 +109,7 @@ def build(region):
         else:
             continue
         key = (name, typ, round(lat, 2), round(lon, 2))
-        if typ in ("river", "water") and key in seen:
+        if key in seen:
             continue
         seen.add(key)
         alts = []

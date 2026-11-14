@@ -1,16 +1,22 @@
 [
-  {
-    "id": "berlin",
-    "name": "Berlin & Umgebung",
-    "bbox": [12.9, 52.2, 14.0, 52.8],
-    "maxzoom": 14,
-    "demMaxzoom": 11
-  },
-  {
-    "id": "kirgistan",
-    "name": "Kirgistan",
-    "bbox": [69.2, 39.1, 80.3, 43.3],
-    "maxzoom": 14,
-    "demMaxzoom": 11
-  }
+  { "id": "berlin", "name": "Berlin & Umgebung", "group": "Test",
+    "boxes": [[12.9, 52.2, 14.0, 52.8]], "maxzoom": 14, "demMaxzoom": 11 },
+
+  { "id": "kirgistan", "name": "Kirgistan", "group": "Zentralasien",
+    "boxes": [[69.2, 39.1, 80.3, 43.3]], "maxzoom": 14, "demMaxzoom": 11 },
+  { "id": "tadschikistan", "name": "Tadschikistan", "group": "Zentralasien",
+    "boxes": [[67.3, 36.6, 75.2, 41.1]], "maxzoom": 14, "demMaxzoom": 11 },
+  { "id": "usbekistan", "name": "Usbekistan", "group": "Zentralasien",
+    "boxes": [[55.9, 41.0, 62.0, 45.6], [60.0, 37.1, 73.2, 42.5]], "maxzoom": 14, "demMaxzoom": 11 },
+  { "id": "kasachstan", "name": "Kasachstan", "group": "Zentralasien",
+    "boxes": [[46.4, 40.5, 58.0, 51.8], [58.0, 40.5, 87.4, 49.5], [58.0, 49.5, 84.0, 55.5]], "maxzoom": 13, "demMaxzoom": 10 },
+
+  { "id": "tuerkei", "name": "Türkei", "group": "Europa & Kleinasien",
+    "boxes": [[25.6, 35.8, 44.9, 42.2]], "maxzoom": 14, "demMaxzoom": 11 },
+  { "id": "griechenland", "name": "Griechenland", "group": "Europa & Kleinasien",
+    "boxes": [[19.3, 34.7, 29.7, 41.8]], "maxzoom": 14, "demMaxzoom": 11 },
+  { "id": "norwegen", "name": "Norwegen", "group": "Skandinavien",
+    "boxes": [[4.5, 57.9, 12.6, 63.0], [8.5, 63.0, 15.5, 66.0], [12.0, 66.0, 31.2, 71.2]], "maxzoom": 14, "demMaxzoom": 11 },
+  { "id": "schweden", "name": "Schweden", "group": "Skandinavien",
+    "boxes": [[10.9, 55.3, 19.5, 61.0], [12.0, 61.0, 24.2, 69.1]], "maxzoom": 14, "demMaxzoom": 11 }
 ]

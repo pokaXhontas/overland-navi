@@ -54,8 +54,9 @@ class FileSource {
 const Tiles = {
   regions: [],
   build: '',
+  sources: {},
   archives: new Map(),
-  local: new Set(),
+  local: new Map(),   // id -> { base: 'neu'|'alt', dem: 'neu'|'alt' }
   ready: null,
 
   async init() {
@@ -64,10 +65,11 @@ const Tiles = {
       const r = await fetch(BASE + 'data/regions.json', { cache: 'no-cache' });
       if (r.ok) json = await r.json();
     } catch (e) { /* offline: Service Worker liefert die gespeicherte Fassung */ }
-    if (!json) json = store.get('regionsCache', null);
+    if (!json || !json.regions) json = store.get('regionsCache', null);
     if (json) store.set('regionsCache', json);
-    this.regions = (json && json.regions) || [];
+    this.regions = ((json && json.regions) || []).map((r) => ({ ...r, boxes: r.boxes || (r.bbox ? [r.bbox] : []) }));
     this.build = (json && json.build) || '';
+    this.sources = (json && json.sources) || {};
     await this.scanLocal();
   },
 
@@ -78,36 +80,52 @@ const Tiles = {
 
   fileName(id, layer) { return `${id}-${layer}.${layer === 'search' ? 'json' : 'pmtiles'}`; },
 
+  async exists(root, name) {
+    try { await root.getFileHandle(name); return true; } catch (e) { return false; }
+  },
+
   async scanLocal() {
     this.local.clear();
     const root = await this.opfs();
     if (!root) return;
     for (const r of this.regions) {
-      let ok = true;
+      const kinds = {};
       for (const layer of ['base', 'dem']) {
-        try { await root.getFileHandle(this.fileName(r.id, layer) + '.ok'); } catch (e) { ok = false; }
+        if (await this.exists(root, `${r.id}-${layer}.idx.ok`)) kinds[layer] = 'neu';
+        else if (await this.exists(root, `${r.id}-${layer}.pmtiles.ok`)) kinds[layer] = 'alt';
       }
-      if (ok) this.local.add(r.id);
+      if (kinds.base && kinds.dem) this.local.set(r.id, kinds);
     }
   },
 
   reset() { this.archives.clear(); },
 
-  async archive(region, layer) {
+  async localArchive(region, layer) {
     const key = `${region.id}/${layer}`;
     if (this.archives.has(key)) return this.archives.get(key);
+    const kind = (this.local.get(region.id) || {})[layer];
+    if (!kind) return null;
+    const root = await this.opfs();
     let a = null;
-    if (this.local.has(region.id)) {
-      const root = await this.opfs();
-      try {
-        const fh = await root.getFileHandle(this.fileName(region.id, layer));
-        const file = await fh.getFile();
+    try {
+      if (kind === 'neu') {
+        const idx = await (await (await root.getFileHandle(`${region.id}-${layer}.idx`)).getFile()).arrayBuffer();
+        const data = await (await root.getFileHandle(`${region.id}-${layer}.dat`)).getFile();
+        a = new OvlExtract.LocalArchive(idx, async (o, l) => new Uint8Array(await data.slice(o, o + l).arrayBuffer()));
+      } else {
+        const file = await (await root.getFileHandle(this.fileName(region.id, layer))).getFile();
         a = new pmtiles.PMTiles(new FileSource(file, key));
-      } catch (e) { a = null; }
-    }
-    if (!a && navigator.onLine) a = new pmtiles.PMTiles(BASE + `data/${region.id}/${layer}.pmtiles`);
-    if (a) this.archives.set(key, a);
+      }
+    } catch (e) { a = null; }
+    this.archives.set(key, a);
     return a;
+  },
+
+  remoteArchive(layer) {
+    if (!navigator.onLine || !this.sources[layer]) return null;
+    const key = 'remote/' + layer;
+    if (!this.archives.has(key)) this.archives.set(key, new pmtiles.PMTiles(this.sources[layer]));
+    return this.archives.get(key);
   },
 
   tileBounds(z, x, y) {
@@ -117,28 +135,34 @@ const Tiles = {
     return [lon1, lat(y + 1), lon2, lat(y)];
   },
 
-  regionsFor(z, x, y) {
-    const [w, s, e, nn] = this.tileBounds(z, x, y);
-    return this.regions
-      .filter((r) => !(e < r.bbox[0] || w > r.bbox[2] || nn < r.bbox[1] || s > r.bbox[3]))
-      .sort((a, b) => (this.local.has(b.id) ? 1 : 0) - (this.local.has(a.id) ? 1 : 0));
+  boxesHit(r, w, s, e, n) {
+    return r.boxes.some((b) => !(e < b[0] || w > b[2] || n < b[1] || s > b[3]));
   },
 
   async tile(layer, z, x, y) {
     await this.ready;
-    for (const region of this.regionsFor(z, x, y)) {
+    const [w, s, e, n] = this.tileBounds(z, x, y);
+    for (const region of this.regions) {
+      if (!this.local.has(region.id) || !this.boxesHit(region, w, s, e, n)) continue;
       try {
-        const a = await this.archive(region, layer);
-        if (!a) continue;
-        const res = await a.getZxy(z, x, y);
+        const a = await this.localArchive(region, layer);
+        const res = a && await a.getZxy(z, x, y);
         if (res && res.data && res.data.byteLength) return res.data;
-      } catch (e) { /* nächste Region versuchen */ }
+      } catch (err) { /* nächste Quelle */ }
+    }
+    const remote = this.remoteArchive(layer);
+    if (remote) {
+      try {
+        const res = await remote.getZxy(z, x, y);
+        if (res && res.data && res.data.byteLength) return res.data;
+      } catch (err) { /* offline oder Server weg */ }
     }
     return null;
   },
 
   regionAt(lon, lat) {
-    return this.regions.find((r) => lon >= r.bbox[0] && lon <= r.bbox[2] && lat >= r.bbox[1] && lat <= r.bbox[3]) || null;
+    const hit = this.regions.filter((r) => r.boxes.some((b) => lon >= b[0] && lon <= b[2] && lat >= b[1] && lat <= b[3]));
+    return hit.find((r) => this.local.has(r.id)) || hit[0] || null;
   }
 };
 Tiles.ready = Tiles.init();
@@ -419,9 +443,8 @@ function updateChip() {
   const dot = $('#mapdot'), txt = $('#maptxt');
   dot.className = 'dot';
   if (r && Tiles.local.has(r.id)) { dot.classList.add('ok'); txt.textContent = 'Offline: ' + r.name; }
-  else if (r && navigator.onLine) { dot.classList.add('warn'); txt.textContent = 'Online: ' + r.name; }
-  else if (r) { dot.classList.add('err'); txt.textContent = r.name + ' nicht geladen'; }
-  else { dot.classList.add('err'); txt.textContent = 'Keine Karte für dieses Gebiet'; }
+  else if (navigator.onLine) { dot.classList.add('warn'); txt.textContent = r ? 'Online · ' + r.name + ' noch nicht geladen' : 'Online-Karte'; }
+  else { dot.classList.add('err'); txt.textContent = r ? r.name + ' nicht geladen' : 'Keine Offline-Karte hier'; }
 }
 window.addEventListener('online', () => { Tiles.reset(); updateChip(); });
 window.addEventListener('offline', () => { Tiles.reset(); updateChip(); });
@@ -809,36 +832,44 @@ async function cacheAssets() {
   await Promise.all(urls.map((u) => cache.add(u).catch(() => {})));
 }
 
+function regionSize(r) {
+  const s = r.sizes || {};
+  return (s.base || 0) + (s.dem || 0) + (s.search || 0);
+}
+
 function startDownload(region) {
   if (downloads.has(region.id)) return;
+  if (!Tiles.sources.base || !Tiles.sources.dem) { toast('Kartenquellen unbekannt. Bitte App mit Internet neu öffnen.'); return; }
   const worker = new Worker('dl-worker.js');
-  const total = region.files.reduce((s, f) => s + f.size, 0);
-  const job = { worker, loaded: 0, total };
+  const job = { worker, loaded: 0, total: regionSize(region), phase: 'scan', note: 'Bereite vor …' };
   downloads.set(region.id, job);
   renderRegions();
   const keepAwake = settings.wake;
   settings.wake = true; updateWakeLock();
+  const finish = () => { worker.terminate(); downloads.delete(region.id); settings.wake = keepAwake; updateWakeLock(); };
   worker.onmessage = async (e) => {
     const m = e.data;
-    if (m.type === 'progress') { job.loaded = m.loaded; updateProgress(region.id); }
+    if (m.type === 'scan') { job.phase = 'scan'; job.note = `Bereite vor … ${m.layer === 'dem' ? 'Höhen' : 'Karte'}: ${m.tiles.toLocaleString('de-DE')} Kacheln gefunden`; updateProgress(region.id); }
+    if (m.type === 'progress') { job.phase = 'download'; job.loaded = m.loaded; job.total = m.total; updateProgress(region.id); }
     if (m.type === 'done') {
-      worker.terminate(); downloads.delete(region.id);
-      settings.wake = keepAwake; updateWakeLock();
+      finish();
       await cacheAssets();
       await Tiles.scanLocal(); Tiles.reset();
+      Search.loaded.delete(region.id);
       toast(region.name + ' ist jetzt offline verfügbar');
       renderRegions(); updateStorage(); updateChip();
       refreshStyle();
     }
     if (m.type === 'error') {
-      worker.terminate(); downloads.delete(region.id);
-      settings.wake = keepAwake; updateWakeLock();
-      toast('Download abgebrochen: ' + m.message, 5000);
+      finish();
+      toast('Download abgebrochen: ' + m.message, 6000);
       renderRegions();
     }
   };
+  worker.onerror = (e) => { finish(); toast('Download-Fehler: ' + (e.message || 'unbekannt'), 6000); renderRegions(); };
   worker.postMessage({
-    files: region.files.map((f) => ({ url: BASE + f.path, name: Tiles.fileName(region.id, f.layer), size: f.size }))
+    id: region.id, boxes: region.boxes, maxzoom: region.maxzoom, demMaxzoom: region.demMaxzoom,
+    sources: Tiles.sources, searchUrl: region.search ? BASE + region.search : null
   });
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 }
@@ -846,11 +877,13 @@ function startDownload(region) {
 async function deleteRegion(region) {
   const root = await Tiles.opfs();
   if (!root) return;
-  for (const layer of ['base', 'dem', 'search']) {
-    for (const suffix of ['.ok', '']) {
-      try { await root.removeEntry(Tiles.fileName(region.id, layer) + suffix); } catch (e) { /* schon weg */ }
-    }
+  const names = [`${region.id}-search.json`];
+  for (const layer of ['base', 'dem']) {
+    for (const suffix of ['.idx.ok', '.idx', '.dat', '.pmtiles.ok', '.pmtiles']) names.push(`${region.id}-${layer}${suffix}`);
   }
+  for (const name of names) { try { await root.removeEntry(name); } catch (e) { /* schon weg */ } }
+  Search.loaded.delete(region.id);
+  Search.items = Search.items.filter((it) => it.regionId !== region.id);
   await Tiles.scanLocal(); Tiles.reset();
   toast(region.name + ' gelöscht');
   renderRegions(); updateStorage(); updateChip(); refreshStyle();
@@ -860,6 +893,10 @@ function updateProgress(id) {
   const job = downloads.get(id);
   const el = document.querySelector(`[data-region="${id}"]`);
   if (!job || !el) return;
+  if (job.phase === 'scan') {
+    el.querySelector('.state').textContent = job.note;
+    return;
+  }
   const pct = job.total ? Math.min(100, Math.round(job.loaded / job.total * 100)) : 0;
   el.querySelector('.bar > div').style.width = pct + '%';
   el.querySelector('.state').textContent = `${pct} % · ${fmtBytes(job.loaded)} von ${fmtBytes(job.total)}`;
@@ -868,13 +905,21 @@ function updateProgress(id) {
 function renderRegions() {
   const box = $('#regions');
   if (!Tiles.regions.length) {
-    box.innerHTML = '<p class="muted">Keine Kartengebiete gefunden. Ist die App schon veröffentlicht?</p>';
+    box.innerHTML = '<p class="muted">Keine Kartengebiete gefunden. Bitte die App einmal mit Internet öffnen.</p>';
     return;
   }
   box.innerHTML = '';
+  let group = null;
   for (const r of Tiles.regions) {
-    const size = r.files.reduce((s, f) => s + f.size, 0);
-    const local = Tiles.local.has(r.id);
+    if (r.group && r.group !== group) {
+      group = r.group;
+      const h = document.createElement('p');
+      h.className = 'region-group';
+      h.textContent = group;
+      box.appendChild(h);
+    }
+    const size = regionSize(r);
+    const local = Tiles.local.get(r.id);
     const job = downloads.get(r.id);
     const div = document.createElement('div');
     div.className = 'region';
@@ -896,16 +941,17 @@ function renderRegions() {
       bar.innerHTML = '<div></div>';
       div.appendChild(bar);
     } else if (local) {
-      state.innerHTML = '<span class="state-ok">✓ Offline verfügbar</span> · ' + fmtBytes(size);
+      state.innerHTML = '<span class="state-ok">✓ Offline verfügbar</span>' + (local.base === 'alt' ? ' · ältere Fassung' : '');
       btn.textContent = 'Löschen';
       btn.classList.add('danger');
       btn.onclick = () => deleteRegion(r);
     } else {
-      state.textContent = fmtBytes(size) + ' · nur online';
+      state.textContent = (size ? 'ca. ' + fmtBytes(size) : 'Größe unbekannt') + ' · nur online';
       btn.textContent = 'Laden';
       btn.classList.add('primary');
       btn.onclick = () => {
         if (!navigator.onLine) { toast('Zum Laden brauchst du eine Internetverbindung.'); return; }
+        if (size > 1.5e9 && !btn.dataset.sure) { btn.dataset.sure = '1'; btn.textContent = 'Sicher? ' + fmtBytes(size); toast('Großer Download: am besten im WLAN und mit Ladekabel. Nochmal tippen zum Starten.', 5000); return; }
         startDownload(r);
       };
     }
@@ -1041,8 +1087,11 @@ const Search = {
     this.loading = (async () => {
       await Tiles.ready;
       const root = await Tiles.opfs();
+      const c = map ? map.getCenter() : null;
+      const here = c ? Tiles.regionAt(c.lng, c.lat) : null;
       for (const r of Tiles.regions) {
         if (this.loaded.has(r.id)) continue;
+        if (!Tiles.local.has(r.id) && !(navigator.onLine && here && here.id === r.id)) continue;
         let json = null;
         if (root) {
           try {
@@ -1050,15 +1099,14 @@ const Search = {
             json = JSON.parse(await (await fh.getFile()).text());
           } catch (e) { json = null; }
         }
-        if (!json) {
-          const f = (r.files || []).find((x) => x.layer === 'search');
-          if (f) { try { const resp = await fetch(BASE + f.path); if (resp.ok) json = await resp.json(); } catch (e) { json = null; } }
+        if (!json && r.search) {
+          try { const resp = await fetch(BASE + r.search); if (resp.ok) json = await resp.json(); } catch (e) { json = null; }
         }
         if (!json || !json.items) continue;
         for (const it of json.items) {
           const [name, alts, type, lat, lon, ele] = it;
           const keys = [norm(name), ...String(alts || '').split('|').filter(Boolean).map(norm)];
-          this.items.push({ name, alts, type, lat, lon, ele, keys, region: r.name });
+          this.items.push({ name, alts, type, lat, lon, ele, keys, region: r.name, regionId: r.id });
         }
         this.loaded.add(r.id);
       }
@@ -1212,8 +1260,8 @@ function openSearch() {
   const inp = $('#search-input');
   inp.focus();
   inp.select();
+  Search.loadAll().then(() => { if (!$('#search').hidden) runSearch(); });
   runSearch();
-  Search.loadAll();
 }
 function closeSearch() {
   $('#search').hidden = true;
