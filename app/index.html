@@ -32,6 +32,9 @@
 </div>
 
 <div class="controls">
+  <button class="ctl panel" id="btn-search" aria-label="Suchen">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+  </button>
   <button class="ctl panel" id="btn-layers" aria-label="Karten und Ebenen">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/></svg>
   </button>
@@ -74,6 +77,17 @@
     <div id="regions" class="regions"><p class="muted">Wird geladen …</p></div>
     <p class="muted small" id="storage"></p>
 
+    <h2>Importieren</h2>
+    <label class="import-btn">
+      <input type="file" id="import-file" multiple>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V9M7 14l5-5 5 5M5 4h14"/></svg>
+      <span><b>GPX, KML oder ZIP öffnen</b><small>Tracks und Orte aus MapOut, iOverlander und anderen Apps</small></span>
+    </label>
+
+    <h2>Meine Tracks</h2>
+    <div class="row static"><span><b id="tracks-count">0 Tracks</b><small>Antippen zeigt den Track, Schalter blendet ihn aus</small></span></div>
+    <div class="track-list" id="track-list"></div>
+
     <h2>Meine Orte</h2>
     <div class="row static"><span><b id="places-count">0 Orte</b><small>Antippen zum Bearbeiten</small></span><button class="btn" id="btn-gpx">Als GPX teilen</button></div>
     <div class="place-list" id="place-list"></div>
@@ -83,6 +97,15 @@
   </div>
 </aside>
 
+
+<section class="search panel" id="search" aria-label="Suche" hidden>
+  <div class="search-bar">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+    <input id="search-input" type="search" placeholder="Ort, Gipfel, Pass, See oder Koordinaten" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search">
+    <button class="round" id="search-close" aria-label="Suche schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </div>
+  <div class="search-results" id="search-results"></div>
+</section>
 
 <aside class="sheet spot" id="spot" aria-label="Ort bearbeiten" hidden>
   <div class="sheet-head">

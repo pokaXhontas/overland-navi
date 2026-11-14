@@ -75,7 +75,7 @@ const Tiles = {
     try { return await navigator.storage.getDirectory(); } catch (e) { return null; }
   },
 
-  fileName(id, layer) { return `${id}-${layer}.pmtiles`; },
+  fileName(id, layer) { return `${id}-${layer}.${layer === 'search' ? 'json' : 'pmtiles'}`; },
 
   async scanLocal() {
     this.local.clear();
@@ -219,6 +219,23 @@ function buildStyle() {
 
   layers.push(
     {
+      id: 'tracks-casing', type: 'line', source: 'tracks',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': dark ? '#0B0F12' : '#FFFFFF', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 4, 14, 8], 'line-opacity': 0.9 }
+    },
+    {
+      id: 'tracks-line', type: 'line', source: 'tracks',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': ['get', 'color'], 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 2.2, 14, 4.5] }
+    },
+    {
+      id: 'tracks-label', type: 'symbol', source: 'tracks', minzoom: 11,
+      layout: { 'symbol-placement': 'line', 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Medium'], 'text-size': 12, 'text-offset': [0, -1] },
+      paint: { 'text-color': ['get', 'color'], 'text-halo-color': dark ? '#0B0F12' : '#FFFFFF', 'text-halo-width': 1.6 }
+    }
+  );
+  layers.push(
+    {
       id: 'places-icon', type: 'symbol', source: 'places',
       layout: { 'icon-image': ['concat', 'cat-', ['get', 'cat']], 'icon-allow-overlap': true, 'icon-ignore-placement': true }
     },
@@ -250,7 +267,8 @@ function buildStyle() {
           elevationKey: 'ele', levelKey: 'level', contourLayer: 'contours', overzoom: 1
         })]
       },
-      places: { type: 'geojson', data: placesGeoJSON() }
+      places: { type: 'geojson', data: placesGeoJSON() },
+      tracks: { type: 'geojson', data: tracksGeoJSON() }
     },
     layers
   };
@@ -484,28 +502,9 @@ function savePlaces() {
 
 /* Fotos: verkleinert in IndexedDB */
 const PhotoDB = {
-  db: null,
-  open() {
-    if (this.db) return Promise.resolve(this.db);
-    return new Promise((resolve, reject) => {
-      const req = indexedDB.open('overland', 1);
-      req.onupgradeneeded = () => req.result.createObjectStore('photos');
-      req.onsuccess = () => { this.db = req.result; resolve(this.db); };
-      req.onerror = () => reject(req.error);
-    });
-  },
-  async run(mode, fn) {
-    const db = await this.open();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction('photos', mode);
-      const r = fn(tx.objectStore('photos'));
-      tx.oncomplete = () => resolve(r && r.result);
-      tx.onerror = () => reject(tx.error);
-    });
-  },
-  put(id, blob) { return this.run('readwrite', (s) => s.put(blob, id)); },
-  get(id) { return this.run('readonly', (s) => s.get(id)); },
-  del(id) { return this.run('readwrite', (s) => s.delete(id)); }
+  put(id, blob) { return DB.run('photos', 'readwrite', (st) => st.put(blob, id)); },
+  get(id) { return DB.run('photos', 'readonly', (st) => st.get(id)); },
+  del(id) { return DB.run('photos', 'readwrite', (st) => st.delete(id)); }
 };
 
 async function shrinkPhoto(file) {
@@ -865,7 +864,7 @@ function startDownload(region) {
 async function deleteRegion(region) {
   const root = await Tiles.opfs();
   if (!root) return;
-  for (const layer of ['base', 'dem']) {
+  for (const layer of ['base', 'dem', 'search']) {
     for (const suffix of ['.ok', '']) {
       try { await root.removeEntry(Tiles.fileName(region.id, layer) + suffix); } catch (e) { /* schon weg */ }
     }
@@ -944,7 +943,7 @@ async function updateStorage() {
 /* ---------- Bedienelemente ---------- */
 function setupUI() {
   const sheet = $('#sheet');
-  $('#btn-layers').onclick = () => { if (editor.open) closeEditor(); renderRegions(); updateStorage(); renderPlaceList(); sheet.hidden = false; };
+  $('#btn-layers').onclick = () => { if (editor.open) closeEditor(); closeSearch(); renderRegions(); updateStorage(); renderPlaceList(); renderTrackList(); sheet.hidden = false; };
   $('#sheet-close').onclick = () => { sheet.hidden = true; };
 
   document.querySelectorAll('.seg button').forEach((b) => {
@@ -983,6 +982,7 @@ function setupUI() {
   $('#zout').onclick = () => map.zoomOut();
   $('#fab').onclick = newPlaceHere;
   setupEditorUI();
+  setupSearchAndImport();
   $('#btn-gpx').onclick = exportGPX;
   savePlaces();
   updateCompassButton();
@@ -992,6 +992,503 @@ function setupUI() {
 function updateCompassButton() {
   $('#compass-label').textContent = settings.headingUp ? 'FAHRT' : 'N';
   $('#btn-compass').classList.toggle('active', settings.headingUp);
+}
+
+/* ---------- Gemeinsame Datenbank (Fotos, Tracks) ---------- */
+const DB = {
+  db: null,
+  open() {
+    if (this.db) return Promise.resolve(this.db);
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open('overland', 2);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains('photos')) db.createObjectStore('photos');
+        if (!db.objectStoreNames.contains('tracks')) db.createObjectStore('tracks', { keyPath: 'id' });
+      };
+      req.onsuccess = () => { this.db = req.result; resolve(this.db); };
+      req.onerror = () => reject(req.error);
+    });
+  },
+  async run(storeName, mode, fn) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, mode);
+      const r = fn(tx.objectStore(storeName));
+      tx.oncomplete = () => resolve(r && r.result);
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+};
+
+/* ---------- Suche ---------- */
+const CYR = { 'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo', 'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch', 'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya', 'ң': 'ng', 'ө': 'o', 'ү': 'u', 'қ': 'q', 'ғ': 'gh', 'ҳ': 'h', 'ә': 'a', 'і': 'i', 'ұ': 'u', 'ӯ': 'u', 'ҷ': 'j' };
+function norm(s) {
+  s = String(s || '').toLowerCase();
+  let out = '';
+  for (const ch of s) out += (CYR[ch] !== undefined ? CYR[ch] : ch);
+  return out.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ß/g, 'ss').replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+const TYPE_INFO = {
+  city: ['Stadt', 30, 11], town: ['Stadt', 26, 12], village: ['Dorf', 18, 14], hamlet: ['Weiler', 12, 15], suburb: ['Stadtteil', 16, 14],
+  quarter: ['Viertel', 12, 15], locality: ['Ort', 8, 14], isolated_dwelling: ['Gehöft', 6, 16],
+  peak: ['Gipfel', 14, 13], pass: ['Pass', 16, 14], spring: ['Quelle', 10, 16], glacier: ['Gletscher', 10, 13], water: ['See', 14, 13],
+  river: ['Fluss', 10, 12], camp: ['Campingplatz', 12, 16], hut: ['Hütte', 10, 16], view: ['Aussicht', 8, 16], sight: ['Sehenswürdigkeit', 8, 16],
+  fuel: ['Tankstelle', 10, 16], drink: ['Trinkwasser', 8, 17], border: ['Grenzkontrolle', 14, 15], own: ['Mein Ort', 40, 16], other: ['Ort', 4, 15]
+};
+const TYPE_ICON = {
+  peak: 'm3 20 6-11 4 6 3-4 5 9Z', pass: 'm3 20 6-11 4 6 3-4 5 9Z', glacier: 'm3 20 6-11 4 6 3-4 5 9Z',
+  water: 'M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z', spring: 'M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z', drink: 'M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z', river: 'M3 8c3-2 6 2 9 0s6-2 9 0M3 16c3-2 6 2 9 0s6-2 9 0',
+  fuel: 'M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12M4 10h10M14 8l3 3v6a1.5 1.5 0 0 0 3 0V9l-3-3',
+  camp: 'M2 20h20M4 20 12 5l8 15M12 20l-3-5M12 20l3-5', hut: 'M3 20h18M5 20V10l7-6 7 6v10M10 20v-5h4v5',
+  border: 'M5 21V4M5 4h11l-2 4 2 4H5', coord: 'M12 2v4M12 18v4M2 12h4M18 12h4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z',
+  default: 'M12 21s6-5.4 6-10.5a6 6 0 0 0-12 0C6 15.6 12 21 12 21ZM12 10.5h.01'
+};
+
+const Search = {
+  items: [],
+  loaded: new Set(),
+  loading: null,
+  searchMarker: null,
+
+  async loadAll() {
+    if (this.loading) return this.loading;
+    this.loading = (async () => {
+      await Tiles.ready;
+      const root = await Tiles.opfs();
+      for (const r of Tiles.regions) {
+        if (this.loaded.has(r.id)) continue;
+        let json = null;
+        if (root) {
+          try {
+            const fh = await root.getFileHandle(Tiles.fileName(r.id, 'search'));
+            json = JSON.parse(await (await fh.getFile()).text());
+          } catch (e) { json = null; }
+        }
+        if (!json) {
+          const f = (r.files || []).find((x) => x.layer === 'search');
+          if (f) { try { const resp = await fetch(BASE + f.path); if (resp.ok) json = await resp.json(); } catch (e) { json = null; } }
+        }
+        if (!json || !json.items) continue;
+        for (const it of json.items) {
+          const [name, alts, type, lat, lon, ele] = it;
+          const keys = [norm(name), ...String(alts || '').split('|').filter(Boolean).map(norm)];
+          this.items.push({ name, alts, type, lat, lon, ele, keys, region: r.name });
+        }
+        this.loaded.add(r.id);
+      }
+      this.loading = null;
+    })();
+    return this.loading;
+  },
+
+  parseCoords(q) {
+    const t = q.trim();
+    let m = t.match(/^(-?\d{1,2}(?:\.\d+)?)\s*[,;\s]\s*(-?\d{1,3}(?:\.\d+)?)$/);
+    if (!m) m = t.match(/^(-?\d{1,2}(?:,\d+)?)\s*[;\s]\s*(-?\d{1,3}(?:,\d+)?)$/);
+    if (!m) return null;
+    const lat = parseFloat(m[1].replace(',', '.')), lon = parseFloat(m[2].replace(',', '.'));
+    if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+    return { name: `${lat.toFixed(5)}, ${lon.toFixed(5)}`, type: 'coord', lat, lon, sub: 'Koordinaten' };
+  },
+
+  query(q) {
+    const nq = norm(q);
+    const results = [];
+    const coord = this.parseCoords(q);
+    if (coord) results.push(coord);
+    if (nq.length < 2) return results;
+    const ref = gps.pos || (map ? { lat: map.getCenter().lat, lon: map.getCenter().lng } : null);
+    const score = (keys) => {
+      let best = 0;
+      for (const k of keys) {
+        if (!k) continue;
+        if (k === nq) return 100;
+        if (k.startsWith(nq)) best = Math.max(best, 80);
+        else if (k.includes(' ' + nq)) best = Math.max(best, 60);
+        else if (nq.length >= 3 && k.includes(nq)) best = Math.max(best, 30);
+      }
+      return best;
+    };
+    for (const p of places) {
+      const s = score([norm(p.name), norm(p.note)]);
+      if (s) results.push({ name: p.name, type: 'own', lat: p.lat, lon: p.lon, place: p, score: s + 40, sub: 'Mein Ort · ' + (CAT[p.cat] || CAT.other).label });
+    }
+    const hits = [];
+    for (const it of this.items) {
+      const s = score(it.keys);
+      if (!s) continue;
+      const w = (TYPE_INFO[it.type] || TYPE_INFO.other)[1];
+      let dist = 0;
+      if (ref) dist = distance(ref, it);
+      hits.push({ ...it, score: s + w - Math.min(25, dist / 20000) });
+    }
+    hits.sort((a, b) => b.score - a.score);
+    for (const h of hits.slice(0, 40)) {
+      const label = (TYPE_INFO[h.type] || TYPE_INFO.other)[0];
+      const extra = h.ele ? ` · ${h.ele.toLocaleString('de-DE')} m` : '';
+      const alt = h.alts ? ' · ' + h.alts.split('|')[0] : '';
+      h.sub = `${label}${extra}${alt}`;
+      results.push(h);
+    }
+    results.sort((a, b) => (b.type === 'coord') - (a.type === 'coord') || (b.score || 0) - (a.score || 0));
+    if (ref) for (const r of results) r.dist = distance(ref, r);
+    return results.slice(0, 40);
+  },
+
+  async online(q) {
+    if (!navigator.onLine || q.trim().length < 3) return [];
+    const c = map.getCenter();
+    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lang=de&limit=8&lat=${c.lat.toFixed(3)}&lon=${c.lng.toFixed(3)}`;
+    try {
+      const r = await originalFetch(url);
+      if (!r.ok) return [];
+      const j = await r.json();
+      const ref = gps.pos || { lat: c.lat, lon: c.lng };
+      return (j.features || []).map((f) => {
+        const p = f.properties || {};
+        const [lon, lat] = f.geometry.coordinates;
+        const where = [p.street && (p.street + (p.housenumber ? ' ' + p.housenumber : '')), p.postcode, p.city || p.county, p.country].filter(Boolean).join(', ');
+        return { name: p.name || where || 'Adresse', type: 'web', lat, lon, sub: 'Online · ' + where, dist: distance(ref, { lat, lon }), zoom: p.osm_key === 'place' ? 13 : 16 };
+      });
+    } catch (e) { return []; }
+  },
+
+  show(r) {
+    closeSearch();
+    if (r.place) { openEditor(r.place); return; }
+    gps.follow = false;
+    $('#btn-locate').classList.remove('active');
+    const zoom = r.zoom || (TYPE_INFO[r.type] || [null, null, 15])[2] || 15;
+    map.flyTo({ center: [r.lon, r.lat], zoom, essential: true });
+    if (this.searchMarker) this.searchMarker.remove();
+    const el = document.createElement('div');
+    el.className = 'search-pin';
+    el.innerHTML = '<div class="sp-card panel"><b></b><small></small><button class="btn primary sp-save">Als Ort speichern</button><button class="round sp-x" aria-label="Markierung entfernen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div><div class="sp-dot"></div>';
+    el.querySelector('b').textContent = r.name;
+    el.querySelector('small').textContent = r.sub || '';
+    el.querySelector('.sp-save').onclick = (ev) => {
+      ev.stopPropagation();
+      const at = { lat: r.lat, lon: r.lon };
+      this.searchMarker.remove(); this.searchMarker = null;
+      openEditor(null, at);
+      $('#spot-name').value = r.type === 'coord' ? '' : r.name;
+    };
+    el.querySelector('.sp-x').onclick = (ev) => { ev.stopPropagation(); this.searchMarker.remove(); this.searchMarker = null; };
+    this.searchMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([r.lon, r.lat]).addTo(map);
+  }
+};
+
+function fmtDist(d) {
+  if (d === undefined || d === null) return '';
+  return d >= 10000 ? Math.round(d / 1000) + ' km' : d >= 1000 ? (d / 1000).toFixed(1).replace('.', ',') + ' km' : Math.round(d) + ' m';
+}
+
+function renderSearchResults(list, note) {
+  const box = $('#search-results');
+  box.innerHTML = '';
+  if (note) { const p = document.createElement('p'); p.className = 'muted small sr-note'; p.textContent = note; box.appendChild(p); }
+  for (const r of list) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'place-item';
+    const color = r.type === 'own' ? (CAT[r.place.cat] || CAT.other).color : r.type === 'web' ? '#5B6670' : 'var(--faint)';
+    const ink = r.type === 'own' ? (CAT[r.place.cat] || CAT.other).ink : r.type === 'web' ? '#fff' : 'var(--text)';
+    const d = r.type === 'own' ? (CAT[r.place.cat] || CAT.other).d : (TYPE_ICON[r.type] || TYPE_ICON.default);
+    b.innerHTML = `<span class="pi-icon" style="background:${color};color:${ink}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg></span><span class="pi-txt"><b></b><small></small></span><span class="pi-dist"></span>`;
+    b.querySelector('b').textContent = r.name;
+    b.querySelector('small').textContent = r.sub || '';
+    b.querySelector('.pi-dist').textContent = fmtDist(r.dist);
+    b.onclick = () => Search.show(r);
+    box.appendChild(b);
+  }
+}
+
+let searchTimer = null, searchSeq = 0;
+async function runSearch() {
+  const q = $('#search-input').value;
+  const seq = ++searchSeq;
+  if (!q.trim()) { renderSearchResults([], 'Suche nach Orten, Gipfeln, Pässen, Seen, Flüssen, Tankstellen, deinen eigenen Orten oder Koordinaten (z. B. 39.02, 73.48).'); return; }
+  if (Search.loading) renderSearchResults([], 'Suchindex wird geladen …');
+  await Search.loadAll();
+  if (seq !== searchSeq) return;
+  const local = Search.query(q);
+  renderSearchResults(local, local.length ? '' : (navigator.onLine ? 'Suche online …' : 'Nichts gefunden. Offline sind nur Orte aus geladenen Kartengebieten suchbar.'));
+  const web = await Search.online(q);
+  if (seq !== searchSeq) return;
+  if (web.length) renderSearchResults([...local, ...web.filter((w) => !local.some((l) => distance(l, w) < 300 && norm(l.name) === norm(w.name)))]);
+  else if (!local.length) renderSearchResults([], 'Nichts gefunden.');
+}
+
+function openSearch() {
+  if (editor.open) closeEditor();
+  $('#sheet').hidden = true;
+  $('#search').hidden = false;
+  const inp = $('#search-input');
+  inp.focus();
+  inp.select();
+  runSearch();
+  Search.loadAll();
+}
+function closeSearch() {
+  $('#search').hidden = true;
+  $('#search-input').blur();
+}
+
+/* ---------- Tracks ---------- */
+const TRACK_COLORS = ['#4F6FE0', '#C2255C', '#2F9E44', '#7048E8', '#0B7285', '#E8590C', '#5C940D'];
+let tracks = [];
+
+function trackLength(coords) {
+  let d = 0;
+  for (let i = 1; i < coords.length; i++) d += distance({ lat: coords[i - 1][1], lon: coords[i - 1][0] }, { lat: coords[i][1], lon: coords[i][0] });
+  return d;
+}
+
+function tracksGeoJSON() {
+  return {
+    type: 'FeatureCollection',
+    features: tracks.filter((t) => t.visible).map((t) => ({
+      type: 'Feature',
+      geometry: { type: 'MultiLineString', coordinates: t.segments.map((seg) => seg.map((c) => [c[0], c[1]])) },
+      properties: { id: t.id, name: t.name, color: t.color }
+    }))
+  };
+}
+
+async function loadTracks() {
+  try { tracks = (await DB.run('tracks', 'readonly', (s) => s.getAll())) || []; } catch (e) { tracks = []; }
+  tracks.sort((a, b) => (a.created || 0) - (b.created || 0));
+  updateTracksSource();
+}
+function updateTracksSource() {
+  const src = map && map.getSource('tracks');
+  if (src) src.setData(tracksGeoJSON());
+  renderTrackList();
+}
+async function saveTrack(t) { await DB.run('tracks', 'readwrite', (s) => s.put(t)); }
+
+function trackBounds(t) {
+  const b = new maplibregl.LngLatBounds();
+  for (const seg of t.segments) for (const c of seg) b.extend([c[0], c[1]]);
+  return b;
+}
+
+function renderTrackList() {
+  const box = $('#track-list');
+  if (!box) return;
+  $('#tracks-count').textContent = tracks.length + (tracks.length === 1 ? ' Track' : ' Tracks');
+  box.innerHTML = '';
+  for (const t of tracks) {
+    const row = document.createElement('div');
+    row.className = 'track-item';
+    row.innerHTML = `<button type="button" class="ti-main"><span class="ti-color"></span><span class="pi-txt"><b></b><small></small></span></button><input type="checkbox" class="switch" aria-label="Track anzeigen"><button type="button" class="round ti-del" aria-label="Track löschen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg></button>`;
+    row.querySelector('.ti-color').style.background = t.color;
+    row.querySelector('b').textContent = t.name;
+    row.querySelector('small').textContent = fmtDist(t.length) + (t.source ? ' · ' + t.source : '');
+    row.querySelector('.ti-main').onclick = () => {
+      $('#sheet').hidden = true;
+      if (!t.visible) { t.visible = true; saveTrack(t); updateTracksSource(); }
+      gps.follow = false; $('#btn-locate').classList.remove('active');
+      map.fitBounds(trackBounds(t), { padding: 80, maxZoom: 15 });
+    };
+    const sw = row.querySelector('.switch');
+    sw.checked = !!t.visible;
+    sw.onchange = () => { t.visible = sw.checked; saveTrack(t); updateTracksSource(); };
+    const del = row.querySelector('.ti-del');
+    del.onclick = async () => {
+      if (!del.classList.contains('confirm')) { del.classList.add('confirm'); toast('Zum Löschen nochmal tippen'); setTimeout(() => del.classList.remove('confirm'), 3000); return; }
+      await DB.run('tracks', 'readwrite', (s) => s.delete(t.id));
+      tracks = tracks.filter((x) => x !== t);
+      updateTracksSource();
+      toast('Track gelöscht');
+    };
+    box.appendChild(row);
+  }
+}
+
+/* ---------- Import: GPX, KML, KMZ, ZIP ---------- */
+async function unzip(buf) {
+  const dv = new DataView(buf);
+  let eocd = -1;
+  for (let i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 65557); i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('Keine gültige ZIP-Datei');
+  const count = dv.getUint16(eocd + 10, true);
+  let off = dv.getUint32(eocd + 16, true);
+  const entries = [];
+  for (let n = 0; n < count; n++) {
+    if (dv.getUint32(off, true) !== 0x02014b50) break;
+    const method = dv.getUint16(off + 10, true);
+    const csize = dv.getUint32(off + 20, true);
+    const nlen = dv.getUint16(off + 28, true), xlen = dv.getUint16(off + 30, true), clen = dv.getUint16(off + 32, true);
+    const lho = dv.getUint32(off + 42, true);
+    const name = new TextDecoder().decode(new Uint8Array(buf, off + 46, nlen));
+    off += 46 + nlen + xlen + clen;
+    const start = lho + 30 + dv.getUint16(lho + 26, true) + dv.getUint16(lho + 28, true);
+    const data = new Uint8Array(buf, start, csize);
+    entries.push({
+      name,
+      async text() {
+        if (method === 0) return new TextDecoder().decode(data);
+        if (method !== 8) throw new Error('Unbekannte Kompression in ' + name);
+        const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+        return await new Response(stream).text();
+      }
+    });
+  }
+  return entries;
+}
+
+function xmlText(el, tag) {
+  const n = el.getElementsByTagName(tag)[0];
+  return n ? n.textContent.trim() : '';
+}
+
+function parseGPX(text, source) {
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  if (doc.getElementsByTagName('parsererror').length) throw new Error('GPX-Datei ist fehlerhaft');
+  const wpts = [], trks = [];
+  for (const w of doc.getElementsByTagName('wpt')) {
+    wpts.push({ lat: +w.getAttribute('lat'), lon: +w.getAttribute('lon'), name: xmlText(w, 'name'), desc: xmlText(w, 'desc') || xmlText(w, 'cmt'), type: xmlText(w, 'type') + ' ' + xmlText(w, 'sym'), ele: parseFloat(xmlText(w, 'ele')) || null });
+  }
+  const lines = (el, ptTag) => [...el.getElementsByTagName(ptTag)].map((p) => [+p.getAttribute('lon'), +p.getAttribute('lat'), parseFloat(xmlText(p, 'ele')) || null]);
+  for (const t of doc.getElementsByTagName('trk')) {
+    const segs = [...t.getElementsByTagName('trkseg')].map((s) => lines(s, 'trkpt')).filter((s) => s.length > 1);
+    if (segs.length) trks.push({ name: xmlText(t, 'name') || source, segments: segs });
+  }
+  for (const r of doc.getElementsByTagName('rte')) {
+    const seg = lines(r, 'rtept');
+    if (seg.length > 1) trks.push({ name: xmlText(r, 'name') || source, segments: [seg] });
+  }
+  return { wpts, trks };
+}
+
+function parseKML(text, source) {
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  if (doc.getElementsByTagName('parsererror').length) throw new Error('KML-Datei ist fehlerhaft');
+  const wpts = [], trks = [];
+  const parseCoords = (s) => s.trim().split(/\s+/).map((c) => c.split(',').map(Number)).filter((c) => c.length >= 2 && !isNaN(c[0]) && !isNaN(c[1])).map((c) => [c[0], c[1], c[2] || null]);
+  for (const pm of doc.getElementsByTagName('Placemark')) {
+    const name = xmlText(pm, 'name');
+    const desc = xmlText(pm, 'description').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    const segs = [];
+    for (const ls of pm.getElementsByTagName('LineString')) {
+      const c = parseCoords(xmlText(ls, 'coordinates'));
+      if (c.length > 1) segs.push(c);
+    }
+    const gxTracks = pm.getElementsByTagNameNS('*', 'Track');
+    for (const tr of gxTracks) {
+      const c = [...tr.getElementsByTagNameNS('*', 'coord')].map((n) => n.textContent.trim().split(/\s+/).map(Number)).filter((v) => v.length >= 2).map((v) => [v[0], v[1], v[2] || null]);
+      if (c.length > 1) segs.push(c);
+    }
+    if (segs.length) { trks.push({ name: name || source, segments: segs }); continue; }
+    const pt = pm.getElementsByTagName('Point')[0];
+    if (pt) {
+      const c = parseCoords(xmlText(pt, 'coordinates'))[0];
+      if (c) wpts.push({ lat: c[1], lon: c[0], ele: c[2], name, desc, type: '' });
+    }
+  }
+  return { wpts, trks };
+}
+
+function guessCategory(w) {
+  const s = norm(`${w.name} ${w.type} ${w.desc}`);
+  const has = (re) => re.test(s);
+  if (has(/\b(wasser|water|quelle|spring|brunnen|trinkwasser|drinking)/)) return 'water';
+  if (has(/\b(diesel|fuel|tank|petrol|gas station|benzin|azs)/)) return 'fuel';
+  if (has(/\b(werkstatt|mechanic|garage|repair|reifen|tyre|tire)/)) return 'mech';
+  if (has(/\b(grenze|border|checkpoint|zoll|customs)/)) return 'border';
+  if (has(/\b(warnung|achtung|danger|gefahr|warning|furt|ford)/)) return 'warn';
+  if (has(/\b(campingplatz|campground|camping|guesthouse|hostel)/)) return 'camp';
+  if (has(/\b(camp|zelt|tent|biwak|bivouac|wild|stellplatz|schlafplatz|overnight|nacht)/)) return 'wild';
+  return 'other';
+}
+
+async function importFiles(fileList) {
+  const jobs = [];
+  for (const f of fileList) {
+    const lower = f.name.toLowerCase();
+    if (lower.endsWith('.zip') || lower.endsWith('.kmz')) {
+      try {
+        for (const e of await unzip(await f.arrayBuffer())) {
+          const n = e.name.toLowerCase();
+          if (n.endsWith('.gpx') || n.endsWith('.kml')) jobs.push({ name: e.name.split('/').pop(), kind: n.endsWith('.gpx') ? 'gpx' : 'kml', text: () => e.text(), source: f.name });
+        }
+      } catch (err) { toast(f.name + ': ' + err.message, 5000); }
+    } else if (lower.endsWith('.kml')) {
+      jobs.push({ name: f.name, kind: 'kml', text: () => f.text(), source: f.name });
+    } else {
+      jobs.push({ name: f.name, kind: 'gpx', text: () => f.text(), source: f.name });
+    }
+  }
+  let nPlaces = 0, nTracks = 0, skipped = 0, errors = 0;
+  const bounds = new maplibregl.LngLatBounds();
+  for (const j of jobs) {
+    let res;
+    try {
+      const text = await j.text();
+      const base = j.name.replace(/\.(gpx|kml)$/i, '');
+      res = j.kind === 'kml' ? parseKML(text, base) : parseGPX(text, base);
+    } catch (err) { errors++; continue; }
+    for (const w of res.wpts) {
+      if (!isFinite(w.lat) || !isFinite(w.lon)) continue;
+      const dupe = places.some((p) => distance(p, w) < 25 && (!w.name || norm(p.name) === norm(w.name)));
+      if (dupe) { skipped++; continue; }
+      const cat = guessCategory(w);
+      const now = new Date().toISOString();
+      places.push({
+        id: Date.now() + Math.floor(Math.random() * 100000), name: w.name || `${CAT[cat].label} ${places.length + 1}`, cat,
+        rating: 0, feats: [], note: w.desc || '', photos: [], lat: +w.lat.toFixed(6), lon: +w.lon.toFixed(6),
+        ele: w.ele ? Math.round(w.ele) : null, time: now, updated: now, source: j.source
+      });
+      bounds.extend([w.lon, w.lat]);
+      nPlaces++;
+    }
+    for (const t of res.trks) {
+      const track = {
+        id: 'trk-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+        name: t.name, color: TRACK_COLORS[tracks.length % TRACK_COLORS.length],
+        segments: t.segments, visible: true, created: Date.now(), source: j.source
+      };
+      track.length = track.segments.reduce((s, seg) => s + trackLength(seg), 0);
+      try { await saveTrack(track); } catch (e) { errors++; continue; }
+      tracks.push(track);
+      for (const seg of t.segments) for (const c of seg) bounds.extend([c[0], c[1]]);
+      nTracks++;
+    }
+  }
+  savePlaces();
+  updateTracksSource();
+  const parts = [];
+  if (nTracks) parts.push(nTracks + (nTracks === 1 ? ' Track' : ' Tracks'));
+  if (nPlaces) parts.push(nPlaces + (nPlaces === 1 ? ' Ort' : ' Orte'));
+  let msg = parts.length ? parts.join(' und ') + ' importiert' : 'Nichts gefunden, was sich importieren lässt';
+  if (skipped) msg += ` · ${skipped} doppelt übersprungen`;
+  if (errors) msg += ` · ${errors} Datei(en) fehlerhaft`;
+  toast(msg, 5000);
+  if (!bounds.isEmpty()) {
+    $('#sheet').hidden = true;
+    gps.follow = false; $('#btn-locate').classList.remove('active');
+    map.fitBounds(bounds, { padding: 80, maxZoom: 14 });
+  }
+}
+
+function setupSearchAndImport() {
+  $('#btn-search').onclick = openSearch;
+  $('#search-close').onclick = closeSearch;
+  $('#search-input').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(runSearch, 220); });
+  $('#search-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeSearch();
+    if (e.key === 'Enter') { const first = $('#search-results .place-item'); if (first) first.click(); }
+  });
+  $('#import-file').onchange = async (e) => {
+    const files = [...e.target.files];
+    e.target.value = '';
+    if (files.length) { toast('Importiere …'); await importFiles(files); }
+  };
 }
 
 /* ---------- Start ---------- */
@@ -1078,6 +1575,7 @@ async function main() {
   map.on('mouseleave', 'places-icon', () => { map.getCanvas().style.cursor = ''; });
   map.on('move', () => { if (editor.open && editor.moving) updateEditorCoords(); });
   setupLongPress();
+  loadTracks();
   map.on('error', (e) => { if (e && e.error) console.warn('Karte:', e.error.message || e.error); });
 
   setupUI();

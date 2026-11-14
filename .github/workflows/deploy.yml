@@ -78,6 +78,9 @@ jobs:
           done
           du -sh data-cache/*
 
+      - name: Suchindex erstellen (Orte, Gipfel, Pässe, Seen aus OpenStreetMap)
+        run: python3 scripts/build_search.py
+
       - name: Schriften und Symbole laden
         run: git clone --depth 1 https://github.com/protomaps/basemaps-assets assets-tmp
 
@@ -103,7 +106,7 @@ jobs:
           cp -r assets-tmp/sprites site/sprites
           for id in $(jq -r '.[].id' regions.json); do
             mkdir -p "site/data/$id"
-            cp "data-cache/$id/base.pmtiles" "data-cache/$id/dem.pmtiles" "site/data/$id/"
+            cp "data-cache/$id/base.pmtiles" "data-cache/$id/dem.pmtiles" "data-cache/$id/search.json" "site/data/$id/"
           done
           python3 - << 'PY'
           import json, os
@@ -111,9 +114,9 @@ jobs:
           build = open('data-cache/build.txt').read().strip()
           for r in regions:
               r['files'] = []
-              for layer in ('base', 'dem'):
-                  p = f"site/data/{r['id']}/{layer}.pmtiles"
-                  r['files'].append({'layer': layer, 'path': f"data/{r['id']}/{layer}.pmtiles", 'size': os.path.getsize(p)})
+              for layer, ext in (('base', 'pmtiles'), ('dem', 'pmtiles'), ('search', 'json')):
+                  p = f"site/data/{r['id']}/{layer}.{ext}"
+                  r['files'].append({'layer': layer, 'path': f"data/{r['id']}/{layer}.{ext}", 'size': os.path.getsize(p)})
               r['version'] = build
           json.dump({'build': build, 'regions': regions}, open('site/data/regions.json', 'w'), ensure_ascii=False, indent=1)
           PY

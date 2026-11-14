@@ -258,3 +258,45 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
   .spot { max-height: 64vh; }
   .move-hint { top: calc(var(--safe-t) + 70px); }
 }
+
+/* ---------- Suche ---------- */
+.search { position: fixed; z-index: 12; top: calc(var(--safe-t) + var(--gap)); left: 50%; transform: translateX(-50%);
+  width: min(560px, calc(100vw - 2 * var(--gap))); max-height: calc(100vh - var(--safe-t) - var(--safe-b) - 2 * var(--gap));
+  display: flex; flex-direction: column; overflow: hidden; background: var(--panel-solid); }
+.search[hidden] { display: none; }
+.search-bar { display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 16px; border-bottom: 1px solid var(--line); }
+.search-bar > svg { color: var(--muted); flex-shrink: 0; }
+.search-bar input { flex-grow: 1; min-width: 0; height: 44px; border: 0; background: transparent; outline: none; font-size: 17px; -webkit-appearance: none; }
+.search-results { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 6px 8px 10px; }
+.sr-note { padding: 8px 8px 4px; margin: 0; line-height: 1.45; }
+.pi-dist { margin-left: auto; padding-left: 8px; font-size: 13px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.place-item .pi-txt { flex-shrink: 1; }
+
+.search-pin { display: flex; flex-direction: column; align-items: center; }
+.sp-card { position: relative; padding: 12px 14px; border-radius: 18px; display: flex; flex-direction: column; gap: 4px; min-width: 200px; max-width: 280px; margin-bottom: 8px; background: var(--panel-solid); }
+.sp-card b { font-size: 15px; padding-right: 36px; }
+.sp-card small { font-size: 12px; color: var(--muted); padding-right: 30px; }
+.sp-card .btn { margin-top: 6px; height: 40px; }
+.sp-x { position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; }
+.sp-x svg { width: 16px; height: 16px; }
+.sp-dot { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); border: 3px solid #fff; box-shadow: 0 0 0 6px rgba(255,122,26,.25), 0 2px 6px rgba(0,0,0,.35); }
+
+/* ---------- Import und Tracks ---------- */
+.import-btn { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 18px; border: 1.5px dashed var(--accent); background: rgba(255,122,26,0.07); cursor: pointer; }
+.import-btn input { display: none; }
+.import-btn svg { color: var(--accent-text); flex-shrink: 0; width: 26px; height: 26px; }
+.import-btn span { display: flex; flex-direction: column; gap: 2px; }
+.import-btn b { font-size: 15px; }
+.import-btn small { font-size: 12px; color: var(--muted); }
+.track-list { display: flex; flex-direction: column; gap: 2px; margin: 6px 0 4px; }
+.track-item { display: flex; align-items: center; gap: 10px; }
+.ti-main { flex-grow: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 8px 6px; border: 0; background: transparent; text-align: left; border-radius: 14px; }
+.ti-main:active { background: var(--faint); }
+.ti-color { width: 12px; height: 40px; border-radius: 6px; flex-shrink: 0; }
+.ti-del { width: 40px; height: 40px; flex-shrink: 0; }
+.ti-del svg { width: 18px; height: 18px; }
+.ti-del.confirm { background: #E5484D; color: #fff; }
+
+@media (max-width: 600px) {
+  .search { top: calc(var(--safe-t) + 8px); max-height: 70vh; }
+}
