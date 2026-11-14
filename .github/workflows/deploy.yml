@@ -69,6 +69,8 @@ jobs:
           BASE_URL: https://build.protomaps.com/${{ steps.build.outputs.date }}.pmtiles
           DEM_URL: https://download.mapterhorn.com/planet.pmtiles
         run: |
+          echo "== Inhalt Spiegel"; pmtiles show https://data.source.coop/protomaps/openstreetmap/tiles/v3.pmtiles 2>&1 | grep -iE "version|replication|max zoom|tile type|clustered" | head -12 || true
+          echo "== Inhalt Original"; pmtiles show "$BASE_URL" 2>&1 | grep -iE "version|replication|max zoom|tile type|clustered" | head -12 || true
           REL=$(gh release view -R protomaps/go-pmtiles --json assets -q '.assets[0].url' 2>/dev/null || true)
           echo "Release-Datei: $REL"
           for u in "$BASE_URL" "$DEM_URL" https://data.source.coop/protomaps/openstreetmap/tiles/v4.pmtiles https://data.source.coop/protomaps/openstreetmap/tiles/v3.pmtiles "$REL"; do
