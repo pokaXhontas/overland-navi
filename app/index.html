@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Overland">
+<meta name="theme-color" content="#F2F0EA">
+<title>Overland-Navi</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="vendor/maplibre-gl.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="map" aria-label="Karte"></div>
+
+<section class="hud panel" aria-label="Fahrdaten">
+  <div class="speed"><span id="spd">–</span><small>km/h</small></div>
+  <div class="hud-grid">
+    <div><span class="lbl">Kurs</span><b id="crs">–</b></div>
+    <div><span class="lbl">Höhe</span><b id="alt">–</b></div>
+    <div><span class="lbl">GPS</span><b id="acc">–</b></div>
+  </div>
+</section>
+
+<div class="topright">
+  <div class="chip panel" id="mapchip"><span class="dot" id="mapdot"></span><span id="maptxt">Karte wird geladen …</span></div>
+</div>
+
+<div class="controls">
+  <button class="ctl panel" id="btn-layers" aria-label="Karten und Ebenen">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/></svg>
+  </button>
+  <button class="ctl panel" id="btn-compass" aria-label="Karte in Fahrtrichtung oder nach Norden">
+    <svg viewBox="0 0 24 24" id="needle" aria-hidden="true"><path class="fill-accent" d="M12 2.5 16.5 12h-9Z"/><path class="fill-muted" d="M12 21.5 7.5 12h9Z"/></svg>
+    <span class="ctl-label" id="compass-label">N</span>
+  </button>
+  <button class="ctl panel" id="btn-locate" aria-label="Auf Position zentrieren">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle class="fill-cur" cx="12" cy="12" r="2.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+  </button>
+  <div class="zoom panel">
+    <button class="ctl flat" id="zin" aria-label="Hineinzoomen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button class="ctl flat" id="zout" aria-label="Herauszoomen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+  </div>
+</div>
+
+<button class="fab" id="fab">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 21h13M3.5 21 10 9l6.5 12M10 21l-2.5-4.5M10 21l2.5-4.5"/><path d="M19 3v6M16 6h6"/></svg>
+  <span class="fab-txt"><b>Platz hier</b><small>Stellplatz speichern</small></span>
+</button>
+
+<aside class="sheet" id="sheet" aria-label="Karten und Ebenen" hidden>
+  <div class="sheet-head">
+    <h1>Karten &amp; Ebenen</h1>
+    <button class="round" id="sheet-close" aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </div>
+  <div class="sheet-body">
+    <h2>Darstellung</h2>
+    <div class="seg" role="radiogroup" aria-label="Farbschema">
+      <button role="radio" data-theme="auto">Automatisch</button>
+      <button role="radio" data-theme="light">Hell</button>
+      <button role="radio" data-theme="dark">Dunkel</button>
+    </div>
+    <label class="row"><span><b>Höhenlinien</b><small>Mit Höhenangaben</small></span><input type="checkbox" class="switch" id="t-contours"></label>
+    <label class="row"><span><b>Geländeschattierung</b><small>Berge plastisch darstellen</small></span><input type="checkbox" class="switch" id="t-hillshade"></label>
+    <label class="row"><span><b>Karte in Fahrtrichtung</b><small>Sonst ist Norden immer oben</small></span><input type="checkbox" class="switch" id="t-headingup"></label>
+    <label class="row"><span><b>Bildschirm anlassen</b><small>Solange die App offen ist</small></span><input type="checkbox" class="switch" id="t-wake"></label>
+
+    <h2>Offline-Karten</h2>
+    <div id="regions" class="regions"><p class="muted">Wird geladen …</p></div>
+    <p class="muted small" id="storage"></p>
+
+    <h2>Meine Plätze</h2>
+    <div class="row static"><span><b id="places-count">0 Plätze</b><small>Mit „Platz hier“ gespeichert</small></span><button class="btn" id="btn-gpx">Als GPX teilen</button></div>
+
+    <p class="muted small foot">Kartendaten © OpenStreetMap-Mitwirkende · Protomaps · Höhen: Mapterhorn<br>Version __BUILD__</p>
+  </div>
+</aside>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="fatal" id="fatal" hidden></div>
+
+<script src="vendor/maplibre-gl.js"></script>
+<script src="vendor/pmtiles.js"></script>
+<script src="vendor/basemaps.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

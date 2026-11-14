@@ -1,0 +1,138 @@
+name: Bauen und veröffentlichen
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Bibliotheken laden (MapLibre, PMTiles, Basemap-Stil, Höhenlinien)
+        run: |
+          mkdir -p vendor-tmp
+          cd vendor-tmp
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund maplibre-gl@5 pmtiles@4 @protomaps/basemaps@5 maplibre-contour@0.1
+
+      - name: pmtiles-Werkzeug installieren
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download -R protomaps/go-pmtiles -p '*Linux_x86_64.tar.gz' -O pmtiles.tgz
+          tar xzf pmtiles.tgz pmtiles
+          sudo mv pmtiles /usr/local/bin/
+          pmtiles version || true
+
+      - name: Kalenderwoche bestimmen
+        id: week
+        run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+
+      - name: Kartendaten aus dem Cache holen
+        uses: actions/cache@v4
+        with:
+          path: data-cache
+          key: data-${{ hashFiles('regions.json') }}-${{ steps.week.outputs.week }}
+
+      - name: Kartendaten schneiden (OpenStreetMap + Höhenmodell)
+        run: |
+          set -euo pipefail
+          mkdir -p data-cache
+          BUILD=""
+          for i in $(seq 0 21); do
+            d=$(date -u -d "-$i day" +%Y%m%d)
+            if curl -sfI "https://build.protomaps.com/$d.pmtiles" > /dev/null; then BUILD=$d; break; fi
+          done
+          if [ -z "$BUILD" ]; then echo "Kein Protomaps-Build gefunden"; exit 1; fi
+          echo "Protomaps-Build: $BUILD"
+          [ -f data-cache/build.txt ] || echo "$BUILD" > data-cache/build.txt
+          for id in $(jq -r '.[].id' regions.json); do
+            bbox=$(jq -r ".[] | select(.id==\"$id\") | .bbox | map(tostring) | join(\",\")" regions.json)
+            mz=$(jq -r ".[] | select(.id==\"$id\") | .maxzoom" regions.json)
+            dmz=$(jq -r ".[] | select(.id==\"$id\") | .demMaxzoom" regions.json)
+            mkdir -p "data-cache/$id"
+            if [ ! -s "data-cache/$id/base.pmtiles" ]; then
+              echo "== $id: Karte (bis Zoom $mz)"
+              pmtiles extract "https://build.protomaps.com/$BUILD.pmtiles" "data-cache/$id/base.pmtiles" --bbox="$bbox" --maxzoom="$mz" --download-threads=8
+            fi
+            if [ ! -s "data-cache/$id/dem.pmtiles" ]; then
+              echo "== $id: Höhenmodell (bis Zoom $dmz)"
+              pmtiles extract "https://download.mapterhorn.com/planet.pmtiles" "data-cache/$id/dem.pmtiles" --bbox="$bbox" --maxzoom="$dmz" --download-threads=8
+            fi
+          done
+          du -sh data-cache/*
+
+      - name: Schriften und Symbole laden
+        run: git clone --depth 1 https://github.com/protomaps/basemaps-assets assets-tmp
+
+      - name: Seite zusammenbauen
+        run: |
+          set -euo pipefail
+          mkdir -p site/vendor site/data
+          cp -r app/. site/
+          pick() {
+            dest="$1"; shift
+            for f in "$@"; do
+              if [ -f "$f" ]; then cp "$f" "$dest"; echo "ok: $f"; return 0; fi
+            done
+            echo "Datei nicht gefunden: $*"; exit 1
+          }
+          N=vendor-tmp/node_modules
+          pick site/vendor/maplibre-gl.js  $N/maplibre-gl/dist/maplibre-gl.js
+          pick site/vendor/maplibre-gl.css $N/maplibre-gl/dist/maplibre-gl.css
+          pick site/vendor/pmtiles.js      $N/pmtiles/dist/pmtiles.js $N/pmtiles/dist/index.js
+          pick site/vendor/basemaps.js     $N/@protomaps/basemaps/dist/basemaps.js $N/@protomaps/basemaps/dist/index.js
+          pick site/vendor/maplibre-contour.js $N/maplibre-contour/dist/index.min.js $N/maplibre-contour/dist/index.js
+          cp -r assets-tmp/fonts site/fonts
+          cp -r assets-tmp/sprites site/sprites
+          for id in $(jq -r '.[].id' regions.json); do
+            mkdir -p "site/data/$id"
+            cp "data-cache/$id/base.pmtiles" "data-cache/$id/dem.pmtiles" "site/data/$id/"
+          done
+          python3 - << 'PY'
+          import json, os
+          regions = json.load(open('regions.json'))
+          build = open('data-cache/build.txt').read().strip()
+          for r in regions:
+              r['files'] = []
+              for layer in ('base', 'dem'):
+                  p = f"site/data/{r['id']}/{layer}.pmtiles"
+                  r['files'].append({'layer': layer, 'path': f"data/{r['id']}/{layer}.pmtiles", 'size': os.path.getsize(p)})
+              r['version'] = build
+          json.dump({'build': build, 'regions': regions}, open('site/data/regions.json', 'w'), ensure_ascii=False, indent=1)
+          PY
+          sed -i "s/__BUILD__/${GITHUB_SHA::7}/g" site/sw.js site/index.html
+          du -sh site
+          du -sh site/*
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
