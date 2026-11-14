@@ -300,3 +300,33 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 @media (max-width: 600px) {
   .search { top: calc(var(--safe-t) + 8px); max-height: 70vh; }
 }
+
+/* ---------- Kategorien ---------- */
+.sheet h2.first { margin-top: 8px; }
+.hint-line { margin: -4px 0 8px; }
+.cat-list { display: flex; flex-direction: column; margin-bottom: 4px; }
+.cat-row { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); }
+.cat-row:last-child { border-bottom: 0; }
+.cat-open { flex-grow: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 9px 4px; border: 0; background: transparent; text-align: left; border-radius: 14px; }
+.cat-open:active { background: var(--faint); }
+.cat-open .pi-txt b { font-size: 16px; }
+.cat-row.empty .pi-icon { opacity: .45; }
+.cat-row.empty .pi-txt b { color: var(--muted); }
+.chev { width: 18px; height: 18px; margin-left: auto; color: var(--muted); flex-shrink: 0; }
+
+.sheet-page { position: absolute; inset: 0; background: var(--panel-solid); display: flex; flex-direction: column; padding-top: var(--safe-t); transform: translateX(0); transition: transform .22s ease; z-index: 2; }
+.sheet-page[hidden] { display: flex; transform: translateX(105%); pointer-events: none; }
+.page-head { padding-top: 14px; }
+.back { display: flex; align-items: center; gap: 2px; height: 44px; padding: 0 10px 0 2px; border: 0; background: transparent; color: var(--accent-text); font-size: 17px; font-weight: 600; }
+.back svg { width: 26px; height: 26px; }
+.cat-title { display: flex; align-items: center; gap: 14px; margin: 6px 0 8px; }
+.cat-title .pi-icon { width: 48px; height: 48px; border-radius: 15px; }
+.cat-title .pi-icon svg { width: 25px; height: 25px; }
+.cat-title h1 { margin: 0; font-size: 26px; font-weight: 700; }
+#cat-items { margin-top: 10px; }
+
+@media (max-width: 600px) {
+  .sheet { overflow: hidden; }
+  .sheet-page { padding-top: 6px; border-radius: 28px 28px 0 0; }
+  .sheet-page[hidden] { transform: translateX(105%); }
+}

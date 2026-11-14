@@ -17,7 +17,8 @@ const settings = {
   contours: store.get('contours', true),
   hillshade: store.get('hillshade', true),
   headingUp: store.get('headingUp', true),
-  wake: store.get('wake', true)
+  wake: store.get('wake', true),
+  hidden: store.get('hiddenCats', [])
 };
 let places = store.get('places', []);
 
@@ -460,7 +461,7 @@ places = places.map((p, i) => ({
 function placesGeoJSON() {
   return {
     type: 'FeatureCollection',
-    features: places.map((p) => ({
+    features: places.filter((p) => !settings.hidden.includes(p.cat)).map((p) => ({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
       properties: { id: p.id, name: p.name, cat: p.cat }
@@ -635,7 +636,7 @@ async function renderPhotos() {
 }
 
 function openEditor(place, at) {
-  $('#sheet').hidden = true;
+  closeSheet();
   gps.follow = false;
   $('#btn-locate').classList.remove('active');
   const isNew = !place;
@@ -708,7 +709,7 @@ async function saveEditor() {
     places.push(d);
   }
   savePlaces();
-  toast(`„${d.name}“ gespeichert`);
+  toast(settings.hidden.includes(d.cat) ? `„${d.name}“ gespeichert. ${CAT[d.cat].label} ist gerade ausgeblendet.` : `„${d.name}“ gespeichert`);
   closeEditor();
 }
 
@@ -732,26 +733,7 @@ function newPlaceHere() {
   openEditor(null, at);
 }
 
-function renderPlaceList() {
-  const box = $('#place-list');
-  if (!box) return;
-  box.innerHTML = '';
-  const ref = gps.pos || (map ? { lat: map.getCenter().lat, lon: map.getCenter().lng } : null);
-  const list = places.map((p) => ({ p, d: ref ? distance(ref, p) : 0 })).sort((a, b) => a.d - b.d);
-  for (const { p, d } of list) {
-    const c = CAT[p.cat] || CAT.other;
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'place-item';
-    b.innerHTML = `<span class="pi-icon" style="background:${c.color};color:${c.ink}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${c.d}"/></svg></span><span class="pi-txt"><b></b><small></small></span>`;
-    b.querySelector('b').textContent = p.name;
-    const km = d >= 1000 ? (d / 1000).toFixed(1).replace('.', ',') + ' km' : Math.round(d) + ' m';
-    b.querySelector('small').textContent = `${c.label}${p.rating ? ' · ' + '★'.repeat(p.rating) : ''}${ref ? ' · ' + km : ''}`;
-    b.onclick = () => openEditor(p);
-    box.appendChild(b);
-  }
-}
-
+function renderPlaceList() { renderDataCats(); refreshCatPage(); }
 function exportGPX() {
   if (!places.length) { toast('Noch keine Orte gespeichert.'); return; }
   const esc = (s) => String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
@@ -943,8 +925,10 @@ async function updateStorage() {
 /* ---------- Bedienelemente ---------- */
 function setupUI() {
   const sheet = $('#sheet');
-  $('#btn-layers').onclick = () => { if (editor.open) closeEditor(); closeSearch(); renderRegions(); updateStorage(); renderPlaceList(); renderTrackList(); sheet.hidden = false; };
-  $('#sheet-close').onclick = () => { sheet.hidden = true; };
+  $('#btn-layers').onclick = () => { if (editor.open) closeEditor(); closeSearch(); renderRegions(); updateStorage(); closeCatPage(); renderDataCats(); sheet.hidden = false; };
+  $('#sheet-close').onclick = closeSheet;
+  $('#cat-close').onclick = closeSheet;
+  $('#cat-back').onclick = closeCatPage;
 
   document.querySelectorAll('.seg button').forEach((b) => {
     b.setAttribute('aria-checked', String(b.dataset.theme === settings.theme));
@@ -1223,7 +1207,7 @@ async function runSearch() {
 
 function openSearch() {
   if (editor.open) closeEditor();
-  $('#sheet').hidden = true;
+  closeSheet();
   $('#search').hidden = false;
   const inp = $('#search-input');
   inp.focus();
@@ -1249,7 +1233,7 @@ function trackLength(coords) {
 function tracksGeoJSON() {
   return {
     type: 'FeatureCollection',
-    features: tracks.filter((t) => t.visible).map((t) => ({
+    features: (settings.hidden.includes('tracks') ? [] : tracks.filter((t) => t.visible)).map((t) => ({
       type: 'Feature',
       geometry: { type: 'MultiLineString', coordinates: t.segments.map((seg) => seg.map((c) => [c[0], c[1]])) },
       properties: { id: t.id, name: t.name, color: t.color }
@@ -1275,36 +1259,119 @@ function trackBounds(t) {
   return b;
 }
 
-function renderTrackList() {
-  const box = $('#track-list');
+function renderTrackList() { renderDataCats(); refreshCatPage(); }
+
+function buildTrackRow(t) {
+  const row = document.createElement('div');
+  row.className = 'track-item';
+  row.innerHTML = `<button type="button" class="ti-main"><span class="ti-color"></span><span class="pi-txt"><b></b><small></small></span></button><input type="checkbox" class="switch" aria-label="Track anzeigen"><button type="button" class="round ti-del" aria-label="Track löschen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg></button>`;
+  row.querySelector('.ti-color').style.background = t.color;
+  row.querySelector('b').textContent = t.name;
+  row.querySelector('small').textContent = fmtDist(t.length) + (t.source ? ' · ' + t.source : '');
+  row.querySelector('.ti-main').onclick = () => {
+    closeSheet();
+    if (!t.visible) { t.visible = true; saveTrack(t); }
+    if (settings.hidden.includes('tracks')) setCatHidden('tracks', false);
+    updateTracksSource();
+    gps.follow = false; $('#btn-locate').classList.remove('active');
+    map.fitBounds(trackBounds(t), { padding: 80, maxZoom: 15 });
+  };
+  const sw = row.querySelector('.switch');
+  sw.checked = !!t.visible;
+  sw.onchange = () => { t.visible = sw.checked; saveTrack(t); updateTracksSource(); };
+  const del = row.querySelector('.ti-del');
+  del.onclick = async () => {
+    if (!del.classList.contains('confirm')) { del.classList.add('confirm'); toast('Zum Löschen nochmal tippen'); setTimeout(() => del.classList.remove('confirm'), 3000); return; }
+    await DB.run('tracks', 'readwrite', (st) => st.delete(t.id));
+    tracks = tracks.filter((x) => x !== t);
+    updateTracksSource();
+    toast('Track gelöscht');
+  };
+  return row;
+}
+
+/* ---------- Kategorien: ein-/ausblenden und Inhalte ansehen ---------- */
+const TRACK_CAT = { id: 'tracks', label: 'Tracks', color: '#4F6FE0', ink: '#FFFFFF', d: 'M4 19c3-6 5 2 8-4s5-2 8-8M4 19h.01M20 7h.01' };
+let openCat = null;
+
+function catDef(id) { return id === 'tracks' ? TRACK_CAT : (CAT[id] || CAT.other); }
+function catItems(id) { return id === 'tracks' ? tracks : places.filter((p) => p.cat === id); }
+
+function setCatHidden(id, hidden) {
+  const set = new Set(settings.hidden);
+  if (hidden) set.add(id); else set.delete(id);
+  settings.hidden = [...set];
+  store.set('hiddenCats', settings.hidden);
+  const ps = map && map.getSource('places');
+  if (ps) ps.setData(placesGeoJSON());
+  const ts = map && map.getSource('tracks');
+  if (ts) ts.setData(tracksGeoJSON());
+  renderDataCats();
+}
+
+function renderDataCats() {
+  const box = $('#cat-list');
   if (!box) return;
-  $('#tracks-count').textContent = tracks.length + (tracks.length === 1 ? ' Track' : ' Tracks');
+  $('#places-count').textContent = places.length + (places.length === 1 ? ' Ort' : ' Orte') + ' · ' + tracks.length + (tracks.length === 1 ? ' Track' : ' Tracks');
   box.innerHTML = '';
-  for (const t of tracks) {
+  for (const c of [TRACK_CAT, ...CATS]) {
+    const n = catItems(c.id).length;
     const row = document.createElement('div');
-    row.className = 'track-item';
-    row.innerHTML = `<button type="button" class="ti-main"><span class="ti-color"></span><span class="pi-txt"><b></b><small></small></span></button><input type="checkbox" class="switch" aria-label="Track anzeigen"><button type="button" class="round ti-del" aria-label="Track löschen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg></button>`;
-    row.querySelector('.ti-color').style.background = t.color;
-    row.querySelector('b').textContent = t.name;
-    row.querySelector('small').textContent = fmtDist(t.length) + (t.source ? ' · ' + t.source : '');
-    row.querySelector('.ti-main').onclick = () => {
-      $('#sheet').hidden = true;
-      if (!t.visible) { t.visible = true; saveTrack(t); updateTracksSource(); }
-      gps.follow = false; $('#btn-locate').classList.remove('active');
-      map.fitBounds(trackBounds(t), { padding: 80, maxZoom: 15 });
-    };
+    row.className = 'cat-row' + (n ? '' : ' empty');
+    row.innerHTML = `<button type="button" class="cat-open"><span class="pi-icon" style="background:${c.color};color:${c.ink}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${c.d}"/></svg></span><span class="pi-txt"><b></b><small></small></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button><input type="checkbox" class="switch">`;
+    row.querySelector('b').textContent = c.label;
+    const hidden = settings.hidden.includes(c.id);
+    row.querySelector('small').textContent = (n === 0 ? 'leer' : n + (c.id === 'tracks' ? (n === 1 ? ' Track' : ' Tracks') : (n === 1 ? ' Ort' : ' Orte'))) + (hidden ? ' · ausgeblendet' : '');
+    row.querySelector('.cat-open').onclick = () => openCatPage(c.id);
     const sw = row.querySelector('.switch');
-    sw.checked = !!t.visible;
-    sw.onchange = () => { t.visible = sw.checked; saveTrack(t); updateTracksSource(); };
-    const del = row.querySelector('.ti-del');
-    del.onclick = async () => {
-      if (!del.classList.contains('confirm')) { del.classList.add('confirm'); toast('Zum Löschen nochmal tippen'); setTimeout(() => del.classList.remove('confirm'), 3000); return; }
-      await DB.run('tracks', 'readwrite', (s) => s.delete(t.id));
-      tracks = tracks.filter((x) => x !== t);
-      updateTracksSource();
-      toast('Track gelöscht');
-    };
+    sw.checked = !hidden;
+    sw.setAttribute('aria-label', c.label + ' auf der Karte zeigen');
+    sw.onchange = () => setCatHidden(c.id, !sw.checked);
     box.appendChild(row);
+  }
+}
+
+function openCatPage(id) {
+  openCat = id;
+  refreshCatPage();
+  const page = $('#cat-page');
+  page.hidden = false;
+  page.querySelector('.sheet-body').scrollTop = 0;
+}
+function closeCatPage() { openCat = null; $('#cat-page').hidden = true; }
+function closeSheet() { closeCatPage(); $('#sheet').hidden = true; }
+
+function refreshCatPage() {
+  if (!openCat) return;
+  const c = catDef(openCat);
+  const items = catItems(openCat);
+  const icon = $('#cat-icon');
+  icon.style.background = c.color;
+  icon.style.color = c.ink;
+  icon.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${c.d}"/></svg>`;
+  $('#cat-name').textContent = c.label;
+  $('#cat-count').textContent = items.length ? `${items.length} Einträge, bleiben gespeichert, auch wenn ausgeblendet` : 'Noch nichts in dieser Kategorie';
+  const tg = $('#cat-toggle');
+  tg.checked = !settings.hidden.includes(openCat);
+  tg.onchange = () => setCatHidden(openCat, !tg.checked);
+  const box = $('#cat-items');
+  box.innerHTML = '';
+  if (openCat === 'tracks') {
+    for (const t of tracks) box.appendChild(buildTrackRow(t));
+    return;
+  }
+  const ref = gps.pos || (map ? { lat: map.getCenter().lat, lon: map.getCenter().lng } : null);
+  const list = items.map((p) => ({ p, d: ref ? distance(ref, p) : null })).sort((a, b) => (a.d || 0) - (b.d || 0));
+  for (const { p, d } of list) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'place-item';
+    b.innerHTML = `<span class="pi-icon" style="background:${c.color};color:${c.ink}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${c.d}"/></svg></span><span class="pi-txt"><b></b><small></small></span><span class="pi-dist"></span>`;
+    b.querySelector('b').textContent = p.name;
+    b.querySelector('small').textContent = [p.rating ? '★'.repeat(p.rating) : '', p.note ? p.note.slice(0, 60) : '', p.source ? 'aus ' + p.source : ''].filter(Boolean).join(' · ') || ' ';
+    b.querySelector('.pi-dist').textContent = fmtDist(d);
+    b.onclick = () => { closeSheet(); openEditor(p); };
+    box.appendChild(b);
   }
 }
 
@@ -1470,7 +1537,7 @@ async function importFiles(fileList) {
   if (errors) msg += ` · ${errors} Datei(en) fehlerhaft`;
   toast(msg, 5000);
   if (!bounds.isEmpty()) {
-    $('#sheet').hidden = true;
+    closeSheet();
     gps.follow = false; $('#btn-locate').classList.remove('active');
     map.fitBounds(bounds, { padding: 80, maxZoom: 14 });
   }

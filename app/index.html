@@ -62,6 +62,18 @@
     <button class="round" id="sheet-close" aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
   </div>
   <div class="sheet-body">
+    <h2 class="first">Meine Daten</h2>
+    <p class="muted small hint-line">Schalter blendet eine ganze Kategorie aus. Antippen zeigt, was darin ist.</p>
+    <div class="cat-list" id="cat-list"></div>
+    <div class="row static"><span><b id="places-count">0 Orte</b><small>Neuer Ort: „Ort speichern“ oder lange auf die Karte drücken</small></span><button class="btn" id="btn-gpx">Als GPX teilen</button></div>
+
+    <h2>Importieren</h2>
+    <label class="import-btn">
+      <input type="file" id="import-file" multiple>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V9M7 14l5-5 5 5M5 4h14"/></svg>
+      <span><b>GPX, KML oder ZIP öffnen</b><small>Tracks und Orte aus MapOut, iOverlander und anderen Apps</small></span>
+    </label>
+
     <h2>Darstellung</h2>
     <div class="seg" role="radiogroup" aria-label="Farbschema">
       <button role="radio" data-theme="auto">Automatisch</button>
@@ -77,23 +89,19 @@
     <div id="regions" class="regions"><p class="muted">Wird geladen …</p></div>
     <p class="muted small" id="storage"></p>
 
-    <h2>Importieren</h2>
-    <label class="import-btn">
-      <input type="file" id="import-file" multiple>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V9M7 14l5-5 5 5M5 4h14"/></svg>
-      <span><b>GPX, KML oder ZIP öffnen</b><small>Tracks und Orte aus MapOut, iOverlander und anderen Apps</small></span>
-    </label>
-
-    <h2>Meine Tracks</h2>
-    <div class="row static"><span><b id="tracks-count">0 Tracks</b><small>Antippen zeigt den Track, Schalter blendet ihn aus</small></span></div>
-    <div class="track-list" id="track-list"></div>
-
-    <h2>Meine Orte</h2>
-    <div class="row static"><span><b id="places-count">0 Orte</b><small>Antippen zum Bearbeiten</small></span><button class="btn" id="btn-gpx">Als GPX teilen</button></div>
-    <div class="place-list" id="place-list"></div>
-    <p class="muted small">Neuer Ort: „Ort speichern“ oder lange auf die Karte drücken.</p>
-
     <p class="muted small foot">Kartendaten © OpenStreetMap-Mitwirkende · Protomaps · Höhen: Mapterhorn<br>Version __BUILD__</p>
+  </div>
+
+  <div class="sheet-page" id="cat-page" hidden>
+    <div class="sheet-head page-head">
+      <button class="back" id="cat-back" aria-label="Zurück"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Zurück</span></button>
+      <button class="round" id="cat-close" aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <div class="cat-title"><span class="pi-icon" id="cat-icon"></span><h1 id="cat-name"></h1></div>
+      <label class="row"><span><b>Auf der Karte zeigen</b><small id="cat-count"></small></span><input type="checkbox" class="switch" id="cat-toggle"></label>
+      <div class="place-list" id="cat-items"></div>
+    </div>
   </div>
 </aside>
 
