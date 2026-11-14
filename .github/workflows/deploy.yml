@@ -121,6 +121,19 @@ jobs:
           du -sh site
           du -sh site/*
 
+      - name: Bibliotheken prüfen
+        run: |
+          node -e '
+          const vm = require("vm"), fs = require("fs");
+          for (const f of ["pmtiles", "basemaps", "maplibre-contour"]) {
+            const ctx = { self: {}, window: {}, console };
+            ctx.globalThis = ctx;
+            vm.createContext(ctx);
+            try { vm.runInContext(fs.readFileSync("site/vendor/" + f + ".js", "utf8"), ctx); } catch (e) { console.log(f, "Fehler:", e.message); }
+            const names = Object.keys(ctx).filter((k) => !["self", "window", "globalThis", "console"].includes(k));
+            console.log(f, "->", names, Object.keys(ctx.self), Object.keys(ctx.window));
+          }'
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
