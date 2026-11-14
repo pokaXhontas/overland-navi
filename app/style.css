@@ -213,6 +213,7 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .spot { z-index: 11; }
 .spot .sheet-body { display: flex; flex-direction: column; gap: 4px; }
 .spot h2 { margin: 16px 0 8px; }
+.spot h2.first { margin-top: 4px; }
 .photos { display: flex; gap: 10px; overflow-x: auto; padding: 4px 0 2px; }
 .photo-add { width: 104px; height: 84px; flex-shrink: 0; border-radius: 16px; border: 1.5px dashed var(--accent); background: rgba(255,122,26,0.08); color: var(--accent-text); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 13px; font-weight: 600; cursor: pointer; }
 .photo-add input { display: none; }

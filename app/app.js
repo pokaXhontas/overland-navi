@@ -478,7 +478,7 @@ function savePlaces() {
   store.set('places', places);
   const src = map && map.getSource('places');
   if (src) src.setData(placesGeoJSON());
-  $('#places-count').textContent = places.length + (places.length === 1 ? ' Platz' : ' Plätze');
+  $('#places-count').textContent = places.length + (places.length === 1 ? ' Ort' : ' Orte');
   renderPlaceList();
 }
 
@@ -645,17 +645,17 @@ function openEditor(place, at) {
   editor.open = true;
   editor.id = isNew ? null : place.id;
   editor.draft = isNew
-    ? { name: '', cat: 'wild', rating: 0, feats: [], note: '', photos: [], lat: at.lat, lon: at.lon, ele }
+    ? { name: '', cat: null, rating: 0, feats: [], note: '', photos: [], lat: at.lat, lon: at.lon, ele }
     : JSON.parse(JSON.stringify(place));
   editor.newPhotos = [];
   editor.removedPhotos = [];
   editor.confirmDelete = false;
 
-  $('#spot-title').textContent = isNew ? 'Neuer Platz' : 'Platz bearbeiten';
+  $('#spot-title').textContent = isNew ? 'Neuer Ort' : 'Ort bearbeiten';
   $('#spot-name').value = editor.draft.name;
   $('#spot-note').value = editor.draft.note;
   $('#spot-delete').hidden = isNew;
-  $('#spot-delete').textContent = 'Platz löschen';
+  $('#spot-delete').textContent = 'Ort löschen';
   $('#spot-move').hidden = isNew;
   renderChips();
   renderPhotos();
@@ -682,6 +682,7 @@ function closeEditor() {
 
 async function saveEditor() {
   const d = editor.draft;
+  if (!d.cat) d.cat = 'other';
   const c = editorCenter();
   d.lat = +c.lat.toFixed(6);
   d.lon = +c.lon.toFixed(6);
@@ -722,13 +723,13 @@ async function deleteEditorPlace() {
   if (p) for (const id of p.photos) { try { await PhotoDB.del(id); } catch (e) { /* egal */ } }
   places = places.filter((x) => x.id !== editor.id);
   savePlaces();
-  toast('Platz gelöscht');
+  toast('Ort gelöscht');
   closeEditor();
 }
 
 function newPlaceHere() {
   const at = gps.pos ? { lat: gps.pos.lat, lon: gps.pos.lon } : (() => { const c = map.getCenter(); return { lat: c.lat, lon: c.lng }; })();
-  if (!gps.pos) toast('Kein GPS – Platz startet in der Kartenmitte');
+  if (!gps.pos) toast('Kein GPS – der Ort startet in der Kartenmitte');
   openEditor(null, at);
 }
 
@@ -753,7 +754,7 @@ function renderPlaceList() {
 }
 
 function exportGPX() {
-  if (!places.length) { toast('Noch keine Plätze gespeichert.'); return; }
+  if (!places.length) { toast('Noch keine Orte gespeichert.'); return; }
   const esc = (s) => String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
   const wpts = places.map((p) => {
     const feats = p.feats.map((f) => (FEATS.find((x) => x[0] === f) || [f, f])[1]);
@@ -761,9 +762,9 @@ function exportGPX() {
     return `  <wpt lat="${p.lat}" lon="${p.lon}">${p.ele ? `<ele>${p.ele}</ele>` : ''}<time>${p.time}</time><name>${esc(p.name)}</name>${desc ? `<desc>${esc(desc)}</desc>` : ''}<type>${esc((CAT[p.cat] || CAT.other).label)}</type></wpt>`;
   }).join('\n');
   const gpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Overland-Navi" xmlns="http://www.topografix.com/GPX/1/1">\n${wpts}\n</gpx>\n`;
-  const file = new File([gpx], 'overland-plaetze.gpx', { type: 'application/gpx+xml' });
+  const file = new File([gpx], 'overland-orte.gpx', { type: 'application/gpx+xml' });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    navigator.share({ files: [file], title: 'Overland-Plätze' }).catch(() => {});
+    navigator.share({ files: [file], title: 'Overland-Orte' }).catch(() => {});
   } else {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(file);
