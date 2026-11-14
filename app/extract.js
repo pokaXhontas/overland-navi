@@ -32,35 +32,29 @@
     return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * Math.pow(2, z));
   }
 
-  /* Alle Kachel-IDs, die eine Liste von Rechtecken [W,S,E,N] abdecken, aufsteigend sortiert */
+  /* Alle Kachel-IDs, die eine Liste von Rechtecken [W,S,E,N] abdecken, aufsteigend sortiert und eindeutig */
   function wantedTileIds(boxes, minZoom, maxZoom) {
-    const levels = [];
-    let cur = new Set();
-    const n = Math.pow(2, maxZoom);
-    for (const [w, s, e, nn] of boxes) {
-      const x0 = Math.max(0, lon2x(w, maxZoom)), x1 = Math.min(n - 1, lon2x(e, maxZoom));
-      const y0 = Math.max(0, lat2y(nn, maxZoom)), y1 = Math.min(n - 1, lat2y(s, maxZoom));
-      for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) cur.add(x * n + y);
-    }
-    levels[maxZoom] = cur;
-    for (let z = maxZoom - 1; z >= minZoom; z--) {
-      const nz = Math.pow(2, z + 1), next = new Set(), np = Math.pow(2, z);
-      for (const k of levels[z + 1]) {
-        const x = Math.floor(k / nz), y = k % nz;
-        next.add((x >> 1) * np + (y >> 1));
-      }
-      levels[z] = next;
-    }
+    const ranges = [];
     let total = 0;
-    for (let z = minZoom; z <= maxZoom; z++) total += levels[z].size;
+    for (let z = minZoom; z <= maxZoom; z++) {
+      const n = Math.pow(2, z);
+      for (const [w, s, e, nn] of boxes) {
+        const x0 = Math.max(0, lon2x(w, z)), x1 = Math.min(n - 1, lon2x(e, z));
+        const y0 = Math.max(0, lat2y(nn, z)), y1 = Math.min(n - 1, lat2y(s, z));
+        if (x1 < x0 || y1 < y0) continue;
+        ranges.push([z, x0, x1, y0, y1]);
+        total += (x1 - x0 + 1) * (y1 - y0 + 1);
+      }
+    }
     const ids = new Float64Array(total);
     let i = 0;
-    for (let z = minZoom; z <= maxZoom; z++) {
-      const nz = Math.pow(2, z);
-      for (const k of levels[z]) ids[i++] = tileIdOf(z, Math.floor(k / nz), k % nz);
+    for (const [z, x0, x1, y0, y1] of ranges) {
+      for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) ids[i++] = tileIdOf(z, x, y);
     }
     ids.sort();
-    return ids;
+    let u = 0;
+    for (let k = 0; k < ids.length; k++) if (k === 0 || ids[k] !== ids[u - 1]) ids[u++] = ids[k];
+    return ids.subarray(0, u);
   }
 
   function lowerBound(arr, v) {
@@ -130,8 +124,8 @@
             if (buf.byteLength !== length) throw new Error('Unvollständige Antwort');
             return buf;
           } catch (e) {
-            if (attempt >= 4) throw e;
-            await new Promise((res) => setTimeout(res, 1500 * (attempt + 1)));
+            if (attempt >= 7 || /Bereichsanfragen/.test(e.message)) throw e;
+            await new Promise((res) => setTimeout(res, Math.min(20000, 1500 * Math.pow(1.7, attempt))));
           }
         }
       }
@@ -146,7 +140,7 @@
     return out;
   }
 
-  /* Plant den Ausschnitt: welche Kacheln es gibt und wo sie liegen */
+  /* Plant den Ausschnitt: welche Kacheln es gibt und wo sie liegen (mit Typed Arrays, damit auch große Länder in den Speicher passen) */
   async function planExtract(src, boxes, maxZoom, onStatus) {
     const head = await src.read(0, 16384);
     const header = parseHeader(head);
@@ -156,8 +150,9 @@
       ? head.subarray(header.rootOffset, header.rootOffset + header.rootLength)
       : await src.read(header.rootOffset, header.rootLength);
     let dirs = [parseDirectory(await decompress(rootBytes, header.internalCompression))];
-    const tIds = [], tRuns = [], tOffs = [], tLens = [];
-    let leafCount = 0;
+    const cap = wanted.length;
+    const tIds = new Float64Array(cap), tOffs = new Float64Array(cap), tRuns = new Uint32Array(cap), tLens = new Uint32Array(cap);
+    let m = 0, leafCount = 0;
     while (dirs.length) {
       const leaves = [];
       for (const d of dirs) {
@@ -173,62 +168,87 @@
             while (k < wanted.length && wanted[k] < end) {
               let run = 1;
               while (k + run < wanted.length && wanted[k + run] === wanted[k] + run && wanted[k + run] < end) run++;
-              tIds.push(wanted[k]); tRuns.push(run); tOffs.push(d.offs[i]); tLens.push(d.lens[i]);
+              tIds[m] = wanted[k]; tRuns[m] = run; tOffs[m] = d.offs[i]; tLens[m] = d.lens[i]; m++;
               k += run;
             }
           }
         }
       }
       leafCount += leaves.length;
-      if (onStatus) onStatus({ phase: 'scan', leaves: leafCount, tiles: tIds.length });
+      if (onStatus) onStatus({ phase: 'scan', leaves: leafCount, tiles: m });
       dirs = await mapLimit(leaves, 6, async ([o, l]) => parseDirectory(await decompress(await src.read(header.leafOffset + o, l), header.internalCompression)));
     }
-    const order = Array.from(tIds.keys()).sort((a, b) => tIds[a] - tIds[b]);
-    const n = order.length;
-    const plan = { header, maxZoom: mz, n, ids: new Float64Array(n), runs: new Uint32Array(n), srcOffs: new Float64Array(n), lens: new Uint32Array(n) };
-    order.forEach((j, i) => { plan.ids[i] = tIds[j]; plan.runs[i] = tRuns[j]; plan.srcOffs[i] = tOffs[j]; plan.lens[i] = tLens[j]; });
-    const uniq = new Map();
-    for (let i = 0; i < n; i++) uniq.set(plan.srcOffs[i], plan.lens[i]);
-    plan.chunks = [...uniq.entries()].sort((a, b) => a[0] - b[0]);
-    plan.bytes = plan.chunks.reduce((s, c) => s + c[1], 0);
+    // nach Kachel-ID sortieren
+    const order = new Uint32Array(m);
+    for (let i = 0; i < m; i++) order[i] = i;
+    order.sort((a, b) => tIds[a] - tIds[b]);
+    const plan = { header, maxZoom: mz, n: m, ids: new Float64Array(m), runs: new Uint32Array(m), srcOffs: new Float64Array(m), lens: new Uint32Array(m) };
+    for (let i = 0; i < m; i++) { const j = order[i]; plan.ids[i] = tIds[j]; plan.runs[i] = tRuns[j]; plan.srcOffs[i] = tOffs[j]; plan.lens[i] = tLens[j]; }
+    // eindeutige Datenblöcke in Dateireihenfolge
+    const byOff = order;
+    for (let i = 0; i < m; i++) byOff[i] = i;
+    byOff.sort((a, b) => plan.srcOffs[a] - plan.srcOffs[b]);
+    plan.tileUniq = new Uint32Array(m);
+    const uOff = new Float64Array(m), uLen = new Uint32Array(m);
+    let u = 0, bytes = 0;
+    for (let i = 0; i < m; i++) {
+      const t = byOff[i];
+      if (u === 0 || plan.srcOffs[t] !== uOff[u - 1]) { uOff[u] = plan.srcOffs[t]; uLen[u] = plan.lens[t]; bytes += plan.lens[t]; u++; }
+      plan.tileUniq[t] = u - 1;
+    }
+    plan.uniqOff = uOff.subarray(0, u);
+    plan.uniqLen = uLen.subarray(0, u);
+    plan.bytes = bytes;
+    // Gruppen für gebündelte Bereichsanfragen
+    const GAP = 128 * 1024, MAX = 12 * 1024 * 1024;
+    plan.groups = [];
+    let g = null;
+    for (let k = 0; k < u; k++) {
+      const off = plan.uniqOff[k], len = plan.uniqLen[k];
+      if (g && off - (g.start + g.length) <= GAP && off + len - g.start <= MAX) {
+        g.length = Math.max(g.length, off + len - g.start);
+        g.to = k + 1;
+      } else {
+        g = { start: off, length: len, from: k, to: k + 1 };
+        plan.groups.push(g);
+      }
+    }
     return plan;
   }
 
-  /* Lädt die Kacheldaten gebündelt und schreibt sie fortlaufend; liefert die Index-Datei */
-  async function runExtract(src, plan, write, onStatus) {
-    const { header, chunks } = plan;
-    const dst = new Map();
-    const GAP = 128 * 1024, MAX = 12 * 1024 * 1024;
-    const groups = [];
-    let g = null;
-    for (const [off, len] of chunks) {
-      if (g && off - (g.start + g.length) <= GAP && off + len - g.start <= MAX) {
-        g.length = Math.max(g.length, off + len - g.start);
-        g.items.push([off, len]);
-      } else {
-        g = { start: off, length: len, items: [[off, len]] };
-        groups.push(g);
+  /* Lädt die Kacheldaten gebündelt und schreibt sie fortlaufend; liefert die Index-Datei.
+     resume = { groupsDone, pos } setzt einen abgebrochenen Download fort. */
+  async function runExtract(src, plan, write, onStatus, resume, onCheckpoint) {
+    const { header, groups } = plan;
+    const uDst = new Float64Array(plan.uniqOff.length);
+    let pos = 0, done = 0, gi = 0;
+    if (resume && resume.groupsDone > 0) {
+      for (; gi < Math.min(resume.groupsDone, groups.length); gi++) {
+        for (let k = groups[gi].from; k < groups[gi].to; k++) { uDst[k] = pos; pos += plan.uniqLen[k]; }
       }
+      if (pos !== resume.pos) { gi = 0; pos = 0; }
+      done = pos;
     }
-    let pos = 0, done = 0;
-    const window = 3;
-    for (let i = 0; i < groups.length; i += window) {
-      const batch = groups.slice(i, i + window);
+    const WINDOW = 3;
+    while (gi < groups.length) {
+      const batch = groups.slice(gi, gi + WINDOW);
       const bufs = await Promise.all(batch.map((gr) => src.read(header.dataOffset + gr.start, gr.length)));
       for (let b = 0; b < batch.length; b++) {
         const gr = batch[b], buf = bufs[b];
-        for (const [off, len] of gr.items) {
-          if (dst.has(off)) continue;
-          await write(buf.subarray(off - gr.start, off - gr.start + len), pos);
-          dst.set(off, pos);
-          pos += len;
-          done += len;
+        for (let k = gr.from; k < gr.to; k++) {
+          const rel = plan.uniqOff[k] - gr.start;
+          await write(buf.subarray(rel, rel + plan.uniqLen[k]), pos);
+          uDst[k] = pos;
+          pos += plan.uniqLen[k];
+          done += plan.uniqLen[k];
         }
       }
+      gi += batch.length;
+      if (onCheckpoint) await onCheckpoint({ groupsDone: gi, pos });
       if (onStatus) onStatus({ phase: 'download', loaded: done, total: plan.bytes });
     }
     const offsets = new Float64Array(plan.n);
-    for (let i = 0; i < plan.n; i++) offsets[i] = dst.get(plan.srcOffs[i]);
+    for (let i = 0; i < plan.n; i++) offsets[i] = uDst[plan.tileUniq[i]];
     return buildIndex({
       tileType: header.tileType, tileCompression: header.tileCompression,
       minZoom: header.minZoom, maxZoom: plan.maxZoom, count: plan.n, dataBytes: pos

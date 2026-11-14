@@ -348,3 +348,6 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .color-dot { width: 40px; height: 40px; border-radius: 20px; border: 3px solid var(--panel-solid); box-shadow: 0 0 0 1px var(--line); padding: 0; }
 .color-dot.on { box-shadow: 0 0 0 3px var(--text); }
 #trackinfo { z-index: 11; }
+.region-error { margin: 0; font-size: 12px; color: #C53030; line-height: 1.4; }
+html.dark .region-error { color: #FF8A8A; }
+.small-btn { height: 44px; padding: 0 12px; font-size: 13px; }

@@ -57,6 +57,7 @@ const Tiles = {
   sources: {},
   archives: new Map(),
   local: new Map(),   // id -> { base: 'neu'|'alt', dem: 'neu'|'alt' }
+  partial: new Set(), // angefangene Downloads
   ready: null,
 
   async init() {
@@ -86,15 +87,17 @@ const Tiles = {
 
   async scanLocal() {
     this.local.clear();
+    this.partial.clear();
     const root = await this.opfs();
     if (!root) return;
     for (const r of this.regions) {
+      if (await this.exists(root, `${r.id}-base.state`) || await this.exists(root, `${r.id}-dem.state`)) this.partial.add(r.id);
       const kinds = {};
       for (const layer of ['base', 'dem']) {
         if (await this.exists(root, `${r.id}-${layer}.idx.ok`)) kinds[layer] = 'neu';
         else if (await this.exists(root, `${r.id}-${layer}.pmtiles.ok`)) kinds[layer] = 'alt';
       }
-      if (kinds.base && kinds.dem) this.local.set(r.id, kinds);
+      if (kinds.base && kinds.dem) { this.local.set(r.id, kinds); this.partial.delete(r.id); }
     }
   },
 
@@ -881,8 +884,11 @@ function regionSize(r) {
   return (s.base || 0) + (s.dem || 0) + (s.search || 0);
 }
 
+const downloadErrors = new Map();
+
 function startDownload(region) {
   if (downloads.has(region.id)) return;
+  downloadErrors.delete(region.id);
   if (!Tiles.sources.base || !Tiles.sources.dem) { toast('Kartenquellen unbekannt. Bitte App mit Internet neu öffnen.'); return; }
   const worker = new Worker('dl-worker.js');
   const job = { worker, loaded: 0, total: regionSize(region), phase: 'scan', note: 'Bereite vor …' };
@@ -906,11 +912,18 @@ function startDownload(region) {
     }
     if (m.type === 'error') {
       finish();
-      toast('Download abgebrochen: ' + m.message, 6000);
+      downloadErrors.set(region.id, m.message);
+      await Tiles.scanLocal();
+      toast('Download unterbrochen. Mit „Fortsetzen“ geht es an der gleichen Stelle weiter.', 6000);
       renderRegions();
     }
   };
-  worker.onerror = (e) => { finish(); toast('Download-Fehler: ' + (e.message || 'unbekannt'), 6000); renderRegions(); };
+  worker.onerror = async (e) => {
+    finish();
+    downloadErrors.set(region.id, 'Download-Prozess beendet' + (e.message ? ': ' + e.message : ' (zu wenig Arbeitsspeicher?)'));
+    await Tiles.scanLocal();
+    renderRegions();
+  };
   worker.postMessage({
     id: region.id, boxes: region.boxes, maxzoom: region.maxzoom, demMaxzoom: region.demMaxzoom,
     sources: Tiles.sources, searchUrl: region.search ? BASE + region.search : null
@@ -923,13 +936,13 @@ async function deleteRegion(region) {
   if (!root) return;
   const names = [`${region.id}-search.json`];
   for (const layer of ['base', 'dem']) {
-    for (const suffix of ['.idx.ok', '.idx', '.dat', '.pmtiles.ok', '.pmtiles']) names.push(`${region.id}-${layer}${suffix}`);
+    for (const suffix of ['.idx.ok', '.idx', '.dat', '.state', '.pmtiles.ok', '.pmtiles']) names.push(`${region.id}-${layer}${suffix}`);
   }
   for (const name of names) { try { await root.removeEntry(name); } catch (e) { /* schon weg */ } }
   Search.loaded.delete(region.id);
   Search.items = Search.items.filter((it) => it.regionId !== region.id);
   await Tiles.scanLocal(); Tiles.reset();
-  toast(region.name + ' gelöscht');
+  toast(region.name + ' entfernt');
   renderRegions(); updateStorage(); updateChip(); refreshStyle();
 }
 
@@ -990,12 +1003,29 @@ function renderRegions() {
       btn.classList.add('danger');
       btn.onclick = () => deleteRegion(r);
     } else {
-      state.textContent = (size ? 'ca. ' + fmtBytes(size) : 'Größe unbekannt') + ' · nur online';
-      btn.textContent = 'Laden';
+      const partial = Tiles.partial.has(r.id);
+      state.textContent = partial
+        ? 'Unterbrochen · Fortsetzen lädt an der gleichen Stelle weiter'
+        : (size ? 'ca. ' + fmtBytes(size) : 'Größe unbekannt') + ' · nur online';
+      btn.textContent = partial ? 'Fortsetzen' : 'Laden';
       btn.classList.add('primary');
+      const err = downloadErrors.get(r.id);
+      if (err) {
+        const p = document.createElement('p');
+        p.className = 'region-error';
+        p.textContent = 'Fehler: ' + err;
+        div.appendChild(p);
+      }
+      if (partial) {
+        const del = document.createElement('button');
+        del.className = 'btn danger small-btn';
+        del.textContent = 'Verwerfen';
+        del.onclick = () => deleteRegion(r);
+        div.querySelector('.region-top').appendChild(del);
+      }
       btn.onclick = () => {
         if (!navigator.onLine) { toast('Zum Laden brauchst du eine Internetverbindung.'); return; }
-        if (size > 1.5e9 && !btn.dataset.sure) { btn.dataset.sure = '1'; btn.textContent = 'Sicher? ' + fmtBytes(size); toast('Großer Download: am besten im WLAN und mit Ladekabel. Nochmal tippen zum Starten.', 5000); return; }
+        if (size > 1.5e9 && !partial && !btn.dataset.sure) { btn.dataset.sure = '1'; btn.textContent = 'Sicher? ' + fmtBytes(size); toast('Großer Download: am besten im WLAN und mit Ladekabel. Nochmal tippen zum Starten.', 5000); return; }
         startDownload(r);
       };
     }
