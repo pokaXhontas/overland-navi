@@ -22,6 +22,9 @@ ENDPOINTS = [
     "https://overpass.private.coffee/api/interpreter",
 ]
 BUDGET_S = int(os.environ.get("SEARCH_BUDGET_S", 30 * 60))
+CACHE_DIR = os.environ.get("CACHE_DIR", "data-cache")
+OUT_DIR = os.environ.get("OUT_DIR", "")
+MAX_AGE_S = 30 * 24 * 3600
 STEP = 3.0
 START = time.time()
 
@@ -129,7 +132,7 @@ def to_items(elements):
 
 def build(region):
     rid = region["id"]
-    cdir = f"data-cache/{rid}/chunks"
+    cdir = f"{CACHE_DIR}/{rid}/chunks"
     os.makedirs(cdir, exist_ok=True)
     complete = True
     all_items, seen = [], set()
@@ -137,7 +140,7 @@ def build(region):
     print(f"{region['name']}: {len(boxes)} Abschnitte", flush=True)
     for box in boxes:
         path = f"{cdir}/{'_'.join(str(v) for v in box)}.json"
-        if os.path.exists(path):
+        if os.path.exists(path) and time.time() - os.path.getmtime(path) < MAX_AGE_S:
             items = json.load(open(path, encoding="utf-8"))
         else:
             try:
@@ -154,7 +157,8 @@ def build(region):
                 continue
             seen.add(key)
             all_items.append(it)
-    out = f"data-cache/{rid}/search.json"
+    out = f"{OUT_DIR}/{rid}.json" if OUT_DIR else f"{CACHE_DIR}/{rid}/search.json"
+    os.makedirs(os.path.dirname(out), exist_ok=True)
     with open(out, "w", encoding="utf-8") as f:
         json.dump({"v": 1, "complete": complete, "items": all_items}, f, ensure_ascii=False, separators=(",", ":"))
     print(f"{region['name']}: {len(all_items)} Einträge, {os.path.getsize(out) // 1024} kB{'' if complete else ' (unvollständig, wird beim nächsten Lauf ergänzt)'}", flush=True)
@@ -162,8 +166,10 @@ def build(region):
 
 def main():
     regions = json.load(open("regions.json", encoding="utf-8"))
+    only = set(sys.argv[1:])
     for r in regions:
-        build(r)
+        if not only or r["id"] in only:
+            build(r)
     return 0
 
 

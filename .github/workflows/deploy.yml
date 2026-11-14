@@ -67,7 +67,7 @@ jobs:
         id: week
         run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
 
-      - name: Suchdaten aus dem Cache holen
+      - name: Größen aus dem Cache holen
         uses: actions/cache@v4
         with:
           path: data-cache
@@ -109,12 +109,6 @@ jobs:
               json.dump(sizes, open(cache, 'w'))
           PY
 
-      - name: Suchindex erstellen (Orte, Gipfel, Pässe, Seen aus OpenStreetMap)
-        timeout-minutes: 40
-        env:
-          SEARCH_BUDGET_S: '1800'
-        run: python3 scripts/build_search.py
-
       - name: Schriften und Symbole laden
         run: git clone --depth 1 https://github.com/protomaps/basemaps-assets assets-tmp
 
@@ -146,7 +140,7 @@ jobs:
           build = os.environ['BUILD_DATE']
           for r in regions:
               os.makedirs(f"site/data/{r['id']}", exist_ok=True)
-              src = f"data-cache/{r['id']}/search.json"
+              src = f"search/{r['id']}.json"
               if os.path.exists(src):
                   shutil.copy(src, f"site/data/{r['id']}/search.json")
               else:
