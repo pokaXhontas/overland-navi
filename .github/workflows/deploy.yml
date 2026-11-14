@@ -71,7 +71,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: data-cache
-          key: data2-${{ hashFiles('regions.json', 'scripts/build_search.py') }}-${{ steps.week.outputs.week }}
+          key: data3-${{ hashFiles('regions.json') }}-${{ steps.week.outputs.week }}
+          restore-keys: |
+            data3-${{ hashFiles('regions.json') }}-
+            data3-
 
       - name: Downloadgrößen der Länder ermitteln
         env:
@@ -81,7 +84,7 @@ jobs:
           set -euo pipefail
           mkdir -p data-cache
           python3 - << 'PY'
-          import json, os, re, subprocess
+          import json, os, re, subprocess, hashlib
           regions = json.load(open('regions.json', encoding='utf-8'))
           def size(url, geo, mz):
               p = subprocess.run(['pmtiles', 'extract', url, '/tmp/dry.pmtiles', f'--region={geo}', f'--maxzoom={mz}', '--dry-run'],
@@ -94,7 +97,8 @@ jobs:
               v, u = m[-1]
               return int(float(v) * {'B': 1, 'kB': 1e3, 'KB': 1e3, 'MB': 1e6, 'GB': 1e9, 'TB': 1e12}[u])
           for r in regions:
-              cache = f"data-cache/sizes-{r['id']}.json"
+              tag = hashlib.md5(json.dumps([r['boxes'], r['maxzoom'], r['demMaxzoom']]).encode()).hexdigest()[:8]
+              cache = f"data-cache/sizes-{r['id']}-{tag}.json"
               if os.path.exists(cache):
                   continue
               geo = f"/tmp/{r['id']}.geojson"
@@ -106,6 +110,9 @@ jobs:
           PY
 
       - name: Suchindex erstellen (Orte, Gipfel, Pässe, Seen aus OpenStreetMap)
+        timeout-minutes: 40
+        env:
+          SEARCH_BUDGET_S: '1800'
         run: python3 scripts/build_search.py
 
       - name: Schriften und Symbole laden
@@ -134,13 +141,18 @@ jobs:
           cp -r assets-tmp/fonts site/fonts
           cp -r assets-tmp/sprites site/sprites
           python3 - << 'PY'
-          import json, os, shutil
+          import json, os, shutil, hashlib
           regions = json.load(open('regions.json', encoding='utf-8'))
           build = os.environ['BUILD_DATE']
           for r in regions:
               os.makedirs(f"site/data/{r['id']}", exist_ok=True)
-              shutil.copy(f"data-cache/{r['id']}/search.json", f"site/data/{r['id']}/search.json")
-              sizes = json.load(open(f"data-cache/sizes-{r['id']}.json"))
+              src = f"data-cache/{r['id']}/search.json"
+              if os.path.exists(src):
+                  shutil.copy(src, f"site/data/{r['id']}/search.json")
+              else:
+                  json.dump({'v': 1, 'complete': False, 'items': []}, open(f"site/data/{r['id']}/search.json", 'w'))
+              tag = hashlib.md5(json.dumps([r['boxes'], r['maxzoom'], r['demMaxzoom']]).encode()).hexdigest()[:8]
+              sizes = json.load(open(f"data-cache/sizes-{r['id']}-{tag}.json"))
               sizes['search'] = os.path.getsize(f"site/data/{r['id']}/search.json")
               r['sizes'] = sizes
               r['search'] = f"data/{r['id']}/search.json"

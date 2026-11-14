@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """Baut pro Kartengebiet einen kleinen Offline-Suchindex aus OpenStreetMap (über die Overpass-API).
 
+Die Gebiete werden in Kacheln von höchstens 3° × 3° zerlegt. Jede Kachel wird einzeln abgefragt und
+zwischengespeichert, damit große Länder über mehrere Läufe hinweg vollständig werden und ein einzelner
+Fehler nicht alles aufhält. Ein Zeitbudget sorgt dafür, dass der Workflow nie hängen bleibt.
+
 Ausgabe: data-cache/<id>/search.json
-Format: {"v": 1, "items": [[name, weitere_namen, typ, lat, lon, höhe], ...]}
+Format: {"v": 1, "items": [[name, weitere_namen, typ, lat, lon, höhe], ...], "complete": bool}
 """
 import json
+import math
 import os
 import sys
 import time
@@ -16,15 +21,19 @@ ENDPOINTS = [
     "https://overpass.kumi.systems/api/interpreter",
     "https://overpass.private.coffee/api/interpreter",
 ]
+BUDGET_S = int(os.environ.get("SEARCH_BUDGET_S", 30 * 60))
+STEP = 3.0
+START = time.time()
 
 QUERY = """
-[out:json][timeout:600];
+[out:json][timeout:170];
 (
   node["place"~"^(city|town|village|hamlet|suburb|quarter|locality|isolated_dwelling)$"]["name"]({b});
   node["natural"~"^(peak|volcano|saddle|spring)$"]["name"]({b});
   node["mountain_pass"="yes"]["name"]({b});
-  nwr["natural"~"^(water|glacier)$"]["name"]({b});
-  nwr["waterway"="river"]["name"]({b});
+  way["natural"~"^(water|glacier)$"]["name"]({b});
+  relation["natural"~"^(water|glacier)$"]["name"]({b});
+  relation["waterway"="river"]["name"]({b});
   nwr["tourism"~"^(camp_site|caravan_site|alpine_hut|wilderness_hut|viewpoint|attraction)$"]["name"]({b});
   nwr["amenity"="fuel"]({b});
   node["amenity"="drinking_water"]({b});
@@ -34,6 +43,7 @@ out center tags qt;
 """
 
 ALT_KEYS = ["name:de", "name:en", "int_name", "name:ru", "name:ky", "name:latin", "old_name"]
+DEFAULT_NAMES = {"fuel": "Tankstelle", "drink": "Trinkwasser", "border": "Grenzkontrolle"}
 
 
 def classify(t):
@@ -41,14 +51,11 @@ def classify(t):
         return t["place"]
     if t.get("mountain_pass") == "yes" or t.get("natural") == "saddle":
         return "pass"
-    if t.get("natural") in ("peak", "volcano"):
+    nat = t.get("natural")
+    if nat in ("peak", "volcano"):
         return "peak"
-    if t.get("natural") == "spring":
-        return "spring"
-    if t.get("natural") == "glacier":
-        return "glacier"
-    if t.get("natural") == "water":
-        return "water"
+    if nat in ("spring", "glacier", "water"):
+        return nat
     if t.get("waterway") == "river":
         return "river"
     if t.get("amenity") == "fuel":
@@ -57,45 +64,43 @@ def classify(t):
         return "drink"
     if t.get("barrier") == "border_control":
         return "border"
-    tour = t.get("tourism", "")
     return {"camp_site": "camp", "caravan_site": "camp", "alpine_hut": "hut", "wilderness_hut": "hut",
-            "viewpoint": "view", "attraction": "sight"}.get(tour, "other")
+            "viewpoint": "view", "attraction": "sight"}.get(t.get("tourism", ""), "other")
 
 
-DEFAULT_NAMES = {"fuel": "Tankstelle", "drink": "Trinkwasser", "border": "Grenzkontrolle"}
+def chunks(boxes):
+    for w, s, e, n in boxes:
+        nx, ny = max(1, math.ceil((e - w) / STEP)), max(1, math.ceil((n - s) / STEP))
+        dx, dy = (e - w) / nx, (n - s) / ny
+        for i in range(nx):
+            for j in range(ny):
+                yield (round(w + i * dx, 4), round(s + j * dy, 4), round(w + (i + 1) * dx, 4), round(s + (j + 1) * dy, 4))
 
 
-def fetch(bbox):
-    w, s, e, n = bbox
-    q = QUERY.replace("{b}", f"{s},{w},{n},{e}")
-    data = urllib.parse.urlencode({"data": q}).encode()
+def fetch(box):
+    w, s, e, n = box
+    data = urllib.parse.urlencode({"data": QUERY.replace("{b}", f"{s},{w},{n},{e}")}).encode()
     last = None
-    for attempt in range(3):
+    for attempt in range(2):
         for url in ENDPOINTS:
+            if time.time() - START > BUDGET_S:
+                raise TimeoutError("Zeitbudget aufgebraucht")
             try:
                 req = urllib.request.Request(url, data=data, headers={"User-Agent": "overland-navi build (GitHub Actions)"})
-                with urllib.request.urlopen(req, timeout=900) as r:
-                    return json.load(r)
+                with urllib.request.urlopen(req, timeout=200) as r:
+                    res = json.load(r)
+                if res.get("remark") and "runtime error" in res["remark"]:
+                    raise RuntimeError(res["remark"][:120])
+                return res.get("elements", [])
             except Exception as ex:  # noqa: BLE001
                 last = ex
-                print(f"  {url}: {ex}", flush=True)
-                time.sleep(10)
+                print(f"    {url.split('/')[2]}: {str(ex)[:120]}", flush=True)
+        time.sleep(20)
     raise RuntimeError(f"Overpass nicht erreichbar: {last}")
 
 
-def build(region):
-    out = f"data-cache/{region['id']}/search.json"
-    if os.path.exists(out) and os.path.getsize(out) > 200:
-        print(f"{region['id']}: Suchindex aus dem Cache")
-        return
-    print(f"{region['id']}: lade Suchdaten …", flush=True)
-    elements = []
-    for box in region["boxes"]:
-        try:
-            elements += fetch(box).get("elements", [])
-        except Exception as ex:  # noqa: BLE001
-            print(f"WARNUNG: {ex} – Teil der Suche für {region['id']} fehlt", flush=True)
-    items, seen = [], set()
+def to_items(elements):
+    items = []
     for el in elements:
         t = el.get("tags", {})
         typ = classify(t)
@@ -108,10 +113,6 @@ def build(region):
             lat, lon = el["center"]["lat"], el["center"]["lon"]
         else:
             continue
-        key = (name, typ, round(lat, 2), round(lon, 2))
-        if key in seen:
-            continue
-        seen.add(key)
         alts = []
         for k in ALT_KEYS:
             v = t.get(k)
@@ -123,10 +124,40 @@ def build(region):
         except ValueError:
             ele = None
         items.append([name, "|".join(alts), typ, round(lat, 5), round(lon, 5), ele])
-    os.makedirs(os.path.dirname(out), exist_ok=True)
+    return items
+
+
+def build(region):
+    rid = region["id"]
+    cdir = f"data-cache/{rid}/chunks"
+    os.makedirs(cdir, exist_ok=True)
+    complete = True
+    all_items, seen = [], set()
+    boxes = list(chunks(region["boxes"]))
+    print(f"{region['name']}: {len(boxes)} Abschnitte", flush=True)
+    for box in boxes:
+        path = f"{cdir}/{'_'.join(str(v) for v in box)}.json"
+        if os.path.exists(path):
+            items = json.load(open(path, encoding="utf-8"))
+        else:
+            try:
+                items = to_items(fetch(box))
+                json.dump(items, open(path, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+                print(f"  {box}: {len(items)} Einträge", flush=True)
+            except Exception as ex:  # noqa: BLE001
+                print(f"  WARNUNG {box}: {ex}", flush=True)
+                complete = False
+                continue
+        for it in items:
+            key = (it[0], it[2], round(it[3], 2), round(it[4], 2))
+            if key in seen:
+                continue
+            seen.add(key)
+            all_items.append(it)
+    out = f"data-cache/{rid}/search.json"
     with open(out, "w", encoding="utf-8") as f:
-        json.dump({"v": 1, "items": items}, f, ensure_ascii=False, separators=(",", ":"))
-    print(f"{region['id']}: {len(items)} Einträge, {os.path.getsize(out) // 1024} kB")
+        json.dump({"v": 1, "complete": complete, "items": all_items}, f, ensure_ascii=False, separators=(",", ":"))
+    print(f"{region['name']}: {len(all_items)} Einträge, {os.path.getsize(out) // 1024} kB{'' if complete else ' (unvollständig, wird beim nächsten Lauf ergänzt)'}", flush=True)
 
 
 def main():

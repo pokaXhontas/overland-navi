@@ -140,6 +140,20 @@ const Tiles = {
   },
 
   async tile(layer, z, x, y) {
+    const data = await this.tileExact(layer, z, x, y);
+    if (data || layer !== 'dem') return data;
+    // Höhenmodell in diesem Land gröber geladen: aus der nächstgröberen Stufe hochrechnen
+    for (let dz = 1; dz <= 3 && z - dz >= 0; dz++) {
+      const pz = z - dz, px = x >> dz, py = y >> dz;
+      const parent = await this.tileExact('dem', pz, px, py);
+      if (parent) {
+        try { return await upscaleDem(parent, dz, x - (px << dz), y - (py << dz)); } catch (err) { return null; }
+      }
+    }
+    return null;
+  },
+
+  async tileExact(layer, z, x, y) {
     await this.ready;
     const [w, s, e, n] = this.tileBounds(z, x, y);
     for (const region of this.regions) {
@@ -167,6 +181,26 @@ const Tiles = {
 };
 Tiles.ready = Tiles.init();
 
+function imageType(data) {
+  const b = new Uint8Array(data, 0, Math.min(4, data.byteLength));
+  if (b[0] === 0x89 && b[1] === 0x50) return 'image/png';
+  if (b[0] === 0xff && b[1] === 0xd8) return 'image/jpeg';
+  return 'image/webp';
+}
+
+/* Ausschnitt einer Höhenkachel ohne Glättung vergrößern (Höhenwerte stecken in den Farben) */
+async function upscaleDem(data, dz, ox, oy) {
+  const bmp = await createImageBitmap(new Blob([data], { type: imageType(data) }));
+  const size = bmp.width, part = size / Math.pow(2, dz);
+  const useOff = typeof OffscreenCanvas !== 'undefined';
+  const cv = useOff ? new OffscreenCanvas(size, size) : Object.assign(document.createElement('canvas'), { width: size, height: size });
+  const g = cv.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  g.drawImage(bmp, ox * part, oy * part, part, part, 0, 0, size, size);
+  const blob = useOff ? await cv.convertToBlob({ type: 'image/png' }) : await new Promise((res) => cv.toBlob(res, 'image/png'));
+  return await blob.arrayBuffer();
+}
+
 /* Höhendaten-Kacheln für das Höhenlinien-Plugin: fetch abfangen, bevor das Plugin lädt */
 const originalFetch = window.fetch.bind(window);
 window.fetch = async function (input, init) {
@@ -176,7 +210,7 @@ window.fetch = async function (input, init) {
     if (m) {
       const data = await Tiles.tile('dem', +m[1], +m[2], +m[3]);
       if (!data) return new Response(null, { status: 404, statusText: 'Keine Höhendaten' });
-      return new Response(data, { status: 200, headers: { 'Content-Type': 'image/webp' } });
+      return new Response(data, { status: 200, headers: { 'Content-Type': imageType(data) } });
     }
   }
   return originalFetch(input, init);
@@ -1439,7 +1473,7 @@ async function demPixels(z, x, y) {
   try {
     const data = await Tiles.tile('dem', z, x, y);
     if (data) {
-      const bmp = await createImageBitmap(new Blob([data], { type: 'image/webp' }));
+      const bmp = await createImageBitmap(new Blob([data], { type: imageType(data) }));
       const cv = document.createElement('canvas');
       cv.width = bmp.width; cv.height = bmp.height;
       const g = cv.getContext('2d', { willReadFrequently: true });
