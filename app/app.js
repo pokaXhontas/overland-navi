@@ -324,6 +324,10 @@ function onPosition(p) {
   const el = meMarker.getElement();
   if (gps.heading !== null) { el.classList.remove('nohead'); meMarker.setRotation(gps.heading); } else { el.classList.add('nohead'); }
 
+  if (!gps.hadFix) {
+    gps.hadFix = true;
+    if (gps.follow) map.jumpTo({ center: [cur.lon, cur.lat], zoom: Math.max(map.getZoom(), 14) });
+  }
   if (gps.follow) {
     const moving = speed !== null && speed > 1.5;
     const opts = { center: [cur.lon, cur.lat], duration: 700, essential: true };
@@ -333,17 +337,47 @@ function onPosition(p) {
 }
 
 function onPositionError(err) {
-  const msg = err.code === 1
-    ? 'Standort nicht erlaubt. Bitte in den Einstellungen für Safari bzw. die App freigeben.'
-    : 'Kein GPS-Signal.';
-  $('#acc').textContent = '–';
-  toast(msg, 4000);
+  if (err.code === 1) {
+    stopGPS();
+    $('#acc').textContent = 'aus';
+    toast('Standort ist blockiert. Einstellungen → Datenschutz & Sicherheit → Ortungsdienste → Safari-Websites → „Beim Verwenden der App“ wählen und „Genauer Standort“ einschalten.', 10000);
+  } else if (err.code === 3) {
+    $('#acc').textContent = 'sucht';
+    if (!gps.pos) toast('Suche GPS-Signal … draußen oder am Fenster geht es schneller.', 4000);
+  } else {
+    $('#acc').textContent = 'kein';
+    toast('Kein GPS-Signal. Ortungsdienste eingeschaltet?', 5000);
+  }
+}
+
+function stopGPS() {
+  if (gps.watch !== null) { navigator.geolocation.clearWatch(gps.watch); gps.watch = null; }
 }
 
 function startGPS() {
-  if (!('geolocation' in navigator)) { toast('Dieses Gerät hat kein GPS.'); return; }
+  if (!('geolocation' in navigator)) { toast('Dieses Gerät meldet keine Standortfunktion.'); return; }
   if (gps.watch !== null) return;
-  gps.watch = navigator.geolocation.watchPosition(onPosition, onPositionError, { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
+  gps.watch = navigator.geolocation.watchPosition(onPosition, onPositionError, { enableHighAccuracy: true, maximumAge: 0 });
+}
+
+function locateNow() {
+  gps.follow = true;
+  $('#btn-locate').classList.add('active');
+  if (gps.pos) {
+    map.easeTo({ center: [gps.pos.lon, gps.pos.lat], zoom: Math.max(map.getZoom(), 14), duration: 600 });
+  } else {
+    toast('Suche Standort …', 3000);
+    $('#acc').textContent = 'sucht';
+  }
+  if (!('geolocation' in navigator)) return;
+  // Direkt beim Antippen fragen: so zeigt iOS die Erlaubnis-Abfrage zuverlässig
+  navigator.geolocation.getCurrentPosition(
+    (p) => { gps.hadFix = false; onPosition(p); },
+    onPositionError,
+    { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
+  );
+  stopGPS();
+  startGPS();
 }
 
 /* ---------- Bildschirm anlassen ---------- */
@@ -577,13 +611,7 @@ function setupUI() {
     if (!settings.headingUp) map.easeTo({ bearing: 0 });
     toast(settings.headingUp ? 'Karte dreht sich in Fahrtrichtung' : 'Norden ist oben');
   };
-  $('#btn-locate').onclick = () => {
-    gps.follow = true;
-    $('#btn-locate').classList.add('active');
-    if (gps.pos) map.easeTo({ center: [gps.pos.lon, gps.pos.lat], zoom: Math.max(map.getZoom(), 14) });
-    else toast('Warte auf GPS …');
-    startGPS();
-  };
+  $('#btn-locate').onclick = locateNow;
   $('#zin').onclick = () => map.zoomIn();
   $('#zout').onclick = () => map.zoomOut();
   $('#fab').onclick = addPlaceHere;
@@ -601,7 +629,16 @@ function updateCompassButton() {
 /* ---------- Start ---------- */
 async function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
-  try { await navigator.serviceWorker.register('sw.js'); } catch (e) { console.warn('Service Worker:', e); }
+  // Neue Version: einmal automatisch neu laden, damit Updates sofort greifen
+  let hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hadController && !downloads.size) location.reload();
+    hadController = true;
+  });
+  try {
+    const reg = await navigator.serviceWorker.register('sw.js');
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+  } catch (e) { console.warn('Service Worker:', e); }
 }
 
 async function main() {
