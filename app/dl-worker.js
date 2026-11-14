@@ -19,10 +19,135 @@ async function remove(root, name) {
   try { await root.removeEntry(name); } catch (e) { /* gab es nicht */ }
 }
 
+/* ---------- Suchindex direkt aus OpenStreetMap (Overpass), für selbst hinzugefügte Gebiete ---------- */
+const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
+const QUERY = `[out:json][timeout:170];
+(
+  node["place"~"^(city|town|village|hamlet|suburb|quarter|locality|isolated_dwelling)$"]["name"]({b});
+  node["natural"~"^(peak|volcano|saddle|spring)$"]["name"]({b});
+  node["mountain_pass"="yes"]["name"]({b});
+  way["natural"~"^(water|glacier)$"]["name"]({b});
+  relation["natural"~"^(water|glacier)$"]["name"]({b});
+  relation["waterway"="river"]["name"]({b});
+  nwr["tourism"~"^(camp_site|caravan_site|alpine_hut|wilderness_hut|viewpoint|attraction)$"]["name"]({b});
+  nwr["amenity"="fuel"]({b});
+  node["amenity"="drinking_water"]({b});
+  node["barrier"="border_control"]({b});
+);
+out center tags qt;`;
+const ALT_KEYS = ['name:de', 'name:en', 'int_name', 'name:ru', 'name:latin', 'old_name'];
+const DEFAULT_NAMES = { fuel: 'Tankstelle', drink: 'Trinkwasser', border: 'Grenzkontrolle' };
+
+function classify(t) {
+  if (t.place) return t.place;
+  if (t.mountain_pass === 'yes' || t.natural === 'saddle') return 'pass';
+  if (t.natural === 'peak' || t.natural === 'volcano') return 'peak';
+  if (['spring', 'glacier', 'water'].includes(t.natural)) return t.natural;
+  if (t.waterway === 'river') return 'river';
+  if (t.amenity === 'fuel') return 'fuel';
+  if (t.amenity === 'drinking_water') return 'drink';
+  if (t.barrier === 'border_control') return 'border';
+  return { camp_site: 'camp', caravan_site: 'camp', alpine_hut: 'hut', wilderness_hut: 'hut', viewpoint: 'view', attraction: 'sight' }[t.tourism] || 'other';
+}
+
+function toItems(elements) {
+  const items = [];
+  for (const el of elements) {
+    const t = el.tags || {};
+    const typ = classify(t);
+    const name = t.name || DEFAULT_NAMES[typ];
+    if (!name) continue;
+    const lat = el.type === 'node' ? el.lat : el.center && el.center.lat;
+    const lon = el.type === 'node' ? el.lon : el.center && el.center.lon;
+    if (lat === undefined || lon === undefined) continue;
+    const alts = [];
+    for (const k of ALT_KEYS) if (t[k] && t[k] !== name && !alts.includes(t[k])) alts.push(t[k]);
+    let ele = t.ele ? parseInt(parseFloat(String(t.ele).replace(',', '.')), 10) : null;
+    if (isNaN(ele)) ele = null;
+    items.push([name, alts.join('|'), typ, Math.round(lat * 1e5) / 1e5, Math.round(lon * 1e5) / 1e5, ele]);
+  }
+  return items;
+}
+
+function searchChunks(boxes, step) {
+  const out = [];
+  for (const [w, s, e, n] of boxes) {
+    const nx = Math.max(1, Math.ceil((e - w) / step)), ny = Math.max(1, Math.ceil((n - s) / step));
+    const dx = (e - w) / nx, dy = (n - s) / ny;
+    for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
+      out.push([w + i * dx, s + j * dy, w + (i + 1) * dx, s + (j + 1) * dy].map((v) => Math.round(v * 1e4) / 1e4));
+    }
+  }
+  return out;
+}
+
+async function overpass(b) {
+  const body = 'data=' + encodeURIComponent(QUERY.replaceAll('{b}', `${b[1]},${b[0]},${b[3]},${b[2]}`));
+  let last = null;
+  for (const url of OVERPASS) {
+    try {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 200000);
+      const r = await fetch(url, { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ctl.signal });
+      clearTimeout(timer);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const res = await r.json();
+      if (res.remark && /runtime error/.test(res.remark)) throw new Error('zu groß');
+      return res.elements || [];
+    } catch (err) { last = err; }
+  }
+  throw last || new Error('Overpass nicht erreichbar');
+}
+
+async function buildSearch(root, id, boxes, post) {
+  const name = `${id}-search.json`;
+  const old = await readJson(root, name);
+  const st = (old && old.v === 1 && old.done) ? old : { v: 1, complete: false, items: [], done: [] };
+  const chunks = searchChunks(boxes, 2);
+  const done = new Set(st.done);
+  const seen = new Set(st.items.map((it) => it[0] + '|' + it[3] + '|' + it[4]));
+  const add = (items) => { for (const it of items) { const k = it[0] + '|' + it[3] + '|' + it[4]; if (!seen.has(k)) { seen.add(k); st.items.push(it); } } };
+  const enc = new TextEncoder();
+  let failed = 0, n = 0;
+  for (const c of chunks) {
+    n++;
+    const key = c.join(',');
+    if (done.has(key)) continue;
+    post({ type: 'search', done: n - 1, total: chunks.length });
+    try {
+      let items;
+      try { items = toItems(await overpass(c)); } catch (err) {
+        // zu viele Daten auf einmal: in vier kleinere Teile zerlegen
+        items = [];
+        for (const sub of searchChunks([c], (c[2] - c[0]) / 2 + 1e-9)) items.push(...toItems(await overpass(sub)));
+      }
+      add(items);
+      done.add(key);
+      st.done = [...done];
+      await writeWhole(root, name, enc.encode(JSON.stringify(st)));
+    } catch (err) {
+      failed++;
+      if (!navigator.onLine) break;
+    }
+  }
+  st.complete = chunks.every((c) => done.has(c.join(',')));
+  await writeWhole(root, name, enc.encode(JSON.stringify(st)));
+  return { done: done.size, total: chunks.length, complete: st.complete };
+}
+
 self.onmessage = async (e) => {
-  const { id, boxes, maxzoom, demMaxzoom, sources, searchUrl } = e.data;
+  const { id, boxes, maxzoom, demMaxzoom, sources, searchUrl, buildSearchIndex, mode } = e.data;
   const post = (m) => self.postMessage(m);
   try {
+    if (mode === 'estimate') {
+      const res = {};
+      for (const [layer, mz] of [['base', maxzoom], ['dem', demMaxzoom]]) {
+        const plan = await OvlExtract.planExtract(OvlExtract.httpSource(sources[layer]), boxes, mz, (s) => post({ type: 'scan', layer, tiles: s.tiles }));
+        res[layer] = plan.bytes;
+      }
+      post({ type: 'estimate', sizes: res });
+      return;
+    }
     if (!navigator.storage || !navigator.storage.getDirectory) throw new Error('Dieses Gerät erlaubt keinen App-Speicher für Dateien');
     const root = await navigator.storage.getDirectory();
     const enc = new TextEncoder();
@@ -69,11 +194,14 @@ self.onmessage = async (e) => {
       post({ type: 'progress', loaded: before, total });
     }
 
+    post({ type: 'tiles-done' });
     if (searchUrl) {
       try {
         const r = await fetch(searchUrl);
         if (r.ok) await writeWhole(root, `${id}-search.json`, new Uint8Array(await r.arrayBuffer()));
       } catch (err) { /* Suche bleibt online */ }
+    } else if (buildSearchIndex) {
+      try { post({ type: 'search-state', ...(await buildSearch(root, id, boxes, post)) }); } catch (err) { /* Suche bleibt online */ }
     }
     for (const layer of ['base', 'dem']) {
       await remove(root, `${id}-${layer}.pmtiles.ok`);

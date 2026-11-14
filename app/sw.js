@@ -13,6 +13,7 @@ const SHELL = [
   'app.js',
   'dl-worker.js',
   'extract.js',
+  'vehicles.js',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',
@@ -48,7 +49,7 @@ self.addEventListener('fetch', (event) => {
   if (path.endsWith('.pmtiles')) return;
 
   // Liste der Kartengebiete: erst Netz, sonst gespeicherte Fassung
-  if (path.endsWith('/data/regions.json')) {
+  if (path.endsWith('/data/regions.json') || path.endsWith('/data/countries.json')) {
     event.respondWith((async () => {
       const cache = await caches.open(DATA_CACHE);
       try {

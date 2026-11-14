@@ -18,6 +18,8 @@ const settings = {
   hillshade: store.get('hillshade', true),
   headingUp: store.get('headingUp', true),
   wake: store.get('wake', true),
+  vehicle: store.get('vehicle', 'arrow'),
+  vehicleColor: store.get('vehicleColor', '#e9e5da'),
   hidden: store.get('hiddenCats', [])
 };
 let places = store.get('places', []);
@@ -68,7 +70,10 @@ const Tiles = {
     } catch (e) { /* offline: Service Worker liefert die gespeicherte Fassung */ }
     if (!json || !json.regions) json = store.get('regionsCache', null);
     if (json) store.set('regionsCache', json);
-    this.regions = ((json && json.regions) || []).map((r) => ({ ...r, boxes: r.boxes || (r.bbox ? [r.bbox] : []) }));
+    const fixed = ((json && json.regions) || []).map((r) => ({ ...r, boxes: r.boxes || (r.bbox ? [r.bbox] : []) }));
+    const ids = new Set(fixed.map((r) => r.id));
+    const added = store.get('addedRegions', []).filter((r) => !ids.has(r.id)).map((r) => ({ ...r, group: 'Hinzugefügt', custom: true }));
+    this.regions = [...fixed, ...added];
     this.build = (json && json.build) || '';
     this.sources = (json && json.sources) || {};
     await this.scanLocal();
@@ -397,15 +402,9 @@ function onPosition(p) {
   $('#acc').textContent = '± ' + Math.round(c.accuracy) + ' m';
 
   if (!map) return;
-  if (!meMarker) {
-    const el = document.createElement('div');
-    el.className = 'me nohead';
-    el.innerHTML = '<svg viewBox="0 0 24 24"><path class="arrow" d="M12 2.5 20 21l-8-4.2L4 21Z"/></svg>';
-    meMarker = new maplibregl.Marker({ element: el, rotationAlignment: 'map', pitchAlignment: 'map' }).setLngLat([cur.lon, cur.lat]).addTo(map);
-  }
+  if (!meMarker) buildMeMarker();
   meMarker.setLngLat([cur.lon, cur.lat]);
-  const el = meMarker.getElement();
-  if (gps.heading !== null) { el.classList.remove('nohead'); meMarker.setRotation(gps.heading); } else { el.classList.add('nohead'); }
+  updateMeMarker();
 
   if (!gps.hadFix) {
     gps.hadFix = true;
@@ -417,6 +416,39 @@ function onPosition(p) {
     if (settings.headingUp && moving && gps.heading !== null) opts.bearing = gps.heading;
     map.easeTo(opts);
   }
+}
+
+/* Eigene Position: Pfeil oder gewähltes Fahrzeug */
+function buildMeMarker() {
+  const pos = meMarker ? meMarker.getLngLat() : (gps.pos ? [gps.pos.lon, gps.pos.lat] : null);
+  if (meMarker) { meMarker.remove(); meMarker = null; }
+  if (!pos || !map) return;
+  const el = document.createElement('div');
+  const veh = settings.vehicle !== 'arrow' && window.Vehicles ? Vehicles.svg(settings.vehicle, settings.vehicleColor) : '';
+  if (veh) {
+    el.className = 'me veh nohead';
+    el.innerHTML = '<div class="me-dir"><i></i></div><div class="me-car">' + veh + '</div>';
+    meMarker = new maplibregl.Marker({ element: el, rotationAlignment: 'viewport', pitchAlignment: 'viewport' });
+  } else {
+    el.className = 'me nohead';
+    el.innerHTML = '<svg viewBox="0 0 24 24"><path class="arrow" d="M12 2.5 20 21l-8-4.2L4 21Z"/></svg>';
+    meMarker = new maplibregl.Marker({ element: el, rotationAlignment: 'map', pitchAlignment: 'map' });
+  }
+  meMarker.setLngLat(pos).addTo(map);
+  updateMeMarker();
+}
+
+function updateMeMarker() {
+  if (!meMarker) return;
+  const el = meMarker.getElement();
+  el.classList.toggle('nohead', gps.heading === null);
+  if (gps.heading === null) return;
+  if (!el.classList.contains('veh')) { meMarker.setRotation(gps.heading); return; }
+  const a = ((gps.heading - map.getBearing()) % 360 + 360) % 360;
+  el.querySelector('.me-dir').style.transform = `rotate(${a}deg)`;
+  const s = Math.sin(a * Math.PI / 180);
+  if (s < -0.15) el.classList.add('left');
+  else if (s > 0.15) el.classList.remove('left');
 }
 
 function onPositionError(err) {
@@ -901,11 +933,19 @@ function startDownload(region) {
     const m = e.data;
     if (m.type === 'scan') { job.phase = 'scan'; job.note = `Bereite vor … ${m.layer === 'dem' ? 'Höhen' : 'Karte'}: ${m.tiles.toLocaleString('de-DE')} Kacheln gefunden`; updateProgress(region.id); }
     if (m.type === 'progress') { job.phase = 'download'; job.loaded = m.loaded; job.total = m.total; updateProgress(region.id); }
+    if (m.type === 'tiles-done') {
+      job.phase = 'search'; job.note = 'Karte fertig · Suchindex wird vorbereitet …';
+      await Tiles.scanLocal(); Tiles.reset();
+      renderRegions(); updateChip(); refreshStyle();
+    }
+    if (m.type === 'search') { job.phase = 'search'; job.note = `Karte fertig · Suchindex: Abschnitt ${m.done + 1} von ${m.total}`; updateProgress(region.id); }
+    if (m.type === 'search-state') { region.searchState = { done: m.done, total: m.total, complete: m.complete }; saveAdded(); }
     if (m.type === 'done') {
       finish();
       await cacheAssets();
       await Tiles.scanLocal(); Tiles.reset();
       Search.loaded.delete(region.id);
+      Search.items = Search.items.filter((it) => it.regionId !== region.id);
       toast(region.name + ' ist jetzt offline verfügbar');
       renderRegions(); updateStorage(); updateChip();
       refreshStyle();
@@ -926,12 +966,12 @@ function startDownload(region) {
   };
   worker.postMessage({
     id: region.id, boxes: region.boxes, maxzoom: region.maxzoom, demMaxzoom: region.demMaxzoom,
-    sources: Tiles.sources, searchUrl: region.search ? BASE + region.search : null
+    sources: Tiles.sources, searchUrl: region.search ? BASE + region.search : null, buildSearchIndex: !region.search
   });
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 }
 
-async function deleteRegion(region) {
+async function deleteRegion(region, forget) {
   const root = await Tiles.opfs();
   if (!root) return;
   const names = [`${region.id}-search.json`];
@@ -941,8 +981,14 @@ async function deleteRegion(region) {
   for (const name of names) { try { await root.removeEntry(name); } catch (e) { /* schon weg */ } }
   Search.loaded.delete(region.id);
   Search.items = Search.items.filter((it) => it.regionId !== region.id);
+  if (forget) {
+    Tiles.regions = Tiles.regions.filter((r) => r !== region);
+    saveAdded();
+  } else if (region.searchState) {
+    delete region.searchState; saveAdded();
+  }
   await Tiles.scanLocal(); Tiles.reset();
-  toast(region.name + ' entfernt');
+  toast(region.name + (forget ? ' aus der Liste entfernt' : ' gelöscht'));
   renderRegions(); updateStorage(); updateChip(); refreshStyle();
 }
 
@@ -950,8 +996,9 @@ function updateProgress(id) {
   const job = downloads.get(id);
   const el = document.querySelector(`[data-region="${id}"]`);
   if (!job || !el) return;
-  if (job.phase === 'scan') {
+  if (job.phase === 'scan' || job.phase === 'search') {
     el.querySelector('.state').textContent = job.note;
+    if (job.phase === 'search') el.querySelector('.bar > div').style.width = '100%';
     return;
   }
   const pct = job.total ? Math.min(100, Math.round(job.loaded / job.total * 100)) : 0;
@@ -1001,12 +1048,25 @@ function renderRegions() {
       state.innerHTML = '<span class="state-ok">✓ Offline verfügbar</span>' + (local.base === 'alt' ? ' · ältere Fassung' : '');
       btn.textContent = 'Löschen';
       btn.classList.add('danger');
-      btn.onclick = () => deleteRegion(r);
+      btn.onclick = () => {
+        if (!btn.dataset.sure) { btn.dataset.sure = '1'; btn.textContent = 'Wirklich löschen?'; return; }
+        deleteRegion(r);
+      };
+      const ss = r.searchState;
+      if (ss && !ss.complete) {
+        state.append(` · Suche ${ss.done} von ${ss.total} Abschnitten`);
+        const more = document.createElement('button');
+        more.className = 'btn small-btn';
+        more.textContent = 'Suche ergänzen';
+        more.onclick = () => { if (!navigator.onLine) { toast('Dafür brauchst du Internet.'); return; } startDownload(r); };
+        div.querySelector('.region-top').insertBefore(more, btn);
+      }
     } else {
       const partial = Tiles.partial.has(r.id);
+      if (!size && r.custom) estimateRegion(r);
       state.textContent = partial
         ? 'Unterbrochen · Fortsetzen lädt an der gleichen Stelle weiter'
-        : (size ? 'ca. ' + fmtBytes(size) : 'Größe unbekannt') + ' · nur online';
+        : (size ? 'ca. ' + fmtBytes(size) : (estimates.has(r.id) ? 'Größe wird berechnet …' : 'Größe unbekannt')) + ' · nur online';
       btn.textContent = partial ? 'Fortsetzen' : 'Laden';
       btn.classList.add('primary');
       const err = downloadErrors.get(r.id);
@@ -1016,11 +1076,11 @@ function renderRegions() {
         p.textContent = 'Fehler: ' + err;
         div.appendChild(p);
       }
-      if (partial) {
+      if (partial || r.custom) {
         const del = document.createElement('button');
         del.className = 'btn danger small-btn';
-        del.textContent = 'Verwerfen';
-        del.onclick = () => deleteRegion(r);
+        del.textContent = r.custom ? 'Entfernen' : 'Verwerfen';
+        del.onclick = () => deleteRegion(r, r.custom);
         div.querySelector('.region-top').appendChild(del);
       }
       btn.onclick = () => {
@@ -1032,6 +1092,101 @@ function renderRegions() {
     box.appendChild(div);
     if (job) updateProgress(r.id);
   }
+}
+
+/* ---------- Eigene Länder und Kartenausschnitte ---------- */
+const estimates = new Map();
+
+function saveAdded() {
+  store.set('addedRegions', Tiles.regions.filter((r) => r.custom).map(({ custom, group, ...r }) => r));
+}
+
+function estimateRegion(r) {
+  if (r.sizes || estimates.has(r.id) || !navigator.onLine || !Tiles.sources.base) return;
+  const w = new Worker('dl-worker.js');
+  estimates.set(r.id, w);
+  const end = () => { w.terminate(); estimates.delete(r.id); renderRegions(); };
+  w.onmessage = (e) => {
+    const m = e.data;
+    if (m.type === 'estimate') { r.sizes = m.sizes; saveAdded(); end(); }
+    if (m.type === 'error') end();
+  };
+  w.onerror = end;
+  w.postMessage({ mode: 'estimate', id: r.id, boxes: r.boxes, maxzoom: r.maxzoom, demMaxzoom: r.demMaxzoom, sources: Tiles.sources });
+}
+
+function addRegion(r) {
+  Tiles.regions.push({ ...r, group: 'Hinzugefügt', custom: true });
+  saveAdded();
+  $('#add-page').hidden = true;
+  renderRegions();
+  const el = document.querySelector(`[data-region="${r.id}"]`);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  toast(r.name + ' ist in deiner Liste. Tippe auf „Laden“.', 4000);
+}
+
+function addArea() {
+  const b = map.getBounds();
+  const w = Math.max(-180, b.getWest()), e = Math.min(180, b.getEast());
+  const s = Math.max(-85, b.getSouth()), n = Math.min(85, b.getNorth());
+  const area = (e - w) * (n - s) * Math.cos((s + n) / 2 * Math.PI / 180);
+  if (area > 250) { toast('Der Ausschnitt ist sehr groß. Zoom weiter hinein oder wähle unten ein ganzes Land.', 5000); return; }
+  if (area < 0.0004) { toast('Der Ausschnitt ist zu klein. Zoom etwas heraus.'); return; }
+  const name = $('#area-name').value.trim() || 'Ausschnitt ' + new Date().toLocaleDateString('de-DE');
+  const r4 = (v) => Math.round(v * 1e4) / 1e4;
+  addRegion({ id: 'a-' + Date.now().toString(36), name, boxes: [[r4(w), r4(s), r4(e), r4(n)]], maxzoom: BASE_MAXZOOM, demMaxzoom: area > 60 ? 10 : 11 });
+  $('#area-name').value = '';
+}
+
+let countryData = null;
+async function openAddPage() {
+  const page = $('#add-page');
+  page.hidden = false;
+  page.querySelector('.sheet-body').scrollTop = 0;
+  $('#add-input').value = '';
+  if (!countryData) {
+    try {
+      const r = await fetch(BASE + 'data/countries.json', { cache: 'no-cache' });
+      if (r.ok) countryData = (await r.json()).countries || [];
+    } catch (e) { /* offline */ }
+  }
+  renderCountries();
+}
+
+function renderCountries() {
+  const box = $('#country-list');
+  if (!countryData) { box.innerHTML = '<p class="muted">Die Länderliste braucht einmal Internet.</p>'; return; }
+  if (!countryData.length) { box.innerHTML = '<p class="muted">Die Länderliste wird gerade erstellt. Schau in einer Stunde nochmal rein.</p>'; return; }
+  const q = norm($('#add-input').value);
+  box.innerHTML = '';
+  let group = null, shown = 0;
+  for (const c of countryData) {
+    if (q && !norm(c.name).includes(q) && norm(c.iso) !== q) continue;
+    if (c.group !== group) {
+      group = c.group;
+      const h = document.createElement('p');
+      h.className = 'region-group';
+      h.textContent = group;
+      box.appendChild(h);
+    }
+    const have = Tiles.regions.some((r) => r.id === c.id || (r.iso && r.iso === c.iso));
+    const row = document.createElement('div');
+    row.className = 'country';
+    row.innerHTML = '<span><b></b><small></small></span><button class="btn"></button>';
+    row.querySelector('b').textContent = c.name;
+    const size = c.sizes ? c.sizes.base + c.sizes.dem : 0;
+    row.querySelector('small').textContent = have ? 'Schon in deiner Liste' : (size ? 'ca. ' + fmtBytes(size) : 'Größe wird beim Hinzufügen berechnet');
+    const btn = row.querySelector('button');
+    if (have) { btn.textContent = '✓'; btn.disabled = true; }
+    else {
+      btn.textContent = 'Hinzufügen';
+      btn.classList.add('primary');
+      btn.onclick = () => addRegion({ id: c.id, iso: c.iso, name: c.name, boxes: c.boxes, maxzoom: c.maxzoom, demMaxzoom: c.demMaxzoom, sizes: c.sizes || undefined });
+    }
+    box.appendChild(row);
+    shown++;
+  }
+  if (!shown) box.innerHTML = '<p class="muted">Kein Land gefunden.</p>';
 }
 
 async function updateStorage() {
@@ -1049,6 +1204,11 @@ function setupUI() {
   $('#sheet-close').onclick = closeSheet;
   $('#cat-close').onclick = closeSheet;
   $('#cat-back').onclick = closeCatPage;
+  $('#btn-add-region').onclick = openAddPage;
+  $('#add-back').onclick = () => { $('#add-page').hidden = true; };
+  $('#add-close').onclick = closeSheet;
+  $('#add-input').oninput = renderCountries;
+  $('#area-add').onclick = addArea;
 
   document.querySelectorAll('.seg button').forEach((b) => {
     b.setAttribute('aria-checked', String(b.dataset.theme === settings.theme));
@@ -1089,9 +1249,45 @@ function setupUI() {
   setupSearchAndImport();
   setupTrackInfoUI();
   $('#btn-gpx').onclick = exportGPX;
+  setupVehiclePicker();
   savePlaces();
   updateCompassButton();
   $('#btn-locate').classList.add('active');
+}
+
+function setupVehiclePicker() {
+  const grid = $('#veh-grid'), colors = $('#veh-colors');
+  if (!grid || !window.Vehicles) return;
+  const render = () => {
+    grid.innerHTML = '';
+    const opts = [{ id: 'arrow', name: 'Pfeil' }, ...Vehicles.list];
+    for (const v of opts) {
+      const b = document.createElement('button');
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', String(settings.vehicle === v.id));
+      b.innerHTML = v.id === 'arrow'
+        ? '<span class="arrow-ico"><svg viewBox="0 0 24 24" width="30" height="30"><path d="M12 2.5 20 21l-8-4.2L4 21Z" fill="#fff" stroke="#0B0F12" stroke-width="1.3" stroke-linejoin="round"/></svg></span>'
+        : Vehicles.svg(v.id, settings.vehicleColor);
+      const label = document.createElement('span');
+      label.textContent = v.name;
+      b.appendChild(label);
+      b.onclick = () => { settings.vehicle = v.id; store.set('vehicle', v.id); render(); buildMeMarker(); };
+      grid.appendChild(b);
+    }
+    colors.hidden = settings.vehicle === 'arrow';
+    colors.innerHTML = '';
+    for (const [hex, name] of Vehicles.colors) {
+      const c = document.createElement('button');
+      c.setAttribute('role', 'radio');
+      c.setAttribute('aria-label', name);
+      c.title = name;
+      c.style.background = hex;
+      c.setAttribute('aria-checked', String(settings.vehicleColor === hex));
+      c.onclick = () => { settings.vehicleColor = hex; store.set('vehicleColor', hex); render(); buildMeMarker(); };
+      colors.appendChild(c);
+    }
+  };
+  render();
 }
 
 function updateCompassButton() {
@@ -1456,7 +1652,7 @@ function openCatPage(id) {
   page.querySelector('.sheet-body').scrollTop = 0;
 }
 function closeCatPage() { openCat = null; $('#cat-page').hidden = true; }
-function closeSheet() { closeCatPage(); $('#sheet').hidden = true; }
+function closeSheet() { closeCatPage(); $('#add-page').hidden = true; $('#sheet').hidden = true; }
 
 function refreshCatPage() {
   if (!openCat) return;
@@ -1952,7 +2148,7 @@ async function main() {
   map.touchZoomRotate.enableRotation();
 
   map.on('dragstart', () => { gps.follow = false; $('#btn-locate').classList.remove('active'); });
-  map.on('rotate', () => { $('#needle').style.transform = `rotate(${-map.getBearing()}deg)`; });
+  map.on('rotate', () => { $('#needle').style.transform = `rotate(${-map.getBearing()}deg)`; updateMeMarker(); });
   map.on('moveend', () => {
     const c = map.getCenter();
     store.set('view', { center: [+c.lng.toFixed(5), +c.lat.toFixed(5)], zoom: +map.getZoom().toFixed(2) });

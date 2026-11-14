@@ -181,6 +181,7 @@ jobs:
               s = r['sizes']
               print(f"{r['name']:<22} Karte {((s['base'] or 0)/1e6):8.0f} MB  Höhen {((s['dem'] or 0)/1e6):8.0f} MB  Suche {s['search']/1e6:5.1f} MB")
           PY
+          if [ -f countries.json ]; then cp countries.json site/data/countries.json; else echo '{"v":1,"countries":[]}' > site/data/countries.json; fi
           sed -i "s/__BUILD__/${GITHUB_SHA::7}/g" site/sw.js site/index.html
           du -sh site
 

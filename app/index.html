@@ -83,10 +83,14 @@
     <label class="row"><span><b>Höhenlinien</b><small>Mit Höhenangaben</small></span><input type="checkbox" class="switch" id="t-contours"></label>
     <label class="row"><span><b>Geländeschattierung</b><small>Berge plastisch darstellen</small></span><input type="checkbox" class="switch" id="t-hillshade"></label>
     <label class="row"><span><b>Karte in Fahrtrichtung</b><small>Sonst ist Norden immer oben</small></span><input type="checkbox" class="switch" id="t-headingup"></label>
+    <p class="sub-head"><b>Positionssymbol</b><small class="muted">Pfeil oder dein Fahrzeug, darüber zeigt die Spitze die Fahrtrichtung</small></p>
+    <div class="veh-grid" id="veh-grid" role="radiogroup" aria-label="Positionssymbol"></div>
+    <div class="veh-colors" id="veh-colors" role="radiogroup" aria-label="Fahrzeugfarbe"></div>
     <label class="row"><span><b>Bildschirm anlassen</b><small>Solange die App offen ist</small></span><input type="checkbox" class="switch" id="t-wake"></label>
 
     <h2>Offline-Karten</h2>
     <div id="regions" class="regions"><p class="muted">Wird geladen …</p></div>
+    <button class="add-region" id="btn-add-region"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span><b>Land oder Gebiet hinzufügen</b><small>Jedes Land der Welt oder der aktuelle Kartenausschnitt</small></span></button>
     <p class="muted small" id="storage"></p>
 
     <p class="muted small foot">Kartendaten © OpenStreetMap-Mitwirkende · Protomaps · Höhen: Mapterhorn<br>Version __BUILD__</p>
@@ -101,6 +105,24 @@
       <div class="cat-title"><span class="pi-icon" id="cat-icon"></span><h1 id="cat-name"></h1></div>
       <label class="row"><span><b>Auf der Karte zeigen</b><small id="cat-count"></small></span><input type="checkbox" class="switch" id="cat-toggle"></label>
       <div class="place-list" id="cat-items"></div>
+    </div>
+  </div>
+
+  <div class="sheet-page" id="add-page" hidden>
+    <div class="sheet-head page-head">
+      <button class="back" id="add-back" aria-label="Zurück"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Zurück</span></button>
+      <button class="round" id="add-close" aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <div class="cat-title"><h1>Gebiet hinzufügen</h1></div>
+      <div class="area-card">
+        <b>Aktueller Kartenausschnitt</b>
+        <small class="muted">Lädt genau das, was du gerade auf der Karte siehst. Gut für ein Gebirge, eine Strecke oder Grenzregionen.</small>
+        <div class="area-row"><input id="area-name" type="text" placeholder="Name, z. B. Pamir Highway" autocomplete="off"><button class="btn primary" id="area-add">Hinzufügen</button></div>
+      </div>
+      <h2>Länder</h2>
+      <div class="add-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="add-input" type="search" placeholder="Land suchen" autocomplete="off" autocorrect="off" spellcheck="false"></div>
+      <div id="country-list" class="country-list"><p class="muted">Wird geladen …</p></div>
     </div>
   </div>
 </aside>
@@ -187,6 +209,7 @@
 <script src="vendor/pmtiles.js"></script>
 <script src="vendor/basemaps.js"></script>
 <script src="extract.js"></script>
+<script src="vehicles.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
