@@ -169,10 +169,12 @@ jobs:
               r['search'] = f"data/{r['id']}/search.json"
               ws, ss, es, ns = zip(*r['boxes'])
               r['bbox'] = [min(ws), min(ss), max(es), max(ns)]
+          cfg = json.load(open('config.json')) if os.path.exists('config.json') else {}
+          proxy = (cfg.get('baseProxy') or '').rstrip('/')
           out = {
               'build': build,
               'sources': {
-                  'base': f'https://build.protomaps.com/{build}.pmtiles',
+                  'base': f'{proxy}/{build}.pmtiles' if proxy else f'https://build.protomaps.com/{build}.pmtiles',
                   'dem': 'https://download.mapterhorn.com/planet.pmtiles'
               },
               'regions': regions
