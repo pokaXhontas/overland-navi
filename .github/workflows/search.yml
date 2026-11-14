@@ -33,6 +33,7 @@ jobs:
           SEARCH_BUDGET_S: '19000'
           CACHE_DIR: search-cache
           OUT_DIR: search
+          GH_TOKEN: ${{ github.token }}
         run: |
           git config user.name "pokaXhontas"
           git config user.email "pokaXhontas@users.noreply.github.com"
@@ -41,7 +42,11 @@ jobs:
             git add search
             if ! git diff --cached --quiet; then
               git commit -q -m "Suchindex: $id"
-              git pull -q --rebase origin main && git push -q origin HEAD:main || echo "Push fehlgeschlagen, später erneut"
+              if git pull -q --rebase origin main && git push -q origin HEAD:main; then
+                gh workflow run deploy.yml --ref main || true
+              else
+                echo "Push fehlgeschlagen, später erneut"
+              fi
             fi
           done
 
