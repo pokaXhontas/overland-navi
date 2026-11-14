@@ -56,6 +56,27 @@
   <span class="fab-txt"><b>Ort speichern</b><small>Platz, Wasser, Diesel …</small></span>
 </button>
 
+<section class="nav-banner panel" id="nav-banner" aria-label="Navigation" hidden>
+  <div class="nb-icon" id="nb-icon"></div>
+  <div class="nb-main"><b id="nb-dist">–</b><span id="nb-text"></span></div>
+  <button class="round" id="nb-voice" aria-label="Sprachansagen an oder aus"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path class="wave" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path class="mute" d="M16 9l6 6M22 9l-6 6"/></svg></button>
+</section>
+<section class="nav-foot panel" id="nav-foot" aria-label="Restweg" hidden>
+  <span><b id="nf-rem">–</b><small id="nf-eta"></small></span>
+  <button class="btn" id="nf-overview">Übersicht</button>
+  <button class="btn danger" id="nf-stop">Beenden</button>
+</section>
+<section class="nav-choose panel" id="nav-choose" aria-label="Navigation starten" hidden>
+  <b id="nc-name"></b><small class="muted" id="nc-dist"></small>
+  <div class="seg nc-seg" role="radiogroup" aria-label="Routenart">
+    <button role="radio" data-profile="tracks">Pisten bevorzugen</button>
+    <button role="radio" data-profile="road">Schnellste Straße</button>
+  </div>
+  <button class="btn primary wide" id="nc-route">Route berechnen</button>
+  <button class="btn wide" id="nc-line">Luftlinie (auch offline)</button>
+  <button class="btn wide flat-btn" id="nc-cancel">Abbrechen</button>
+</section>
+
 <aside class="sheet" id="sheet" aria-label="Karten und Ebenen" hidden>
   <div class="sheet-head">
     <h1>Karten &amp; Ebenen</h1>
@@ -75,6 +96,13 @@
     </label>
 
     <h2>Darstellung</h2>
+    <p class="sub-head"><b>Kartenart</b><small class="muted">Luftbild und Hybrid brauchen Internet</small></p>
+    <div class="seg" role="radiogroup" aria-label="Kartenart">
+      <button role="radio" data-maptype="topo">Topo</button>
+      <button role="radio" data-maptype="sat">Luftbild</button>
+      <button role="radio" data-maptype="hybrid">Hybrid</button>
+    </div>
+    <p class="sub-head"><b>Farbschema</b></p>
     <div class="seg" role="radiogroup" aria-label="Farbschema">
       <button role="radio" data-theme="auto">Automatisch</button>
       <button role="radio" data-theme="light">Hell</button>
@@ -164,6 +192,7 @@
       <button class="btn" id="spot-cancel">Abbrechen</button>
       <button class="btn primary" id="spot-save">Speichern</button>
     </div>
+    <button class="btn primary wide" id="spot-nav">Hierhin navigieren</button>
     <button class="btn danger wide" id="spot-delete">Ort löschen</button>
   </div>
 </aside>
@@ -211,5 +240,6 @@
 <script src="extract.js"></script>
 <script src="vehicles.js"></script>
 <script src="app.js"></script>
+<script src="nav.js"></script>
 </body>
 </html>

@@ -185,6 +185,33 @@ jobs:
           sed -i "s/__BUILD__/${GITHUB_SHA::7}/g" site/sw.js site/index.html
           du -sh site
 
+      - name: Online-Dienste für Route und Luftbild prüfen
+        continue-on-error: true
+        run: |
+          O="Origin: https://pokaxhontas.github.io"
+          for u in 'https://valhalla1.openstreetmap.de/route?json=%7B%22locations%22%3A%5B%7B%22lat%22%3A42.87%2C%22lon%22%3A74.57%7D%2C%7B%22lat%22%3A42.49%2C%22lon%22%3A78.39%7D%5D%2C%22costing%22%3A%22auto%22%7D' \
+                   'https://routing.openstreetmap.de/routed-car/route/v1/driving/74.57,42.87;78.39,42.49?overview=false' \
+                   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/16/24272/46960'; do
+            echo "== ${u:0:60}"; curl -s -D - -o /dev/null -H "$O" "$u" | grep -iE "^HTTP|access-control-allow-origin" || true
+          done
+
+      - name: Probelauf im Browser
+        continue-on-error: true
+        run: |
+          (cd vendor-tmp && npm install --no-audit --no-fund puppeteer-core@23 > /dev/null)
+          (cd site && nohup python3 -m http.server 8080 > /dev/null 2>&1 &)
+          sleep 2
+          NODE_PATH=vendor-tmp/node_modules timeout 600 node scripts/smoke_test.js http://localhost:8080/
+
+      - name: Bildschirmfotos aufheben
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: shots
+          path: shots
+          if-no-files-found: ignore
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3

@@ -19,6 +19,7 @@ const settings = {
   headingUp: store.get('headingUp', true),
   wake: store.get('wake', true),
   vehicle: store.get('vehicle', 'arrow'),
+  mapType: store.get('mapType', 'topo'),
   vehicleColor: store.get('vehicleColor', '#e9e5da'),
   hidden: store.get('hiddenCats', [])
 };
@@ -253,16 +254,28 @@ function buildStyle() {
   const dark = isDark();
   const flavorName = dark ? 'dark' : 'light';
   const B = window.basemaps || window.protomaps_basemaps;
-  const baseLayers = B.layers('protomaps', B.namedFlavor(flavorName), { lang: 'de' });
+  const sat = settings.mapType === 'sat' || settings.mapType === 'hybrid';
+  let baseLayers = B.layers('protomaps', B.namedFlavor(flavorName), { lang: 'de' });
+  if (sat) {
+    // Luftbild über der Grundkarte: wo (offline) kein Bild kommt, scheint die normale Karte durch
+    const under = baseLayers.filter((l) => l.type !== 'symbol');
+    const satLayer = { id: 'satellite', type: 'raster', source: 'sat', paint: { 'raster-fade-duration': 150 } };
+    const over = settings.mapType === 'hybrid'
+      ? B.layers('protomaps', B.namedFlavor('dark'), { lang: 'de' })
+        .filter((l) => l.type === 'symbol' || (l.type === 'line' && /^(roads|boundaries)/.test(l.id) && !/casing/.test(l.id)))
+        .map((l) => ({ ...l, id: 'hy-' + l.id, ...(l.type === 'line' ? { paint: { ...l.paint, 'line-opacity': 0.75 } } : {}) }))
+      : [];
+    baseLayers = [...under, satLayer, ...over];
+  }
 
   const hill = {
     id: 'hillshade', type: 'hillshade', source: 'dem',
-    layout: { visibility: settings.hillshade ? 'visible' : 'none' },
+    layout: { visibility: settings.hillshade && !sat ? 'visible' : 'none' },
     paint: dark
       ? { 'hillshade-exaggeration': 0.35, 'hillshade-shadow-color': '#000000', 'hillshade-highlight-color': 'rgba(255,255,255,0.18)', 'hillshade-accent-color': '#000000' }
       : { 'hillshade-exaggeration': 0.5, 'hillshade-shadow-color': '#4A3B2A', 'hillshade-highlight-color': '#FFFFFF', 'hillshade-accent-color': '#6B5A45' }
   };
-  const lineColor = dark ? 'rgba(181,195,202,0.35)' : 'rgba(110,80,50,0.45)';
+  const lineColor = sat ? 'rgba(255,236,200,0.55)' : dark ? 'rgba(181,195,202,0.35)' : 'rgba(110,80,50,0.45)';
   const contourLine = {
     id: 'contours', type: 'line', source: 'contours', 'source-layer': 'contours',
     layout: { visibility: settings.contours ? 'visible' : 'none', 'line-join': 'round' },
@@ -279,7 +292,7 @@ function buildStyle() {
     paint: { 'text-color': dark ? '#B5C3CA' : '#6E5234', 'text-halo-color': dark ? '#0B0F12' : '#FFFFFF', 'text-halo-width': 1.2 }
   };
 
-  let at = baseLayers.findIndex((l) => /^roads/.test(l.id) || /^buildings/.test(l.id));
+  let at = sat ? baseLayers.findIndex((l) => l.id === 'satellite') + 1 : baseLayers.findIndex((l) => /^roads/.test(l.id) || /^buildings/.test(l.id));
   if (at < 0) at = baseLayers.findIndex((l) => l.type === 'symbol');
   if (at < 0) at = baseLayers.length;
   const layers = [...baseLayers.slice(0, at), hill, contourLine, ...baseLayers.slice(at), contourText];
@@ -309,6 +322,19 @@ function buildStyle() {
       layout: { 'symbol-placement': 'line', 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Medium'], 'text-size': 12, 'text-offset': [0, -1] },
       paint: { 'text-color': ['get', 'color'], 'text-halo-color': dark ? '#0B0F12' : '#FFFFFF', 'text-halo-width': 1.6 }
     }
+  );
+  const navBlue = '#2F80ED';
+  layers.push(
+    { id: 'route-casing', type: 'line', source: 'route', filter: ['==', ['get', 'kind'], 'route'], layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': dark || sat ? '#0B1A33' : '#FFFFFF', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 7, 15, 14] } },
+    { id: 'route-line', type: 'line', source: 'route', filter: ['==', ['get', 'kind'], 'route'], layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': navBlue, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 4, 15, 9] } },
+    { id: 'route-done', type: 'line', source: 'route', filter: ['==', ['get', 'kind'], 'done'], layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': '#8C98A2', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 4, 15, 9] } },
+    { id: 'route-air', type: 'line', source: 'route', filter: ['==', ['get', 'kind'], 'line'], layout: { 'line-cap': 'round' },
+      paint: { 'line-color': navBlue, 'line-width': 4, 'line-dasharray': [0.1, 2] } },
+    { id: 'route-target', type: 'circle', source: 'route', filter: ['==', ['get', 'kind'], 'target'],
+      paint: { 'circle-radius': 9, 'circle-color': navBlue, 'circle-stroke-color': '#FFFFFF', 'circle-stroke-width': 3 } }
   );
   layers.push(
     {
@@ -344,6 +370,12 @@ function buildStyle() {
         })]
       },
       places: { type: 'geojson', data: placesGeoJSON() },
+      route: { type: 'geojson', data: typeof Nav !== 'undefined' ? Nav.geojson() : { type: 'FeatureCollection', features: [] } },
+      sat: {
+        type: 'raster', tileSize: 256, maxzoom: 19,
+        tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+        attribution: 'Luftbilder © Esri, Maxar, Earthstar Geographics'
+      },
       tracks: { type: 'geojson', data: tracksGeoJSON() }
     },
     layers
@@ -405,6 +437,7 @@ function onPosition(p) {
   if (!meMarker) buildMeMarker();
   meMarker.setLngLat([cur.lon, cur.lat]);
   updateMeMarker();
+  if (typeof Nav !== 'undefined' && Nav.active) Nav.update(cur);
 
   if (!gps.hadFix) {
     gps.hadFix = true;
@@ -757,6 +790,7 @@ function openEditor(place, at) {
   $('#spot-name').value = editor.draft.name;
   $('#spot-note').value = editor.draft.note;
   $('#spot-delete').hidden = isNew;
+  $('#spot-nav').hidden = isNew;
   $('#spot-delete').textContent = 'Ort löschen';
   $('#spot-move').hidden = isNew;
   renderChips();
@@ -862,6 +896,12 @@ function setupEditorUI() {
   $('#spot-cancel').onclick = closeEditor;
   $('#spot-save').onclick = saveEditor;
   $('#spot-delete').onclick = deleteEditorPlace;
+  $('#spot-nav').onclick = () => {
+    const p = places.find((x) => x.id === editor.id);
+    if (!p) return;
+    closeEditor();
+    Nav.choose({ lat: p.lat, lon: p.lon, name: p.name });
+  };
   $('#spot-move').onclick = () => {
     map.easeTo({ center: [editor.draft.lon, editor.draft.lat], duration: 300 });
     setMoving(true);
@@ -1210,11 +1250,11 @@ function setupUI() {
   $('#add-input').oninput = renderCountries;
   $('#area-add').onclick = addArea;
 
-  document.querySelectorAll('.seg button').forEach((b) => {
+  document.querySelectorAll('.seg button[data-theme]').forEach((b) => {
     b.setAttribute('aria-checked', String(b.dataset.theme === settings.theme));
     b.onclick = () => {
       settings.theme = b.dataset.theme; store.set('theme', settings.theme);
-      document.querySelectorAll('.seg button').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+      document.querySelectorAll('.seg button[data-theme]').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
       refreshStyle();
     };
   });
@@ -1250,6 +1290,16 @@ function setupUI() {
   setupTrackInfoUI();
   $('#btn-gpx').onclick = exportGPX;
   setupVehiclePicker();
+  Nav.setup();
+  document.querySelectorAll('[data-maptype]').forEach((b) => {
+    b.setAttribute('aria-checked', String(b.dataset.maptype === settings.mapType));
+    b.onclick = () => {
+      settings.mapType = b.dataset.maptype; store.set('mapType', settings.mapType);
+      document.querySelectorAll('[data-maptype]').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+      if (settings.mapType !== 'topo' && !navigator.onLine) toast('Luftbilder gibt es nur mit Internet. Offline siehst du die normale Karte.', 4500);
+      refreshStyle();
+    };
+  });
   savePlaces();
   updateCompassButton();
   $('#btn-locate').classList.add('active');
@@ -1468,7 +1518,7 @@ const Search = {
     if (this.searchMarker) this.searchMarker.remove();
     const el = document.createElement('div');
     el.className = 'search-pin';
-    el.innerHTML = '<div class="sp-card panel"><b></b><small></small><button class="btn primary sp-save">Als Ort speichern</button><button class="round sp-x" aria-label="Markierung entfernen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div><div class="sp-dot"></div>';
+    el.innerHTML = '<div class="sp-card panel"><b></b><small></small><div class="sp-btns"><button class="btn primary sp-nav">Navigieren</button><button class="btn sp-save">Speichern</button></div><button class="round sp-x" aria-label="Markierung entfernen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div><div class="sp-dot"></div>';
     el.querySelector('b').textContent = r.name;
     el.querySelector('small').textContent = r.sub || '';
     el.querySelector('.sp-save').onclick = (ev) => {
@@ -1479,6 +1529,11 @@ const Search = {
       $('#spot-name').value = r.type === 'coord' ? '' : r.name;
     };
     el.querySelector('.sp-x').onclick = (ev) => { ev.stopPropagation(); this.searchMarker.remove(); this.searchMarker = null; };
+    el.querySelector('.sp-nav').onclick = (ev) => {
+      ev.stopPropagation();
+      this.searchMarker.remove(); this.searchMarker = null;
+      Nav.choose({ lat: r.lat, lon: r.lon, name: r.type === 'coord' ? '' : r.name });
+    };
     this.searchMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([r.lon, r.lat]).addTo(map);
   }
 };
