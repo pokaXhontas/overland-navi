@@ -24,7 +24,8 @@ jobs:
         run: |
           for u in https://overpass-api.de https://overpass.private.coffee https://maps.mail.ru/osm/tools/overpass https://overpass.kumi.systems; do
             echo "== $u"
-            curl -s -m 30 -o /tmp/o -w "HTTP %{http_code} in %{time_total}s\n" "$u/api/interpreter" -H "Origin: https://pokaxhontas.github.io" \
+            curl -s -m 30 -o /tmp/o -w "HTTP %{http_code} in %{time_total}s\n" "$u/api/interpreter" -H "Origin: https://pokaxhontas.github.io" -H "Referer: https://pokaxhontas.github.io/overland-navi/" \
+              -A "Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1" \
               --data-urlencode 'data=[out:json][timeout:20];nwr["amenity"="atm"](around:3000,42.875,74.59);out center tags 3;' || true
             head -c 200 /tmp/o; echo
           done
