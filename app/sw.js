@@ -33,7 +33,8 @@ const SHELL = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(SHELL_CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  // cache: 'reload' – sonst kann der Browser-Zwischenspeicher (bis 10 min) noch die alte Fassung liefern
+  event.waitUntil(caches.open(SHELL_CACHE).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (event) => {
@@ -106,7 +107,8 @@ self.addEventListener('fetch', (event) => {
   event.respondWith((async () => {
     const cache = await caches.open(SHELL_CACHE);
     const hit = await cache.match(req, { ignoreSearch: true });
-    const net = fetch(req).then((resp) => {
+    // Seitenaufrufe (navigate) lassen sich nicht mit Optionen weiterreichen, daher über die Adresse
+    const net = fetch(req.mode === 'navigate' ? req.url : req, { cache: 'no-cache' }).then((resp) => {
       if (resp.ok && resp.type === 'basic') cache.put(req, resp.clone());
       return resp;
     }).catch(() => null);
