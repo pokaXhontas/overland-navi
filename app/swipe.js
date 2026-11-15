@@ -36,6 +36,7 @@ const Swipe = {
       if (opts.enabled && !opts.enabled()) return;
       const dir = opts.dir();
       if (scrollBlocks(e.target, dir)) return;
+      Swipe.last = { phase: 'down', dir, target: e.target.className };
       st = { dir, x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId, on: false, off: 0, lastOff: 0, lastT: performance.now(), v: 0 };
     });
 
@@ -73,6 +74,7 @@ const Swipe = {
       setTimeout(() => window.removeEventListener('click', stop, { capture: true }), 350);
       const size = axis(s.dir) === 'y' ? el.offsetHeight : el.offsetWidth;
       const go = s.off > Math.min(140, size * 0.3) || (s.v > 0.5 && s.off > 25);
+      Swipe.last = { phase: 'end', dir: s.dir, off: Math.round(s.off), size, go };
       el.style.transition = 'translate .2s ease';
       if (!go) { el.style.translate = ''; setTimeout(() => { el.style.transition = ''; }, 220); return; }
       const out = (size + 60) * sign(s.dir);

@@ -111,7 +111,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   console.log('Routenauswahl nach Wischen:', await page.evaluate(() => $('#nav-alts').className));
   await shot('12b-auswahl-klein');
   await drag('#nav-alts', 0, -200);
-  console.log('Nach Hochwischen:', await page.evaluate(() => $('#nav-alts').className));
+  console.log('Nach Hochwischen:', await page.evaluate(() => $('#nav-alts').className + ' ' + JSON.stringify(Swipe.last) + ' ' + JSON.stringify($('#nav-alts').getBoundingClientRect())));
   await drag('.hud', -260, 0);
   console.log('Tacho:', await page.evaluate(() => document.querySelector('.hud').className));
   await page.evaluate(() => document.querySelector('.hud').click());
