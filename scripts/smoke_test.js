@@ -36,8 +36,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await shot('1-fahrzeug');
 
   // Route berechnen und Fahrt simulieren
+  // Berlin: Vorschläge zur Auswahl
+  await page.evaluate(() => { gps.pos = { lat: 52.5219, lon: 13.4132 }; return Nav.start({ lat: 52.3906, lon: 13.0645, name: 'Potsdam' }, 'route'); });
+  await page.waitForFunction(() => Nav.active || Nav.pending, { timeout: 60000 });
+  console.log('Vorschläge Berlin–Potsdam:', await page.evaluate(() => Nav.pending ? Nav.pending.list.map((r) => Math.round(r.time / 60) + ' min/' + Math.round(r.total / 1000) + ' km').join(', ') : 'nur eine Route'));
+  await shot('2a-vorschlaege');
+  await page.evaluate(() => { if (Nav.pending) $('#na-cancel').click(); Nav.stop(true); gps.pos = { lat: 42.8746, lon: 74.5698 }; });
   await page.evaluate(() => Nav.start({ lat: 42.4901, lon: 78.3936, name: 'Karakol' }, 'route'));
-  await page.waitForFunction(() => Nav.active, { timeout: 60000 });
+  await page.waitForFunction(() => Nav.active || Nav.pending, { timeout: 60000 });
+  await page.evaluate(() => { if (Nav.pending) $('#na-go').click(); });
   const info = await page.evaluate(() => ({ mode: Nav.active.mode, pts: Nav.active.coords.length, man: Nav.active.maneuvers.length, km: Math.round(Nav.active.total / 1000), src: Nav.active.source, first: (Nav.active.maneuvers[1] || {}).text }));
   console.log('Route:', JSON.stringify(info));
   await shot('2-route-uebersicht');
@@ -79,6 +86,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   // iPhone-Größe mit Navigation
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   await page.evaluate(() => { closeSheet(); return Nav.start({ lat: 42.4901, lon: 78.3936, name: 'Karakol' }, 'route'); });
+  await page.evaluate(() => { if (Nav.pending) $('#na-go').click(); });
   await sleep(5000);
   await page.evaluate(() => { const c = Nav.active.coords; onPosition({ coords: { latitude: c[30][1], longitude: c[30][0], accuracy: 6, speed: 14, heading: null, altitude: 800 }, timestamp: Date.now() }); map.jumpTo({ zoom: 15 }); });
   await shot('8-iphone-navigation');

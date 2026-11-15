@@ -423,6 +423,11 @@ html.dark .region-error { color: #FF8A8A; }
   width: min(440px, calc(100vw - 2 * var(--gap))); padding: 18px; display: flex; flex-direction: column; gap: 4px; background: var(--panel-solid); }
 .nav-choose > b { font-size: 19px; }
 .nav-choose .nc-seg { grid-template-columns: 1fr 1fr; margin-top: 10px; }
+.na-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.na-row { display: flex; align-items: baseline; gap: 10px; padding: 12px 14px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--faint); color: var(--text); font: inherit; text-align: left; }
+.na-row b { font-size: 18px; }
+.na-row span { color: var(--muted); font-size: 14px; }
+.na-row[aria-checked="true"] { border-color: #2F80ED; background: rgba(47,128,237,.12); }
 .flat-btn { border: 0; background: transparent; color: var(--muted); }
 .sp-btns { display: flex; gap: 6px; }
 .sp-btns .btn { flex: 1; padding: 0 10px; }

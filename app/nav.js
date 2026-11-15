@@ -7,7 +7,8 @@ const OSRM = 'https://routing.openstreetmap.de/routed-car/route/v1/driving/';
 
 const Nav = {
   active: null,
-  profile: store.get('navProfile', 'tracks'),
+  profile: store.get('navProfile2', 'road'),
+  pending: null,
   voice: store.get('navVoice', true),
   busy: false,
 
@@ -29,20 +30,25 @@ const Nav = {
 
   async valhalla(from, to) {
     const opts = this.profile === 'tracks'
-      ? { use_tracks: 1, use_highways: 0.3, exclude_unpaved: false, use_ferry: 0.5 }
-      : { use_tracks: 0, use_highways: 1 };
+      ? { use_tracks: 0.8, use_highways: 0.6, exclude_unpaved: false, use_ferry: 0.5 }
+      : { use_tracks: 0, use_highways: 1, use_ferry: 0.5 };
     const loc = { lat: from.lat, lon: from.lon };
     if (gps.heading !== null && gps.speed > 2) { loc.heading = Math.round(gps.heading); loc.heading_tolerance = 60; }
     const q = {
       locations: [loc, { lat: to.lat, lon: to.lon }],
       costing: 'auto', costing_options: { auto: opts },
-      directions_options: { units: 'kilometers', language: 'de-DE' }
+      directions_options: { units: 'kilometers', language: 'de-DE' },
+      alternates: 2
     };
     const r = await fetch(VALHALLA + '?json=' + encodeURIComponent(JSON.stringify(q)));
     const j = await r.json();
     if (!r.ok || !j.trip) throw new Error((j && (j.error || j.status_message)) || 'Keine Route gefunden');
+    return [j.trip, ...(j.alternates || []).map((a) => a.trip)].filter(Boolean).map((t) => this.parseTrip(t));
+  },
+
+  parseTrip(trip) {
     const coords = [], man = [];
-    for (const leg of j.trip.legs) {
+    for (const leg of trip.legs) {
       const off = coords.length ? coords.length - 1 : 0;
       const pts = this.decode6(leg.shape);
       coords.push(...(coords.length ? pts.slice(1) : pts));
@@ -52,7 +58,7 @@ const Nav = {
           verbal: m.verbal_pre_transition_instruction || m.instruction, street: (m.street_names || [])[0] || '' });
       }
     }
-    return { coords, maneuvers: man, time: j.trip.summary.time, source: 'Valhalla' };
+    return { coords, maneuvers: man, time: trip.summary.time, source: 'Valhalla' };
   },
 
   osrmText(s) {
@@ -68,10 +74,14 @@ const Nav = {
   },
 
   async osrm(from, to) {
-    const r = await fetch(`${OSRM}${from.lon},${from.lat};${to.lon},${to.lat}?overview=full&geometries=geojson&steps=true`);
+    const r = await fetch(`${OSRM}${from.lon},${from.lat};${to.lon},${to.lat}?overview=full&geometries=geojson&steps=true&alternatives=true`);
     const j = await r.json();
     if (!r.ok || !j.routes || !j.routes.length) throw new Error('Keine Route gefunden');
-    const route = j.routes[0], coords = route.geometry.coordinates, man = [];
+    return j.routes.slice(0, 3).map((route) => this.parseOsrm(route));
+  },
+
+  parseOsrm(route) {
+    const coords = route.geometry.coordinates, man = [];
     let idx = 0;
     const typeOf = (s) => {
       const t = s.maneuver.type, m = s.maneuver.modifier || '';
@@ -108,9 +118,9 @@ const Nav = {
   async calc(from, target) {
     let res = null, err = null;
     for (const fn of [this.valhalla, this.osrm]) {
-      try { res = await fn.call(this, from, target); break; } catch (e) { err = e; }
+      try { res = await fn.call(this, from, target); if (res && res.length) break; } catch (e) { err = e; }
     }
-    if (!res) throw err || new Error('Keine Route gefunden');
+    if (!res || !res.length) throw err || new Error('Keine Route gefunden');
     return res;
   },
 
@@ -137,7 +147,9 @@ const Nav = {
         } else {
           toast('Route wird berechnet …', 8000);
           try {
-            this.active = this.prepare(target, await this.calc(from, target), 'route');
+            const list = (await this.calc(from, target)).map((r) => this.prepare(target, r, 'route'));
+            if (list.length > 1) { $('#toast').classList.remove('show'); this.pickRoute(target, list); return; }
+            this.active = list[0];
             toast(`Route: ${fmtDist(this.active.total)} · ${this.fmtTime(this.active.time)}`, 3000);
           } catch (e) {
             toast('Keine Route gefunden (' + e.message + '). Ich zeige dir die Luftlinie.', 5000);
@@ -145,6 +157,47 @@ const Nav = {
           }
         }
       }
+      this.go(from);
+    } finally { this.busy = false; }
+  },
+
+  /* mehrere Vorschläge: auf der Karte zeigen und auswählen lassen */
+  pickRoute(target, list) {
+    this.pending = { target, list, sel: 0 };
+    const box = $('#nav-alts'), rows = $('#na-list');
+    const fastest = Math.min(...list.map((r) => r.time));
+    const render = () => {
+      rows.innerHTML = '';
+      list.forEach((r, i) => {
+        const b = document.createElement('button');
+        b.className = 'na-row';
+        b.setAttribute('aria-checked', String(i === this.pending.sel));
+        const extra = r.time > fastest ? ` · +${Math.round((r.time - fastest) / 60)} min` : ' · schnellste';
+        b.innerHTML = `<b>${this.fmtTime(r.time)}</b><span>${fmtDist(r.total)}${extra}</span>`;
+        b.onclick = () => { this.pending.sel = i; render(); this.draw(); };
+        rows.appendChild(b);
+      });
+    };
+    render();
+    $('#na-go').onclick = () => {
+      const p = this.pending;
+      this.pending = null;
+      box.hidden = true;
+      this.active = p.list[p.sel];
+      this.go(gps.pos);
+    };
+    $('#na-cancel').onclick = () => { this.pending = null; box.hidden = true; this.draw(); };
+    box.hidden = false;
+    this.draw();
+    const b = new maplibregl.LngLatBounds(list[0].coords[0], list[0].coords[0]);
+    for (const r of list) for (const p of r.coords) b.extend(p);
+    gps.follow = false;
+    $('#btn-locate').classList.remove('active');
+    map.fitBounds(b, { padding: { top: 120, bottom: 300, left: 60, right: 90 }, maxZoom: 15, bearing: 0, duration: 800 });
+  },
+
+  go(from) {
+    {
       this.save();
       this.showUI(true);
       gps.follow = true;
@@ -157,7 +210,7 @@ const Nav = {
         this.followTimer = setTimeout(() => { if (this.active === a) this.follow(); }, 4000);
       }
       this.say(this.active.mode === 'route' ? 'Route gestartet.' : 'Luftlinie zum Ziel.');
-    } finally { this.busy = false; }
+    }
   },
 
   async reroute(pos) {
@@ -168,7 +221,7 @@ const Nav = {
     try {
       const res = await this.calc(pos, a.target);
       if (this.active !== a) return;
-      this.active = this.prepare(a.target, res, 'route');
+      this.active = this.prepare(a.target, res[0], 'route');
       this.save();
       this.say('Route neu berechnet.');
       this.update(pos);
@@ -331,6 +384,13 @@ const Nav = {
   geojson(pos) {
     const a = this.active;
     const fc = { type: 'FeatureCollection', features: [] };
+    const pd = this.pending;
+    if (pd) {
+      pd.list.forEach((r, i) => { if (i !== pd.sel) fc.features.push({ type: 'Feature', properties: { kind: 'alt' }, geometry: { type: 'LineString', coordinates: r.coords } }); });
+      fc.features.push({ type: 'Feature', properties: { kind: 'route' }, geometry: { type: 'LineString', coordinates: pd.list[pd.sel].coords } });
+      fc.features.push({ type: 'Feature', properties: { kind: 'target' }, geometry: { type: 'Point', coordinates: [pd.target.lon, pd.target.lat] } });
+      return fc;
+    }
     if (!a) return fc;
     if (a.mode === 'line') {
       const p = pos || gps.pos;
@@ -404,7 +464,7 @@ const Nav = {
     $('#nc-dist').textContent = gps.pos ? 'Luftlinie ' + fmtDist(distance(gps.pos, target)) : '';
     sheet.querySelectorAll('[data-profile]').forEach((b) => {
       b.setAttribute('aria-checked', String(b.dataset.profile === this.profile));
-      b.onclick = () => { this.profile = b.dataset.profile; store.set('navProfile', this.profile); this.choose(target); };
+      b.onclick = () => { this.profile = b.dataset.profile; store.set('navProfile2', this.profile); this.choose(target); };
     });
     $('#nc-route').onclick = () => { sheet.hidden = true; this.start(target, 'route'); };
     $('#nc-line').onclick = () => { sheet.hidden = true; this.start(target, 'line'); };

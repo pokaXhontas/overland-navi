@@ -325,6 +325,8 @@ function buildStyle() {
   );
   const navBlue = '#2F80ED';
   layers.push(
+    { id: 'route-alt', type: 'line', source: 'route', filter: ['==', ['get', 'kind'], 'alt'], layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': '#7FA9E0', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 4, 15, 8], 'line-opacity': 0.8 } },
     { id: 'route-casing', type: 'line', source: 'route', filter: ['==', ['get', 'kind'], 'route'], layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: { 'line-color': dark || sat ? '#0B1A33' : '#FFFFFF', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 7, 15, 14] } },
     { id: 'route-line', type: 'line', source: 'route', filter: ['==', ['get', 'kind'], 'route'], layout: { 'line-join': 'round', 'line-cap': 'round' },
