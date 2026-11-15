@@ -1313,6 +1313,7 @@ function setupUI() {
   Nav.setup();
   Planner.setup();
   Draw.setup();
+  Swipe.setup();
   document.querySelectorAll('[data-maptype]').forEach((b) => {
     b.setAttribute('aria-checked', String(b.dataset.maptype === settings.mapType));
     b.onclick = () => {

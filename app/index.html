@@ -89,6 +89,8 @@
 </section>
 
 <section class="nav-choose panel" id="nav-alts" aria-label="Route auswählen" hidden>
+  <div class="grab" aria-hidden="true"></div>
+  <div class="na-peek"><span class="na-peek-txt"><b id="na-peek-time"></b><small>Nach oben wischen für alle Routen</small></span><button class="btn primary" id="na-peek-go">Los</button></div>
   <b id="na-title">Route auswählen</b><small class="muted" id="na-sub">Antippen zeigt sie auf der Karte</small>
   <div class="na-list" id="na-list"></div>
   <button class="btn primary wide" id="na-go">Losfahren</button>
@@ -97,6 +99,7 @@
 </section>
 
 <aside class="sheet" id="sheet" aria-label="Karten und Ebenen" hidden>
+  <div class="grab sheet-grab" aria-hidden="true"></div>
   <div class="sheet-head">
     <h1>Karten &amp; Ebenen</h1>
     <button class="round" id="sheet-close" aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
@@ -190,6 +193,7 @@
   </div>
   <div class="pl-go"><button class="btn primary" id="pl-go">Route berechnen</button><button class="btn" id="pl-line">Luftlinie</button></div>
   <div class="search-results pl-results" id="pl-results"></div>
+  <div class="grab grab-bottom" aria-hidden="true"></div>
 </section>
 <div class="pl-pickbar panel" id="pl-pickbar" hidden>
   <span>Karte verschieben, bis die Nadel auf dem Punkt steht</span>
@@ -204,9 +208,11 @@
     <button class="round" id="search-close" aria-label="Suche schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
   </div>
   <div class="search-results" id="search-results"></div>
+  <div class="grab grab-bottom" aria-hidden="true"></div>
 </section>
 
 <aside class="sheet spot" id="spot" aria-label="Ort bearbeiten" hidden>
+  <div class="grab sheet-grab" aria-hidden="true"></div>
   <div class="sheet-head">
     <h1 id="spot-title">Neuer Ort</h1>
     <button class="round" id="spot-close" aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
@@ -239,6 +245,7 @@
 </aside>
 
 <aside class="sheet spot" id="trackinfo" aria-label="Track-Infos" hidden>
+  <div class="grab sheet-grab" aria-hidden="true"></div>
   <div class="sheet-head">
     <h1>Track</h1>
     <button class="round" id="ti-close" aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
@@ -291,5 +298,6 @@
 <script src="nav.js"></script>
 <script src="planner.js"></script>
 <script src="draw.js"></script>
+<script src="swipe.js"></script>
 </body>
 </html>

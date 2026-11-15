@@ -227,8 +227,12 @@ const Nav = {
         b.onclick = () => { this.pending.sel = i; render(); this.draw(); };
         rows.appendChild(b);
       });
+      const cur = list[this.pending.sel];
+      $('#na-peek-time').textContent = `${this.fmtTime(cur.time)} · ${fmtDist(cur.total)}`;
     };
     render();
+    box.classList.remove('peek');
+    $('#na-peek-go').onclick = (e) => { e.stopPropagation(); $('#na-go').click(); };
     $('#na-go').onclick = () => {
       const p = this.pending;
       this.pending = null;
@@ -517,6 +521,8 @@ const Nav = {
   showUI(on) {
     $('#nav-banner').hidden = !on;
     $('#nav-foot').hidden = !on;
+    $('#nav-banner').classList.remove('mini');
+    $('#nav-foot').classList.remove('mini');
     document.body.classList.toggle('navigating', on);
     $('#nb-voice').classList.toggle('off', !this.voice);
   },

@@ -100,6 +100,22 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.waitForFunction(() => Nav.pending, { timeout: 60000 });
   console.log('Geplante Route:', await page.evaluate(() => Nav.pending.list.map((r) => Math.round(r.time / 60) + ' min/' + Math.round(r.total / 1000) + ' km/' + r.vias.length + ' Stopp').join(', ') + ' · ' + $('#na-sub').textContent));
   await shot('12-geplante-route');
+  // Wischgesten: Routenauswahl nach unten klein, wieder hoch; Tacho zur Seite
+  const drag = async (sel, dx, dy) => {
+    const r = await page.evaluate((sel) => { const b = document.querySelector(sel).getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + Math.min(30, b.height / 2) }; }, sel);
+    await page.mouse.move(r.x, r.y); await page.mouse.down();
+    for (let k = 1; k <= 12; k++) { await page.mouse.move(r.x + dx * k / 12, r.y + dy * k / 12); await sleep(16); }
+    await page.mouse.up(); await sleep(500);
+  };
+  await drag('#nav-alts', 0, 260);
+  console.log('Routenauswahl nach Wischen:', await page.evaluate(() => $('#nav-alts').className));
+  await shot('12b-auswahl-klein');
+  await drag('#nav-alts', 0, -200);
+  console.log('Nach Hochwischen:', await page.evaluate(() => $('#nav-alts').className));
+  await drag('.hud', -260, 0);
+  console.log('Tacho:', await page.evaluate(() => document.querySelector('.hud').className));
+  await page.evaluate(() => document.querySelector('.hud').click());
+  console.log('Tacho nach Antippen:', await page.evaluate(() => document.querySelector('.hud').className));
   await page.evaluate(() => $('#na-edit').click());
   await sleep(500);
   console.log('Nach „Route ändern“:', await page.evaluate(() => !$('#planner').hidden && Planner.stops.map((s) => Planner.label(s)).join(' → ')));
@@ -130,6 +146,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.evaluate(() => $('#btn-layers').click());
   await page.evaluate(() => $('#veh-grid').scrollIntoView());
   await shot('6-menue-fahrzeuge');
+  await drag('#sheet', 300, 0);
+  console.log('Menü nach Wischen nach rechts:', await page.evaluate(() => $('#sheet').hidden ? 'zu' : 'offen'));
+  await page.evaluate(() => $('#btn-layers').click());
+  await sleep(500);
   await page.evaluate(() => openAddPage());
   await sleep(2000);
   const n = await page.evaluate(() => document.querySelectorAll('#country-list .country').length);

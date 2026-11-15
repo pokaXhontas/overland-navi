@@ -42,6 +42,7 @@ const Draw = {
     $('#btn-locate').classList.remove('active');
     document.body.classList.add('drawing');
     $('#draw-bar').hidden = false;
+    $('#draw-bar').classList.remove('mini');
     this.renderBar();
     this.redraw();
     if (track) map.fitBounds(trackBounds(track), { padding: 80, maxZoom: 15 });
