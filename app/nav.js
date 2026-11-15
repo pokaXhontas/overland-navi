@@ -9,7 +9,12 @@ const OSRM = 'https://routing.openstreetmap.de/routed-car/route/v1/driving/';
  * iOS gibt Ton erst nach einem echten Fingertipp frei. Deshalb wird bei jedem Tipp „entsperrt“,
  * und wenn Web-Audio trotzdem stumm bleibt, spielt ein normaler Audio-Player die Ansage. */
 const SILENT_WAV = 'data:audio/wav;base64,UklGRiYAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YQIAAAAAAA==';
+const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const Pack = {
+  /* Stummschalter: „playback“ ist trotz Stummschalter hörbar (Musik pausiert kurz), „transient“ macht Musik nur leiser, schweigt aber im Stummmodus */
+  session() {
+    try { if (navigator.audioSession) navigator.audioSession.type = store.get('voiceSilent', true) ? 'playback' : 'transient'; } catch (e) { /* älteres iOS */ }
+  },
   index: null, ctx: null, raw: new Map(), dec: new Map(), playing: [], el: null, elReady: false,
   async load() {
     if (this.index) return this.index;
@@ -27,7 +32,7 @@ const Pack = {
   },
   /* im Fingertipp aufrufen */
   unlock() {
-    try { if (navigator.audioSession) navigator.audioSession.type = 'transient'; } catch (e) { /* älteres iOS */ }
+    this.session();
     const ctx = this.ac();
     if (ctx && ctx.state !== 'running') {
       ctx.resume().catch(() => {});
@@ -72,7 +77,10 @@ const Pack = {
     if (this.el && !this.el.paused) { try { this.el.pause(); } catch (e) { /* egal */ } }
   },
   async play(voice, keys, rate) {
-    if (await this.running()) {
+    this.session();
+    // älteres iOS ohne audioSession: nur der Audio-Player ist trotz Stummschalter hörbar
+    const htmlOnly = IOS && !navigator.audioSession && store.get('voiceSilent', true);
+    if (!htmlOnly && await this.running()) {
       const bufs = await Promise.all(keys.map((k) => this.decoded(voice, k)));
       this.stop();
       const ctx = this.ctx;
@@ -758,6 +766,9 @@ const Nav = {
       setTimeout(() => { test.textContent = 'Probe hören'; }, 1800);
       if (!ok) toast('Kein Ton möglich. Ist das iPad stumm oder ganz leise gestellt?', 4500);
     };
+    const silent = $('#voice-silent');
+    silent.checked = store.get('voiceSilent', true);
+    silent.onchange = () => { store.set('voiceSilent', silent.checked); Pack.unlock(); };
     const on = $('#voice-on');
     on.checked = this.voice;
     on.onchange = () => { this.voice = on.checked; store.set('navVoice', this.voice); $('#nb-voice').classList.toggle('off', !this.voice); };
