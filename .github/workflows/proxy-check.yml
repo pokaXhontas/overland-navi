@@ -23,7 +23,8 @@ jobs:
           echo "== Wanderwege (Testdatei)"; curl -sL -D /tmp/h -H "Origin: https://pokaxhontas.github.io" "$P/wander/test.json"; echo; grep -iE "^HTTP|access-control-allow-origin" /tmp/h
       - name: Fähre Rostock–Trelleborg bei Valhalla
         run: |
-          python3 scripts/check_ferry.py '[{"lat":54.776865,"lon":12.481319,"type":"through"},{"lat":54.776865,"lon":12.481319,"type":"through","radius":20000},{"lat":54.776865,"lon":12.481319,"type":"break"}]' || true
+          python3 scripts/check_ferry.py '[{"lat":54.776865,"lon":12.481319,"type":"through"}]' '{"lat":65.5915,"lon":19.1752}' '{}' || true
+          python3 scripts/check_ferry.py '[{"lat":54.776865,"lon":12.481319,"type":"through"}]' '{"lat":65.5915,"lon":19.1752}' '{"use_tracks":0,"use_highways":1,"use_ferry":0.5,"use_living_streets":0.6,"destination_only_penalty":120,"service_penalty":10}' || true
       - name: Grundkarte an Beispielorten untersuchen
         run: |
           set +e

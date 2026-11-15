@@ -30,9 +30,12 @@ for lat, lon in [(54.776865, 12.481319), (54.70, 12.60), (54.90, 12.75)]:
             print("  ", ei.get("names"), ed.get("use"), "Abstand", round(e.get("distance", 0)), e.get("correlated_lat"), e.get("correlated_lon"))
 
 stops = json.loads(sys.argv[1]) if len(sys.argv) > 1 else []
+dest = json.loads(sys.argv[2]) if len(sys.argv) > 2 else {"lat": 55.3759, "lon": 13.1461}
+opts = json.loads(sys.argv[3]) if len(sys.argv) > 3 else {}
 for via in stops:
-    print("== Route Berlin -> Trelleborg über", via)
-    q = {"locations": [{"lat": 52.52, "lon": 13.405}, via, {"lat": 55.3759, "lon": 13.1461}], "costing": "auto"}
+    print("== Route Berlin ->", dest, "über", via, opts)
+    q = {"locations": [{"lat": 52.52, "lon": 13.405, "type": "break"}, via, {**dest, "type": "break"}], "costing": "auto",
+         "costing_options": {"auto": opts}, "directions_options": {"units": "kilometers", "language": "de-DE"}}
     d = get("route", q)
     if "trip" not in d:
         print("   Fehler", d); continue
