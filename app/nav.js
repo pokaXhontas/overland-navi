@@ -136,7 +136,7 @@ const Nav = {
     return out;
   },
 
-  async valhalla(pts, variant) {
+  async valhalla(pts, variant, split) {
     // Spielstraßen und „Anlieger frei“ nicht künstlich meiden, sonst entstehen in Wohngebieten große Umwege
     const town = { use_living_streets: 0.6, destination_only_penalty: 120, service_penalty: 10 };
     const opts = {
@@ -153,11 +153,41 @@ const Nav = {
       costing: 'auto', costing_options: { auto: opts },
       directions_options: { units: 'kilometers', language: 'de-DE' }
     };
-    if (pts.length === 2 && !variant) q.alternates = 2;
+    if (pts.length === 2 && !variant && !split) q.alternates = 2;
     const r = await fetch(VALHALLA + '?json=' + encodeURIComponent(JSON.stringify(q)));
     const j = await r.json();
+    // sehr lange Routen mit Zwischenstopps: der Server erlaubt nur 1.500 km am Stück, dann Abschnitt für Abschnitt rechnen
+    if (!j.trip && j.error_code === 154 && pts.length > 2) return [await this.valhallaSplit(pts, variant)];
     if (!r.ok || !j.trip) throw new Error((j && (j.error || j.status_message)) || 'Keine Route gefunden');
     return [j.trip, ...(j.alternates || []).map((a) => a.trip)].filter(Boolean).map((t) => this.parseTrip(t));
+  },
+
+  /* Route in Abschnitten (je zwei Punkte) rechnen und zusammensetzen */
+  async valhallaSplit(pts, variant) {
+    const legs = [];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = { lat: pts[i].lat, lon: pts[i].lon }, b = { lat: pts[i + 1].lat, lon: pts[i + 1].lon };
+      if (i === 0 && pts[0].gps) a.gps = true;
+      legs.push(this.valhalla([a, b], variant, true).then((l) => l[0]));
+    }
+    const parts = await Promise.all(legs);
+    const out = { coords: [], maneuvers: [], time: 0, source: 'Valhalla', ferries: [], tolls: [] };
+    parts.forEach((p, k) => {
+      const off = out.coords.length ? out.coords.length - 1 : 0;
+      out.coords.push(...(out.coords.length ? p.coords.slice(1) : p.coords));
+      const last = k === parts.length - 1;
+      const viaFerry = !last && pts[k + 1].ferry;
+      for (const m of p.maneuvers) {
+        if (k > 0 && [1, 2, 3].includes(m.type)) continue;                 // „Losfahren“ mitten auf der Strecke weglassen
+        if (!last && [4, 5, 6].includes(m.type) && viaFerry) continue;      // auf der Fähre gibt es kein „Ziel erreicht“
+        out.maneuvers.push({ ...m, idx: m.idx + off, ...(!last && [4, 5, 6].includes(m.type) ? { type: 5 } : {}) });
+      }
+      for (const f of p.ferries || []) out.ferries.push({ ...f, idx: f.idx + off, endIdx: (f.endIdx || f.idx) + off });
+      for (const t of p.tolls || []) out.tolls.push({ ...t, idx: t.idx + off });
+      out.time += p.time;
+    });
+    out.ferries = this.mergeFerries(out.ferries.map((f) => ({ idx: f.idx, name: f.name, km: f.km, time: f.time })));
+    return out;
   },
 
   /* Fährverbindung als Zwischenstopp: ein Punkt auf halber Strecke der Fährlinie */
@@ -218,7 +248,7 @@ const Nav = {
     const out = [];
     for (const f of list) {
       const last = out[out.length - 1];
-      if (last && f.idx - last.endIdx <= 2) { last.km += f.km; last.time += f.time; last.endIdx = f.idx; if (!last.name) last.name = f.name; }
+      if (last && (f.idx - last.endIdx <= 2 || (f.name && f.name === last.name))) { last.km += f.km; last.time += f.time; last.endIdx = f.idx; if (!last.name) last.name = f.name; }
       else out.push({ ...f, endIdx: f.idx });
     }
     return out.filter((f) => f.km > 0.3 || f.time > 120);
@@ -310,7 +340,9 @@ const Nav = {
      Für Straßen kommen so mehr echte Alternativen zusammen; auf Pisten zählt nur Valhalla. */
   async calc(pts) {
     const jobs = [this.valhalla(pts)];
-    if (this.profile !== 'tracks') jobs.push(this.osrm(pts));
+    // mit gewählter Fähre nur Valhalla: OSRM fängt den Punkt auf See nicht zuverlässig auf der Fähre ein
+    const ferryVia = pts.some((p) => p.ferry);
+    if (this.profile !== 'tracks' && !ferryVia) jobs.push(this.osrm(pts));
     // lange Strecken: auch eine Fähren-Variante und eine ohne Maut rechnen lassen (wie bei Google Maps)
     const far = distance(pts[0], pts[pts.length - 1]) > 80000;
     if (far && this.profile !== 'tracks') {
