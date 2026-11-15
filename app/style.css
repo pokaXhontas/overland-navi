@@ -468,3 +468,4 @@ body.drawing .fab, body.drawing .hud { display: none; }
   .db-btns { grid-template-columns: 1fr 1fr; }
   #db-reverse { display: none; }
 }
+.sheet-body > * { flex-shrink: 0; }
