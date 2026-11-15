@@ -715,3 +715,22 @@ body.drawing .fab, body.drawing .hud { display: none; }
 #hk-back { margin-right: 4px; }
 #hike-sheet .sheet-head h1 { flex-grow: 1; }
 #hk-back[hidden], #to-general-h[hidden], #to-facts[hidden] { display: none; }
+
+/* Suche: Kategorien, Verlauf, Treffer in der Nähe */
+.poi-chips { display: flex; gap: 8px; overflow-x: auto; padding: 4px 12px 8px; scrollbar-width: none; -webkit-overflow-scrolling: touch; flex-shrink: 0; }
+.poi-chips::-webkit-scrollbar { display: none; }
+.poi-chips[hidden] { display: none; }
+.poi-chip { display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0; min-height: 40px; padding: 0 14px 0 5px; border-radius: 20px; border: 1px solid var(--line); background: var(--panel-solid); color: var(--text); font: inherit; font-size: 14px; white-space: nowrap; }
+.poi-chip span { width: 30px; height: 30px; border-radius: 15px; display: inline-flex; align-items: center; justify-content: center; }
+.poi-chip svg { width: 17px; height: 17px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.sr-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 8px 2px; }
+.linkbtn { border: 0; background: none; color: var(--accent); font: inherit; font-size: 13px; padding: 6px 0; }
+.poi-all { margin: 4px 0 8px; }
+.poi-pill { position: fixed; z-index: 6; top: calc(var(--safe-t) + 74px); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 6px 0 16px; border-radius: 20px; border: 0; color: var(--text); font: inherit; font-size: 14px; font-weight: 600; }
+.poi-pill[hidden] { display: none; }
+.poi-x { font-style: normal; width: 30px; height: 30px; border-radius: 15px; display: inline-flex; align-items: center; justify-content: center; background: var(--faint); font-size: 13px; }
+.poi-ico { width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; display: block; }
+.poi-open, .poi-closed { display: inline-block; margin: 8px 0 4px; padding: 3px 10px; border-radius: 10px; font-size: 12.5px; font-weight: 700; }
+.poi-open { background: rgba(47,158,68,.15); color: #2B8A3E; }
+.poi-closed { background: rgba(224,49,49,.13); color: #C92A2A; }
+.hk-actions a.btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }

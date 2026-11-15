@@ -483,7 +483,7 @@ const Tours = {
     const tap = (e) => {
       if ((typeof Draw !== 'undefined' && Draw.active) || editor.open || editor.moving) return;
       if (this._lastTap === e.originalEvent) return;
-      if (map.queryRenderedFeatures(e.point, { layers: ['places-icon', 'tracks-hit', 'hike-pts'].filter((l) => map.getLayer(l)) }).length) return;
+      if (map.queryRenderedFeatures(e.point, { layers: ['places-icon', 'tracks-hit', 'hike-pts', 'poi-icon'].filter((l) => map.getLayer(l)) }).length) return;
       this._lastTap = e.originalEvent;
       const f = e.features && e.features[0];
       if (f) this.open(f.properties.id);

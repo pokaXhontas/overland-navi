@@ -213,12 +213,15 @@
   <button class="btn primary" id="pl-take">Punkt übernehmen</button>
 </div>
 
+<button class="poi-pill panel" id="poi-pill" hidden><span></span><i class="poi-x" aria-label="Treffer ausblenden">✕</i></button>
+
 <section class="search panel" id="search" aria-label="Suche" hidden>
   <div class="search-bar">
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
     <input id="search-input" type="search" placeholder="Ort, Gipfel, Pass, See oder Koordinaten" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search">
     <button class="round" id="search-close" aria-label="Suche schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
   </div>
+  <div class="poi-chips" id="search-cats" aria-label="In der Nähe suchen"></div>
   <div class="search-results" id="search-results"></div>
   <div class="grab grab-bottom" aria-hidden="true"></div>
 </section>
@@ -390,5 +393,6 @@
 <script src="swipe.js"></script>
 <script src="hike.js"></script>
 <script src="tours.js"></script>
+<script src="poi.js"></script>
 </body>
 </html>

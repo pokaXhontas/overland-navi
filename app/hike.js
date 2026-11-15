@@ -325,7 +325,7 @@ const Hike = {
     });
     map.on('click', 'hike-pts', (e) => {
       if ((typeof Draw !== 'undefined' && Draw.active) || editor.open || editor.moving) return;
-      if (map.queryRenderedFeatures(e.point, { layers: ['places-icon'].filter((l) => map.getLayer(l)) }).length) return;
+      if (map.queryRenderedFeatures(e.point, { layers: ['places-icon', 'poi-icon'].filter((l) => map.getLayer(l)) }).length) return;
       const f = e.features && e.features[0];
       if (f) { this._ptTap = e.originalEvent; this.showPoint(f); }
     });
@@ -334,7 +334,7 @@ const Hike = {
     map.on('click', 'hike-hit', (e) => {
       if (this._ptTap === e.originalEvent) return;
       if ((typeof Draw !== 'undefined' && Draw.active) || editor.open || editor.moving) return;
-      if (map.queryRenderedFeatures(e.point, { layers: ['places-icon', 'tracks-hit', 'tours-hit', 'tours-pt', 'hike-pts'].filter((l) => map.getLayer(l)) }).length) return;
+      if (map.queryRenderedFeatures(e.point, { layers: ['places-icon', 'tracks-hit', 'tours-hit', 'tours-pt', 'hike-pts', 'poi-icon'].filter((l) => map.getLayer(l)) }).length) return;
       const f = e.features && e.features[0];
       if (f) this.showInfo(f, e.lngLat);
     });

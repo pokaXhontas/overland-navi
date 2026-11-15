@@ -307,6 +307,7 @@ function buildStyle() {
 
   if (typeof Tours !== 'undefined') layers.push(...Tours.layers(dark));
   if (hk.top) layers.push(...hk.top);
+  if (typeof Poi !== 'undefined') layers.push(...Poi.layers(dark));
   layers.push(
     {
       id: 'tracks-highlight', type: 'line', source: 'tracks', filter: ['==', ['get', 'id'], '__keiner__'],
@@ -399,6 +400,7 @@ function buildStyle() {
       },
       places: { type: 'geojson', data: placesGeoJSON() },
       ...(typeof Tours !== 'undefined' ? { tours: Tours.source() } : {}),
+      ...(typeof Poi !== 'undefined' ? { poi: Poi.source() } : {}),
       ...(hk.lines.length ? { hike: Hike.source() } : {}),
       draw: { type: 'geojson', data: typeof Draw !== 'undefined' ? Draw.geojson() : { type: 'FeatureCollection', features: [] } },
       route: { type: 'geojson', data: typeof Nav !== 'undefined' ? Nav.geojson() : { type: 'FeatureCollection', features: [] } },
@@ -1347,6 +1349,7 @@ function setupUI() {
   Swipe.setup();
   Hike.setup();
   Tours.setup();
+  Poi.setup();
   document.querySelectorAll('[data-maptype]').forEach((b) => {
     b.setAttribute('aria-checked', String(b.dataset.maptype === settings.mapType));
     b.onclick = () => {
@@ -1564,8 +1567,19 @@ const Search = {
     } catch (e) { return []; }
   },
 
+  recent() { return store.get('searchRecent', []); },
+  remember(item) {
+    const key = (x) => x.kind === 'cat' ? 'c:' + x.cat + ':' + (x.place || '') : 'p:' + x.name + ':' + Math.round(x.lat * 1e3) + ':' + Math.round(x.lon * 1e3);
+    const l = [item, ...this.recent().filter((x) => key(x) !== key(item))].slice(0, 12);
+    store.set('searchRecent', l);
+  },
+
   show(r) {
     closeSearch();
+    if (r.type !== 'quick-gps' && r.type !== 'quick-map') {
+      this.remember({ kind: 'place', name: r.name, sub: (r.sub || '').replace(/^Online · /, ''), lat: r.lat, lon: r.lon, type: r.type, zoom: r.zoom, placeId: r.place ? r.place.id : undefined });
+    }
+    if (r.placeId && !r.place) r.place = places.find((p) => p.id === r.placeId);
     if (r.place) { openEditor(r.place); return; }
     gps.follow = false;
     $('#btn-locate').classList.remove('active');
@@ -1610,9 +1624,10 @@ function renderResultList(box, list, note, onPick) {
     b.type = 'button';
     b.className = 'place-item';
     const quick = QUICK_ICON[r.type];
-    const color = quick ? '#2F80ED' : r.type === 'own' ? (CAT[r.place.cat] || CAT.other).color : r.type === 'web' ? '#5B6670' : 'var(--faint)';
-    const ink = quick ? '#fff' : r.type === 'own' ? (CAT[r.place.cat] || CAT.other).ink : r.type === 'web' ? '#fff' : 'var(--text)';
-    const d = quick || (r.type === 'own' ? (CAT[r.place.cat] || CAT.other).d : (TYPE_ICON[r.type] || TYPE_ICON.default));
+    const own = r.type === 'own' && r.place;
+    const color = r.color || (quick ? '#2F80ED' : own ? (CAT[r.place.cat] || CAT.other).color : r.type === 'web' ? '#5B6670' : 'var(--faint)');
+    const ink = r.color ? '#fff' : quick ? '#fff' : own ? (CAT[r.place.cat] || CAT.other).ink : r.type === 'web' ? '#fff' : 'var(--text)';
+    const d = r.icon || quick || (own ? (CAT[r.place.cat] || CAT.other).d : (TYPE_ICON[r.type] || TYPE_ICON.default));
     b.innerHTML = `<span class="pi-icon" style="background:${color};color:${ink}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg></span><span class="pi-txt"><b></b><small></small></span><span class="pi-dist"></span>`;
     b.querySelector('b').textContent = r.name;
     b.querySelector('small').textContent = r.sub || '';
@@ -1626,16 +1641,47 @@ let searchTimer = null, searchSeq = 0;
 async function runSearch() {
   const q = $('#search-input').value;
   const seq = ++searchSeq;
-  if (!q.trim()) { renderSearchResults([], 'Suche nach Orten, Gipfeln, Pässen, Seen, Flüssen, Tankstellen, deinen eigenen Orten oder Koordinaten (z. B. 39.02, 73.48).'); return; }
-  if (Search.loading) renderSearchResults([], 'Suchindex wird geladen …');
+  $('#search-cats').hidden = !!q.trim();
+  if (!q.trim()) { renderRecent(); return; }
+  const cats = Poi.match(q).map((m) => ({ name: m.cat.label + (m.place ? ' in ' + m.place : ' in der Nähe'), sub: m.place ? 'Mit Öffnungszeiten und mehr' : 'Im Kartenausschnitt, mit Öffnungszeiten und mehr', color: m.cat.color, icon: m.cat.d, poiCat: m }));
+  if (cats.length) {
+    renderResultList($('#search-results'), cats, '', (r) => Poi.run(r.poiCat.cat, r.poiCat.place));
+    if (cats[0].poiCat.place || norm(q).split(' ').length === 1) {
+      // reine Kategorie-Eingabe: keine Ortssuche dazu
+      const local0 = Search.query(q);
+      if (!local0.length) return;
+    }
+  }
+  if (Search.loading && !cats.length) renderSearchResults([], 'Suchindex wird geladen …');
   await Search.loadAll();
   if (seq !== searchSeq) return;
-  const local = Search.query(q);
-  renderSearchResults(local, local.length ? '' : (navigator.onLine ? 'Suche online …' : 'Nichts gefunden. Offline sind nur Orte aus geladenen Kartengebieten suchbar.'));
+  const local = [...cats, ...Search.query(q)];
+  const pick = (r) => (r.poiCat ? Poi.run(r.poiCat.cat, r.poiCat.place) : Search.show(r));
+  renderResultList($('#search-results'), local, local.length ? '' : (navigator.onLine ? 'Suche online …' : 'Nichts gefunden. Offline sind nur Orte aus geladenen Kartengebieten suchbar.'), pick);
   const web = await Search.online(q);
   if (seq !== searchSeq) return;
-  if (web.length) renderSearchResults([...local, ...web.filter((w) => !local.some((l) => distance(l, w) < 300 && norm(l.name) === norm(w.name)))]);
+  if (web.length) renderResultList($('#search-results'), [...local, ...web.filter((w) => !local.some((l) => l.lat !== undefined && distance(l, w) < 300 && norm(l.name) === norm(w.name)))], '', pick);
   else if (!local.length) renderSearchResults([], 'Nichts gefunden.');
+}
+
+const RECENT_ICON = 'M12 7v5l3 2M12 21a9 9 0 1 0-9-9';
+function renderRecent() {
+  const box = $('#search-results');
+  const rec = Search.recent();
+  const list = rec.map((x) => x.kind === 'cat' && POI[x.cat]
+    ? { name: x.name, sub: 'Zuletzt gesucht', color: POI[x.cat].color, icon: POI[x.cat].d, rec: x }
+    : { ...x, sub: x.sub || 'Zuletzt gesucht', icon: (TYPE_ICON[x.type] || RECENT_ICON), rec: x });
+  renderResultList(box, list, rec.length ? '' : 'Suche nach Orten, Gipfeln, Pässen, Seen, deinen eigenen Orten oder Koordinaten (z. B. 39.02, 73.48). Oder tippe oben eine Kategorie an.', (r) => {
+    if (r.rec.kind === 'cat') Poi.run(POI[r.rec.cat], r.rec.place);
+    else Search.show({ ...r.rec });
+  });
+  if (rec.length) {
+    const h = document.createElement('div');
+    h.className = 'sr-head';
+    h.innerHTML = '<span class="lbl">Zuletzt gesucht</span><button type="button" class="linkbtn">Verlauf löschen</button>';
+    h.querySelector('button').onclick = () => { store.set('searchRecent', []); renderRecent(); };
+    box.insertBefore(h, box.firstChild);
+  }
 }
 
 function openSearch() {
@@ -2298,7 +2344,7 @@ async function main() {
   });
   map.on('click', 'tracks-hit', (e) => {
     if (editor.moving || editor.open || (typeof Draw !== 'undefined' && Draw.active)) return;
-    if (map.queryRenderedFeatures(e.point, { layers: ['places-icon'] }).length) return;
+    if (map.queryRenderedFeatures(e.point, { layers: ['places-icon', 'poi-icon'].filter((l) => map.getLayer(l)) }).length) return;
     const f = e.features && e.features[0];
     const t = f && tracks.find((x) => x.id === f.properties.id);
     if (t) openTrackInfo(t);
