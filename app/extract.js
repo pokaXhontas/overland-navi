@@ -119,6 +119,8 @@
         for (let attempt = 0; ; attempt++) {
           try {
             const r = await f(url, { headers: { Range: `bytes=${offset}-${offset + length - 1}` } });
+            // Server kurz überlastet: nochmal versuchen
+            if (r.status >= 500 || r.status === 429 || r.status === 408) throw new Error('Server gerade nicht erreichbar (' + r.status + ')');
             if (r.status !== 206) throw new Error('Server unterstützt keine Bereichsanfragen (' + r.status + ')');
             const buf = new Uint8Array(await r.arrayBuffer());
             if (buf.byteLength !== length) throw new Error('Unvollständige Antwort');
