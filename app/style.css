@@ -273,12 +273,14 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .place-item .pi-txt { flex-shrink: 1; }
 
 .search-pin { display: flex; flex-direction: column; align-items: center; }
-.sp-card { position: relative; padding: 12px 14px; border-radius: 18px; display: flex; flex-direction: column; gap: 4px; min-width: 200px; max-width: 280px; margin-bottom: 8px; background: var(--panel-solid); }
-.sp-card b { font-size: 15px; padding-right: 36px; }
-.sp-card small { font-size: 12px; color: var(--muted); padding-right: 30px; }
-.sp-card .btn { margin-top: 6px; height: 40px; }
-.sp-x { position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; }
-.sp-x svg { width: 16px; height: 16px; }
+.sp-card { position: relative; padding: 6px 6px 6px 14px; border-radius: 22px; display: flex; align-items: center; gap: 6px; max-width: min(300px, 80vw); margin-bottom: 8px; background: var(--panel-solid); }
+.sp-txt { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.sp-txt b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-txt small { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-txt small[hidden] { display: none; }
+.sp-nav, .sp-x { width: 36px; height: 36px; flex-shrink: 0; }
+.sp-nav { background: var(--accent); color: var(--accent-ink); }
+.sp-nav svg, .sp-x svg { width: 18px; height: 18px; }
 .sp-dot { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); border: 3px solid #fff; box-shadow: 0 0 0 6px rgba(255,122,26,.25), 0 2px 6px rgba(0,0,0,.35); }
 
 /* ---------- Import und Tracks ---------- */
@@ -429,8 +431,6 @@ html.dark .region-error { color: #FF8A8A; }
 .na-row span { color: var(--muted); font-size: 14px; }
 .na-row[aria-checked="true"] { border-color: #2F80ED; background: rgba(47,128,237,.12); }
 .flat-btn { border: 0; background: transparent; color: var(--muted); }
-.sp-btns { display: flex; gap: 6px; }
-.sp-btns .btn { flex: 1; padding: 0 10px; }
 body.navigating .fab { display: none; }
 @media (max-width: 600px) {
   .nav-banner { left: calc(var(--safe-l) + var(--gap)); width: calc(100vw - 3 * var(--gap) - var(--ctl) - var(--safe-l) - var(--safe-r)); min-height: 72px; padding: 10px; gap: 10px; }

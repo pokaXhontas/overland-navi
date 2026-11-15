@@ -1663,16 +1663,11 @@ const Search = {
     if (this.searchMarker) this.searchMarker.remove();
     const el = document.createElement('div');
     el.className = 'search-pin';
-    el.innerHTML = '<div class="sp-card panel"><b></b><small></small><div class="sp-btns"><button class="btn primary sp-nav">Navigieren</button><button class="btn sp-save">Speichern</button></div><button class="round sp-x" aria-label="Markierung entfernen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div><div class="sp-dot"></div>';
+    // schlicht: nur Name und Art, dazu ein kleiner Routen-Knopf (Speichern geht per langem Drücken auf die Karte)
+    el.innerHTML = '<div class="sp-card panel"><span class="sp-txt"><b></b><small></small></span><button class="round sp-nav" aria-label="Route hierher"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 21 12l-9 9-9-9ZM9 14v-2.5a1.5 1.5 0 0 1 1.5-1.5H15M13 8l2 2-2 2"/></svg></button><button class="round sp-x" aria-label="Markierung entfernen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div><div class="sp-dot"></div>';
     el.querySelector('b').textContent = r.name;
-    el.querySelector('small').textContent = r.sub || '';
-    el.querySelector('.sp-save').onclick = (ev) => {
-      ev.stopPropagation();
-      const at = { lat: r.lat, lon: r.lon };
-      this.searchMarker.remove(); this.searchMarker = null;
-      openEditor(null, at);
-      $('#spot-name').value = r.type === 'coord' ? '' : r.name;
-    };
+    el.querySelector('small').textContent = (r.sub || '').replace(/^Online · /, '');
+    el.querySelector('small').hidden = !r.sub;
     el.querySelector('.sp-x').onclick = (ev) => { ev.stopPropagation(); this.searchMarker.remove(); this.searchMarker = null; };
     el.querySelector('.sp-nav').onclick = (ev) => {
       ev.stopPropagation();
