@@ -38,7 +38,7 @@ jobs:
     timeout-minutes: 150
     strategy:
       fail-fast: false
-      max-parallel: 3
+      max-parallel: 2
       matrix:
         include: ${{ fromJSON(needs.plan.outputs.list) }}
     steps:
@@ -47,7 +47,7 @@ jobs:
       - name: Größe prüfen
         id: size
         run: |
-          S=$(curl -sfIL --retry 4 "${{ matrix.url }}" | grep -i '^content-length' | tail -1 | tr -dc '0-9')
+          S=$(curl -sfIL --retry 2 --connect-timeout 20 "${{ matrix.url }}" | grep -i '^content-length' | tail -1 | tr -dc '0-9' || true)
           echo "Größe: $((S/1000000)) MB"
           if [ "${S:-0}" -gt 12000000000 ]; then echo "zu groß, übersprungen"; echo "skip=1" >> "$GITHUB_OUTPUT"; fi
           if [ "${S:-0}" -gt 2500000000 ]; then sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL; df -h / | tail -1; fi
@@ -61,7 +61,15 @@ jobs:
 
       - name: OpenStreetMap-Daten laden (Geofabrik)
         if: steps.size.outputs.skip != '1'
-        run: curl -sfL --retry 6 --retry-delay 30 --retry-all-errors -o land.osm.pbf "${{ matrix.url }}" && ls -lh land.osm.pbf
+        run: |
+          # erst Geofabrik, sonst der Spiegel von OpenStreetMap France (gleiche Pfade)
+          ALT=$(echo "${{ matrix.url }}" | sed 's#https://download.geofabrik.de/#https://download.openstreetmap.fr/extracts/#')
+          for u in "${{ matrix.url }}" "$ALT" "${{ matrix.url }}"; do
+            echo "lade $u"
+            if curl -sfL --retry 3 --retry-delay 20 --retry-all-errors --connect-timeout 30 -o land.osm.pbf "$u"; then ls -lh land.osm.pbf; exit 0; fi
+            sleep 60
+          done
+          exit 1
 
       - name: Wanderwege herausfiltern
         if: steps.size.outputs.skip != '1'
