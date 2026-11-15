@@ -1,38 +1,23 @@
 #!/usr/bin/env python3
-"""Baut die empfohlenen Touren (Linie + Wegpunkte) aus OpenStreetMap.
+"""Baut die empfohlenen Touren (Linie + Wegpunkte) aus einem OpenStreetMap-Länderauszug.
 
-Wegpunkte werden über ihre OSM-Namen gesucht (mit Ersatzkoordinate), der Weg dazwischen
-mit Valhalla als Fußweg berechnet oder aus einer eingetragenen Wanderroute zusammengesetzt.
-Aufruf: build_tours.py <touren.json> <ausgabe.geojson>
+Wegpunkte werden über ihre OSM-Merkmale gesucht (nächster Treffer zur geschätzten Lage),
+der Weg dazwischen kommt aus einer eingetragenen Wanderroute, aus allen Wegen eines Gebiets
+oder aus einer Fußweg-Berechnung mit Valhalla.
+Aufruf: build_tours.py <touren-def.json> <land.osm.pbf> <ausgabe.geojson>
 """
 import json
 import math
+import re
 import sys
 import time
 import urllib.parse
 import urllib.request
 
-OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"]
+import osmium
+
 VALHALLA = "https://valhalla1.openstreetmap.de/route"
-
-
-def http(url, data=None, timeout=180):
-    for attempt in range(4):
-        try:
-            req = urllib.request.Request(url, data=data, headers={"User-Agent": "overland-navi (pokaXhontas)"})
-            return json.load(urllib.request.urlopen(req, timeout=timeout))
-        except Exception as e:
-            print("  Netzfehler:", e, flush=True)
-            time.sleep(10 * (attempt + 1))
-    return None
-
-
-def overpass(q):
-    for u in OVERPASS:
-        r = http(u, urllib.parse.urlencode({"data": "[out:json][timeout:120];" + q}).encode())
-        if r is not None:
-            return r.get("elements", [])
-    return []
+FILTER_RE = re.compile(r'\["([^"]+)"(?:(=|~)"([^"]*)")?\]')
 
 
 def dist(a, b):
@@ -42,33 +27,120 @@ def dist(a, b):
     return math.hypot(x, y) * 111195
 
 
-def center(el):
-    if "lat" in el:
-        return [el["lon"], el["lat"]]
-    if "center" in el:
-        return [el["center"]["lon"], el["center"]["lat"]]
-    if "geometry" in el:
-        g = el["geometry"]
-        return [g[len(g) // 2]["lon"], g[len(g) // 2]["lat"]]
-    return None
+def parse_filter(s):
+    return [(k, op, v) for k, op, v in FILTER_RE.findall(s or "")]
 
 
-def find(p):
-    """Wegpunkt per Name suchen: nächster Treffer zur Ersatzkoordinate."""
-    lon, lat = p["near"]
-    r = p.get("radius", 15000)
-    q = "".join(f'{t}{p["filter"]}(around:{r},{lat},{lon});' for t in ("node", "way", "relation"))
-    els = overpass(f"({q});out center tags;")
-    best = None
-    for e in els:
-        c = center(e)
-        if c and (best is None or dist(c, p["near"]) < dist(best[0], p["near"])):
-            best = (c, e.get("tags", {}).get("name", ""))
-    if best:
-        print(f"  gefunden: {p['label']} = {best[1]} {best[0]} ({dist(best[0], p['near']) / 1000:.1f} km von der Schätzung)", flush=True)
-        return best[0]
-    print(f"  NICHT gefunden: {p['label']}, nehme Schätzung {p['near']}", flush=True)
-    return p["near"]
+def matches(tags, flt):
+    for k, op, v in flt:
+        val = tags.get(k)
+        if val is None:
+            return False
+        if op == "=" and val != v:
+            return False
+        if op == "~" and not re.search(v, val):
+            return False
+    return True
+
+
+def tagdict(o):
+    return {t.k: t.v for t in o.tags}
+
+
+class Relations(osmium.SimpleHandler):
+    """1. Durchgang: Wanderrouten und Wegpunkte, die als Relation eingetragen sind."""
+
+    def __init__(self, tours):
+        super().__init__()
+        self.tours = tours
+        self.found = []  # (Art, Tour, Punkt oder None, Name, [Weg-IDs])
+        self.need = set()
+
+    def relation(self, r):
+        tags = tagdict(r)
+        if not tags:
+            return
+        ways = [m.ref for m in r.members if m.type == "w"]
+        if not ways:
+            return
+        for t in self.tours:
+            if t.get("relation") and tags.get("route") in ("hiking", "foot") and re.search(t["relation"], tags.get("name", "")):
+                self.found.append(("route", t["id"], None, tags.get("name", ""), ways))
+                self.need.update(ways)
+            for i, p in enumerate(t["points"]):
+                if p.get("flt") and matches(tags, p["flt"]):
+                    self.found.append(("point", t["id"], i, tags.get("name", ""), ways))
+                    self.need.update(ways)
+
+
+class Scan(osmium.SimpleHandler):
+    """2. Durchgang mit Koordinaten: Punkte, Gebietswege und Geometrie der Relationswege."""
+
+    def __init__(self, tours, need):
+        super().__init__()
+        self.tours = tours
+        self.need = need
+        self.geom = {}
+        self.cands = {}   # (Tour, Punkt) → [(Abstand, Lage, Name)]
+        self.area = {}    # Tour → [Linien]
+
+    def check_point(self, tags, c):
+        for t in self.tours:
+            for i, p in enumerate(t["points"]):
+                if p.get("flt") and matches(tags, p["flt"]):
+                    d = dist(c, p["near"])
+                    if d <= p.get("radius", 15000):
+                        self.cands.setdefault((t["id"], i), []).append((d, c, tags.get("name", "")))
+
+    def node(self, n):
+        if not n.tags:
+            return
+        self.check_point(tagdict(n), [n.location.lon, n.location.lat])
+
+    def way(self, w):
+        tags = tagdict(w) if w.tags else {}
+        try:
+            line = [[round(n.lon, 6), round(n.lat, 6)] for n in w.nodes]
+        except osmium.InvalidLocationError:
+            return
+        if len(line) < 2:
+            return
+        if w.id in self.need:
+            self.geom[w.id] = line
+        if not tags:
+            return
+        self.check_point(tags, line[len(line) // 2])
+        for t in self.tours:
+            a = t.get("ways")
+            if not a or not re.search(a.get("highway", "^(path|footway|track)$"), tags.get("highway", "")):
+                continue
+            if a.get("name") and not re.search(a["name"], tags.get("name", "")):
+                continue
+            if any(dist(c, a["near"]) <= a.get("radius", 1500) for c in line[:: max(1, len(line) // 8)]):
+                self.area.setdefault(t["id"], []).append(line)
+
+
+def stitch(segs, near):
+    """Wegstücke einer Route der Reihe nach zu Linien verbinden (Beginn nahe 'near')."""
+    if not segs:
+        return []
+    i0, end = min(((i, e) for i in range(len(segs)) for e in (0, -1)), key=lambda x: dist(segs[x[0]][x[1]], near))
+    line = list(segs[i0] if end == 0 else segs[i0][::-1])
+    used = {i0}
+    lines = [line]
+    while len(used) < len(segs):
+        tail = line[-1]
+        i = min((i for i in range(len(segs)) if i not in used), key=lambda i: min(dist(tail, segs[i][0]), dist(tail, segs[i][-1])))
+        s = segs[i]
+        gap = min(dist(tail, s[0]), dist(tail, s[-1]))
+        used.add(i)
+        piece = s if dist(tail, s[0]) <= dist(tail, s[-1]) else s[::-1]
+        if gap > 300:
+            line = list(piece)
+            lines.append(line)
+        else:
+            line += piece[1:]
+    return lines
 
 
 def decode6(s):
@@ -93,51 +165,25 @@ def decode6(s):
 
 def route(points):
     q = {"locations": [{"lon": p[0], "lat": p[1], "type": "break"} for p in points], "costing": "pedestrian",
-         "costing_options": {"pedestrian": {"max_hiking_difficulty": 6, "use_tracks": 1, "walking_speed": 4}},
-         "directions_options": {"units": "kilometers"}, "directions_type": "none"}
-    r = http(VALHALLA + "?json=" + urllib.parse.quote(json.dumps(q)))
-    if not r or "trip" not in r:
-        print("  Valhalla: keine Route", r and r.get("error"), flush=True)
-        return None
-    coords = []
-    for leg in r["trip"]["legs"]:
-        pts = decode6(leg["shape"])
-        coords += pts[1:] if coords else pts
-    return coords
-
-
-def relation_line(name_re, near):
-    """Eingetragene Wanderroute zu einer Linie zusammensetzen."""
-    lon, lat = near
-    els = overpass(f'relation["route"="hiking"]["name"~"{name_re}"](around:40000,{lat},{lon});out geom;')
-    if not els:
-        print("  Wanderroute nicht gefunden:", name_re, flush=True)
-        return None
-    segs = [[[g["lon"], g["lat"]] for g in m["geometry"]] for m in els[0]["members"] if m.get("type") == "way" and m.get("geometry")]
-    print(f"  Wanderroute: {els[0]['tags'].get('name')} mit {len(segs)} Wegstücken", flush=True)
-    # am Ende, das der Schätzung am nächsten liegt, beginnen und der Reihe nach anhängen
-    start = min(((i, s, end) for i, s in enumerate(segs) for end in (0, -1)), key=lambda x: dist(x[1][x[2]], near))
-    line = segs[start[0]] if start[2] == 0 else segs[start[0]][::-1]
-    used = {start[0]}
-    while len(used) < len(segs):
-        tail = line[-1]
-        cand = min(((i, s) for i, s in enumerate(segs) if i not in used), key=lambda x: min(dist(tail, x[1][0]), dist(tail, x[1][-1])))
-        i, s = cand
-        if min(dist(tail, s[0]), dist(tail, s[-1])) > 1500:
-            break
-        line += (s if dist(tail, s[0]) <= dist(tail, s[-1]) else s[::-1])[1:]
-        used.add(i)
-    return line
-
-
-def ways_lines(w):
-    """Alle Wege eines Gebiets, z. B. Canyons ohne durchgehende Route."""
-    lon, lat = w["near"]
-    name = f'["name"~"{w["name"]}"]' if w.get("name") else ""
-    els = overpass(f'way["highway"~"{w.get("highway", "path|footway|track")}"]{name}(around:{w.get("radius", 1500)},{lat},{lon});out geom;')
-    lines = [[[g["lon"], g["lat"]] for g in e["geometry"]] for e in els if e.get("geometry")]
-    print(f"  Wege im Gebiet: {len(lines)}", flush=True)
-    return lines
+         "costing_options": {"pedestrian": {"max_hiking_difficulty": 6, "use_tracks": 1}},
+         "directions_type": "none"}
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(VALHALLA + "?json=" + urllib.parse.quote(json.dumps(q)), headers={"User-Agent": "overland-navi (pokaXhontas)"})
+            r = json.load(urllib.request.urlopen(req, timeout=60))
+            coords = []
+            for leg in r["trip"]["legs"]:
+                pts = decode6(leg["shape"])
+                coords += pts[1:] if coords else pts
+            return coords
+        except urllib.error.HTTPError as e:
+            print("  Valhalla:", e.code, e.read()[:200], flush=True)
+            if e.code == 400:
+                return None
+        except Exception as e:
+            print("  Valhalla:", e, flush=True)
+        time.sleep(10 * (attempt + 1))
+    return None
 
 
 def length(c):
@@ -145,37 +191,73 @@ def length(c):
 
 
 def main():
-    tours = json.load(open(sys.argv[1], encoding="utf-8"))
+    defs, pbf, out = sys.argv[1:4]
+    tours = json.load(open(defs, encoding="utf-8"))["tours"]
+    for t in tours:
+        for p in t["points"]:
+            p["flt"] = parse_filter(p.get("filter"))
+
+    t0 = time.time()
+    rel = Relations(tours)
+    rel.apply_file(pbf)
+    print(f"Relationen gelesen ({time.time() - t0:.0f} s), Treffer: {len(rel.found)}", flush=True)
+    scan = Scan(tours, rel.need)
+    scan.apply_file(pbf, locations=True, idx="flex_mem")
+    print(f"Knoten und Wege gelesen ({time.time() - t0:.0f} s)", flush=True)
+
+    # Wegpunkte, die als Relation eingetragen sind (z. B. Seen), mit ihrer Mitte
+    for kind, tid, i, name, ways in rel.found:
+        if kind != "point":
+            continue
+        pts = [c for w in ways for c in scan.geom.get(w, [])]
+        if pts:
+            c = [sum(x[0] for x in pts) / len(pts), sum(x[1] for x in pts) / len(pts)]
+            p = next(t for t in tours if t["id"] == tid)["points"][i]
+            d = dist(c, p["near"])
+            if d <= p.get("radius", 15000):
+                scan.cands.setdefault((tid, i), []).append((d, c, name))
+
     feats = []
     for t in tours:
         print(f"\n== {t['name']}", flush=True)
         pts = []
-        for p in t["points"]:
-            c = find(p) if "filter" in p else p["near"]
-            pts.append({**p, "coord": c})
-            time.sleep(2)
+        for i, p in enumerate(t["points"]):
+            c = p["near"]
+            if p.get("flt"):
+                cs = sorted(scan.cands.get((t["id"], i), []), key=lambda x: x[0])
+                if cs:
+                    c = cs[0][1]
+                    print(f"  gefunden: {p['label']} = {cs[0][2] or '(ohne Namen)'} {[round(v, 5) for v in c]} ({cs[0][0] / 1000:.1f} km von der Schätzung)", flush=True)
+                else:
+                    print(f"  NICHT gefunden: {p['label']}, nehme Schätzung {c}", flush=True)
+            pts.append({"label": p["label"], "icon": p.get("icon", "dot"), "coord": [round(c[0], 6), round(c[1], 6)], "on_route": p.get("on_route", True)})
+
         lines = []
         if t.get("relation"):
-            l = relation_line(t["relation"], t["points"][0]["near"])
-            if l:
-                lines.append(l)
+            routes = [x for x in rel.found if x[0] == "route" and x[1] == t["id"]]
+            for _, _, _, name, ways in routes[:1]:
+                segs = [scan.geom[w] for w in ways if w in scan.geom]
+                lines = stitch(segs, pts[0]["coord"])
+                print(f"  Wanderroute: {name} mit {len(segs)} Wegstücken, {len(lines)} Teil(e)", flush=True)
+            if not routes:
+                print("  Wanderroute nicht gefunden:", t["relation"], flush=True)
         if t.get("ways"):
-            lines = ways_lines(t["ways"])
+            lines = scan.area.get(t["id"], [])
+            print(f"  Wege im Gebiet: {len(lines)}", flush=True)
         if not lines:
-            for part in t.get("legs", [[p["label"] for p in t["points"] if p.get("on_route", True)]]):
-                via = [next(x["coord"] for x in pts if x["label"] == lab) for lab in part]
-                l = route(via)
-                if l:
-                    lines.append(l)
-                time.sleep(2)
+            via = [p["coord"] for p in pts if p["on_route"]]
+            l = route(via) if len(via) >= 2 else None
+            if l:
+                lines = [l]
+                print(f"  Fußweg berechnet über {len(via)} Punkte", flush=True)
         km = sum(length(l) for l in lines) / 1000
         print(f"  Länge: {km:.1f} km (erwartet {t.get('expect_km')})", flush=True)
         feats.append({"type": "Feature", "properties": {"id": t["id"], "kind": "tour", "name": t["name"], "color": t["color"], "km": round(km, 1), "info": t.get("info", t["id"])},
                       "geometry": {"type": "MultiLineString", "coordinates": lines}})
         for p in pts:
-            feats.append({"type": "Feature", "properties": {"id": t["id"], "kind": "point", "label": p["label"], "icon": p.get("icon", "dot")},
+            feats.append({"type": "Feature", "properties": {"id": t["id"], "kind": "point", "label": p["label"], "icon": p["icon"]},
                           "geometry": {"type": "Point", "coordinates": p["coord"]}})
-    json.dump({"type": "FeatureCollection", "features": feats}, open(sys.argv[2], "w", encoding="utf-8"), ensure_ascii=False)
+    json.dump({"type": "FeatureCollection", "features": feats}, open(out, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
 
 
 if __name__ == "__main__":

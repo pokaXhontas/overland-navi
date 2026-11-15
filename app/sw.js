@@ -19,6 +19,7 @@ const SHELL = [
   'draw.js',
   'swipe.js',
   'hike.js',
+  'tours.js',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',
@@ -63,6 +64,21 @@ self.addEventListener('fetch', (event) => {
         return resp;
       } catch (e) {
         return (await cache.match(req)) || new Response('{"regions":[]}', { headers: { 'Content-Type': 'application/json' } });
+      }
+    })());
+    return;
+  }
+
+  // Empfohlene Touren: erst Netz, sonst gespeicherte Fassung (offline verfügbar)
+  if (path.includes('/tours/')) {
+    event.respondWith((async () => {
+      const cache = await caches.open(DATA_CACHE);
+      try {
+        const resp = await fetch(req);
+        if (resp.ok) cache.put(req, resp.clone());
+        return resp;
+      } catch (e) {
+        return (await cache.match(req)) || new Response(null, { status: 404 });
       }
     })());
     return;

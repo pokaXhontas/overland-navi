@@ -265,6 +265,9 @@
   <div class="sheet-body">
     <label class="row"><span><b>Wanderwege anzeigen</b><small>Gestrichelt, Farbe nach Schwierigkeit, ab Zoomstufe 11</small></span><input type="checkbox" class="switch" id="hk-on"></label>
     <label class="row"><span><b>Feld- und Fahrwege</b><small>Pisten und Feldwege, die oft Teil von Wanderungen sind (ab Zoomstufe 12)</small></span><input type="checkbox" class="switch" id="hk-tracks"></label>
+    <h2>Empfohlene Touren</h2>
+    <label class="row"><span><b>Touren auf der Karte</b><small>Ausgewählte Wanderungen mit Infos zu Anreise, Kosten, Unterkünften und Gefahren</small></span><input type="checkbox" class="switch" id="hk-tours"></label>
+    <div class="to-list" id="hk-tour-list"></div>
     <h2>Zeige Wege bis</h2>
     <div class="seg hk-seg" role="radiogroup" aria-label="Schwierigkeit bis">
       <button role="radio" data-hkmax="1">T1</button><button role="radio" data-hkmax="2">T2</button><button role="radio" data-hkmax="3">T3</button>
@@ -277,6 +280,39 @@
     <div class="hk-leg"><span class="hk-band"></span><span class="hk-badge" style="background:#C2255C">R</span><span><b>Wanderroute</b><small>Breites farbiges Band, z. B. Fernwanderwege</small></span></div>
     <p class="muted small" id="hk-status"></p>
     <p class="muted small">Tippe auf einen Weg für Infos. Daten: © OpenStreetMap-Mitwirkende, monatlich aktualisiert.</p>
+  </div>
+</aside>
+
+<aside class="sheet spot" id="tour-sheet" aria-label="Tour" hidden>
+  <div class="grab sheet-grab" aria-hidden="true"></div>
+  <div class="sheet-head">
+    <h1 id="to-name">Tour</h1>
+    <button class="round" id="to-close" aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </div>
+  <div class="sheet-body">
+    <p class="muted small to-region" id="to-region"></p>
+    <div class="stats">
+      <div><span class="lbl">Länge</span><b id="to-len">–</b></div>
+      <div><span class="lbl">Anstieg</span><b id="to-up">–</b></div>
+      <div><span class="lbl">Abstieg</span><b id="to-down">–</b></div>
+    </div>
+    <div class="to-facts" id="to-facts"></div>
+    <div class="to-actions">
+      <button class="btn primary wide" id="to-follow">Diesem Weg folgen</button>
+      <button class="btn wide" id="to-route">Route zum Startpunkt</button>
+      <button class="btn wide" id="to-adopt">In meine Tracks übernehmen</button>
+    </div>
+    <h2>Höhenprofil</h2>
+    <div class="profile" id="to-profile"></div>
+    <p class="muted small"><span>Höchster Punkt der Linie: </span><b id="to-max">–</b>. <span id="to-lennote"></span></p>
+    <h2>Wegpunkte</h2>
+    <div class="to-points" id="to-points"></div>
+    <h2>Infos</h2>
+    <div class="to-md" id="to-md"></div>
+    <h2>Für alle Touren</h2>
+    <div class="to-md" id="to-general"></div>
+    <h2>Quellen</h2>
+    <div class="to-md to-sources" id="to-sources"></div>
   </div>
 </aside>
 
@@ -336,5 +372,6 @@
 <script src="draw.js"></script>
 <script src="swipe.js"></script>
 <script src="hike.js"></script>
+<script src="tours.js"></script>
 </body>
 </html>

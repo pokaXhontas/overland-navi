@@ -121,6 +121,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.evaluate(() => { if (Hike.popup) Hike.popup.remove(); Hike.open(); });
   await shot('4c-wandermenue');
   await page.evaluate(() => Hike.close());
+  // Empfohlene Touren: Ala-Kul antippen und Infofenster zeigen
+  const tourInfo = await page.evaluate(async () => {
+    for (let i = 0; i < 20 && !Tours.list().length; i++) await new Promise((r) => setTimeout(r, 300));
+    const list = Tours.list().map((f) => f.properties.name + ' ' + f.properties.km + ' km');
+    if (list.length) await Tours.open(Tours.list()[0].properties.id);
+    return list.join(', ') || 'keine Touren geladen';
+  });
+  console.log('Touren:', tourInfo);
+  await shot('4d-tour');
+  await page.evaluate(() => Tours.close());
 
   // Luftbild und Hybrid
   for (const t of ['sat', 'hybrid']) {

@@ -305,6 +305,7 @@ function buildStyle() {
     layers.push(...hk.labels);
   }
 
+  if (typeof Tours !== 'undefined') layers.push(...Tours.layers(dark));
   layers.push(
     {
       id: 'tracks-highlight', type: 'line', source: 'tracks', filter: ['==', ['get', 'id'], '__keiner__'],
@@ -396,6 +397,7 @@ function buildStyle() {
         })]
       },
       places: { type: 'geojson', data: placesGeoJSON() },
+      ...(typeof Tours !== 'undefined' ? { tours: Tours.source() } : {}),
       ...(hk.lines.length ? { hike: Hike.source() } : {}),
       draw: { type: 'geojson', data: typeof Draw !== 'undefined' ? Draw.geojson() : { type: 'FeatureCollection', features: [] } },
       route: { type: 'geojson', data: typeof Nav !== 'undefined' ? Nav.geojson() : { type: 'FeatureCollection', features: [] } },
@@ -1343,6 +1345,7 @@ function setupUI() {
   Draw.setup();
   Swipe.setup();
   Hike.setup();
+  Tours.setup();
   document.querySelectorAll('[data-maptype]').forEach((b) => {
     b.setAttribute('aria-checked', String(b.dataset.maptype === settings.mapType));
     b.onclick = () => {
@@ -1869,8 +1872,7 @@ async function trackProfile(t) {
   return { points: sm, source, length: dist, up, down, max: Math.max(...eles), min: Math.min(...eles) };
 }
 
-function drawProfile(prof, marker) {
-  const box = $('#ti-profile');
+function drawProfile(prof, marker, box = $('#ti-profile'), color = null) {
   if (!prof.points.length) { box.innerHTML = '<p class="muted small">Keine Höhendaten verfügbar. Mit Internet oder geladenem Land klappt es.</p>'; return; }
   const W = 400, H = 130, P = 4;
   const maxD = prof.points[prof.points.length - 1].d || 1;
@@ -1879,7 +1881,7 @@ function drawProfile(prof, marker) {
   const Y = (e) => H - P - (H - 2 * P) * (e - lo) / (hi - lo);
   const line = prof.points.map((p, i) => `${i ? 'L' : 'M'}${X(p.d).toFixed(1)} ${Y(p.ele).toFixed(1)}`).join(' ');
   const area = `${line} L${X(maxD).toFixed(1)} ${H - P} L${X(0).toFixed(1)} ${H - P} Z`;
-  const color = (trackInfo.track && trackInfo.track.color) || '#4F6FE0';
+  color = color || (trackInfo.track && trackInfo.track.color) || '#4F6FE0';
   let mark = '';
   if (marker) mark = `<line x1="${X(marker.d)}" y1="${P}" x2="${X(marker.d)}" y2="${H - P}" class="pf-mark"/><circle cx="${X(marker.d)}" cy="${Y(marker.ele)}" r="5" class="pf-dot"/>`;
   box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Höhenprofil"><path d="${area}" fill="${color}" fill-opacity="0.18" stroke="none"/><path d="${line}" fill="none" stroke="${color}" stroke-width="2.2" vector-effect="non-scaling-stroke"/>${mark}</svg><div class="pf-axis"><span>${Math.round(prof.max).toLocaleString('de-DE')} m</span><span>${Math.round(prof.min).toLocaleString('de-DE')} m</span></div><div class="pf-x"><span>0</span><span>${fmtDist(maxD)}</span></div>`;
@@ -1901,6 +1903,7 @@ function setSheetPadding(sheet) {
 
 async function openTrackInfo(t) {
   if (editor.open) closeEditor();
+  if (typeof Tours !== 'undefined') Tours.close();
   closeSearch();
   closeSheet();
   trackInfo.open = true;

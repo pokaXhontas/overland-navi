@@ -12,14 +12,24 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+      - run: pip install --quiet osmium
       - name: Touren aus OpenStreetMap berechnen
         run: |
           mkdir -p app/tours
           for def in tours/*-def.json; do
             name=$(basename "$def" -def.json)
-            python3 scripts/build_tours.py "$def" "app/tours/$name.geojson"
+            land=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['pbf'])" "$def")
+            ok=0
+            for u in "https://download.openstreetmap.fr/extracts/$land-latest.osm.pbf" "https://download.geofabrik.de/$land-latest.osm.pbf"; do
+              echo "lade $u"
+              if curl -sfL --retry 3 --retry-delay 20 --retry-all-errors --connect-timeout 30 -o land.osm.pbf "$u"; then ok=1; break; fi
+            done
+            [ $ok = 1 ] || exit 1
+            ls -lh land.osm.pbf
+            python3 scripts/build_tours.py "$def" land.osm.pbf "app/tours/$name.geojson"
             ls -l "app/tours/$name.geojson"
           done
       - name: Ergebnis speichern und App neu bauen
@@ -31,5 +41,5 @@ jobs:
           git add app/tours
           if git diff --cached --quiet; then echo "keine Änderung"; exit 0; fi
           git commit -m "Empfohlene Touren aktualisiert"
-          git push
+          git pull --rebase -q && git push
           gh workflow run deploy.yml -R ${{ github.repository }}

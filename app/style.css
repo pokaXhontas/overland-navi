@@ -660,3 +660,29 @@ body.drawing .fab, body.drawing .hud { display: none; }
 }
 
 .hk-dash-long { border-top-style: dashed; border-top-width: 3px; opacity: .9; }
+
+/* Empfohlene Touren */
+#tour-sheet { z-index: 11; }
+.to-region { margin: -4px 0 0; }
+.to-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+.to-item { width: 100%; text-align: left; padding: 10px 12px; border-radius: 14px; background: var(--faint); border: 0; color: inherit; font: inherit; min-height: 52px; }
+.to-item .ti-color { flex-shrink: 0; }
+.to-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 10px; margin: 10px 0 4px; padding: 14px; border-radius: 18px; background: var(--faint); }
+.to-facts div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.to-facts b { font-size: 14px; font-weight: 600; line-height: 1.3; }
+.to-actions { display: flex; flex-direction: column; gap: 8px; margin: 14px 0 4px; }
+.to-points { display: flex; flex-wrap: wrap; gap: 8px; }
+.to-pt { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 4px 12px 4px 4px; border-radius: 20px; border: 1px solid var(--line); background: var(--panel-solid); color: inherit; font: inherit; font-size: 13px; }
+.to-ico { width: 30px; height: 30px; border-radius: 15px; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 14px; font-weight: 700; flex-shrink: 0; }
+.to-md { font-size: 14px; line-height: 1.5; }
+.to-md p { margin: 0 0 10px; }
+.to-md ul { margin: 0 0 10px; padding-left: 20px; }
+.to-md ul ul { margin: 4px 0; }
+.to-md li { margin: 3px 0; }
+.to-md a { color: var(--accent); }
+.md-table { display: flex; flex-direction: column; gap: 8px; margin: 0 0 12px; }
+.md-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 10px; padding: 12px; border-radius: 14px; background: var(--faint); }
+.md-row > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.md-row > div:first-child { grid-column: 1 / -1; font-weight: 600; }
+.md-row .lbl { font-size: 11px; }
+.to-sources li { word-break: break-word; }

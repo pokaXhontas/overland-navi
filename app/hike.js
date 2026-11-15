@@ -165,7 +165,9 @@ const Hike = {
   open() {
     closeSearch(); closeSheet();
     if (typeof closeTrackInfo === 'function') closeTrackInfo();
+    if (typeof Tours !== 'undefined') Tours.close();
     this.renderSheet();
+    if (typeof Tours !== 'undefined') Tours.renderList();
     $('#hike-sheet').hidden = false;
   },
   close() { $('#hike-sheet').hidden = true; },
@@ -212,7 +214,7 @@ const Hike = {
     });
     map.on('click', 'hike-hit', (e) => {
       if ((typeof Draw !== 'undefined' && Draw.active) || editor.open || editor.moving) return;
-      if (map.queryRenderedFeatures(e.point, { layers: ['places-icon', 'tracks-hit'].filter((l) => map.getLayer(l)) }).length) return;
+      if (map.queryRenderedFeatures(e.point, { layers: ['places-icon', 'tracks-hit', 'tours-hit', 'tours-pt'].filter((l) => map.getLayer(l)) }).length) return;
       const f = e.features && e.features[0];
       if (f) this.showInfo(f, e.lngLat);
     });
