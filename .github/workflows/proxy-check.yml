@@ -23,32 +23,7 @@ jobs:
           echo "== Wanderwege (Testdatei)"; curl -sL -D /tmp/h -H "Origin: https://pokaxhontas.github.io" "$P/wander/test.json"; echo; grep -iE "^HTTP|access-control-allow-origin" /tmp/h
       - name: Fähre Rostock–Trelleborg bei Valhalla
         run: |
-          set +e
-          V=https://valhalla1.openstreetmap.de
-          for pt in "54.776865,12.481319" "54.70,12.60" "54.9,12.75"; do
-            la=${pt%,*}; lo=${pt#*,}
-            echo "== locate $pt"
-            curl -s -m 40 "$V/locate?json=$(python3 -c "import json,urllib.parse,sys;print(urllib.parse.quote(json.dumps({'locations':[{'lat':float(sys.argv[1]),'lon':float(sys.argv[2])}],'costing':'auto','verbose':True})))" $la $lo)" | python3 -c "
-import json,sys
-d=json.load(sys.stdin)
-for loc in d:
-  for e in (loc.get('edges') or [])[:4]:
-    ei=e.get('edge_info',{}); ed=e.get('edge',{})
-    print('  ', ei.get('names'), ed.get('use'), 'dist', round(e.get('distance',0)), e.get('correlated_lat'), e.get('correlated_lon'))
-  if not loc.get('edges'): print('  keine Kanten', loc)
-"
-          done
-          echo "== Route Berlin -> Trelleborg durch die Mitte"
-          curl -s -m 60 "$V/route?json=$(python3 -c "import json,urllib.parse;print(urllib.parse.quote(json.dumps({'locations':[{'lat':52.52,'lon':13.405},{'lat':54.776865,'lon':12.481319,'type':'through','radius':20000},{'lat':55.3759,'lon':13.1461}],'costing':'auto','costing_options':{'auto':{'use_ferry':1}}})))")" | python3 -c "
-import json,sys
-d=json.load(sys.stdin)
-if 'trip' not in d: print(' Fehler', d); sys.exit()
-t=d['trip']; print(' ', round(t['summary']['length']), 'km', round(t['summary']['time']/3600,1), 'h')
-for l in t['legs']:
-  for m in l['maneuvers']:
-    if m.get('travel_type')=='ferry' or m['type'] in (28,29): print('   ', m['type'], m.get('street_names'), round(m['length']), 'km', round(m['time']/60), 'min')
-"
-          exit 0
+          python3 scripts/check_ferry.py '[{"lat":54.776865,"lon":12.481319,"type":"through"},{"lat":54.776865,"lon":12.481319,"type":"through","radius":20000},{"lat":54.776865,"lon":12.481319,"type":"break"}]' || true
       - name: Grundkarte an Beispielorten untersuchen
         run: |
           set +e
