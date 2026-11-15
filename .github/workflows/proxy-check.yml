@@ -21,20 +21,19 @@ jobs:
           for d in $(seq 0 14); do D=$(date -u -d "-$d day" +%Y%m%d); if curl -sfI "https://build.protomaps.com/$D.pmtiles" > /dev/null; then break; fi; done
           echo "== Karte $D"; curl -s -D - -o /dev/null -H "Range: bytes=0-99" -H "Origin: https://pokaxhontas.github.io" "$P/$D.pmtiles" | grep -iE "^HTTP|access-control-allow-origin|content-range"
           echo "== Wanderwege (Testdatei)"; curl -sL -D /tmp/h -H "Origin: https://pokaxhontas.github.io" "$P/wander/test.json"; echo; grep -iE "^HTTP|access-control-allow-origin" /tmp/h
-      - name: OpenStreetMap-Abfragedienste erreichbar?
+      - name: Fährverbindungen in der Suche?
         run: |
           set +e
           UA="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
           R="https://pokaxhontas.github.io/overland-navi/"
-          echo "== Nominatim Geldautomaten Bischkek"
-          curl -s -m 30 -o /tmp/o -w "HTTP %{http_code} in %{time_total}s\n" -A "$UA" -e "$R" "https://nominatim.openstreetmap.org/search?amenity=atm&viewbox=74.55,42.90,74.63,42.85&bounded=1&extratags=1&format=jsonv2&limit=50&accept-language=de"
-          python3 -c "import json;d=json.load(open('/tmp/o'));print(len(d),'Treffer');[print(x.get('name'),x.get('category'),x.get('type'),(x.get('extratags') or {}).get('opening_hours')) for x in d[:5]]"
-          echo "== Nominatim Supermarkt"
-          curl -s -m 30 -o /tmp/o -w "HTTP %{http_code} in %{time_total}s\n" -A "$UA" -e "$R" "https://nominatim.openstreetmap.org/search?q=supermarket&viewbox=74.55,42.90,74.63,42.85&bounded=1&extratags=1&format=jsonv2&limit=50"
-          python3 -c "import json;d=json.load(open('/tmp/o'));print(len(d),'Treffer');[print(x.get('name'),x.get('category'),x.get('type')) for x in d[:5]]"
-          echo "== Overpass"
-          curl -s -m 20 -o /tmp/o -w "HTTP %{http_code} in %{time_total}s\n" -A "$UA" -e "$R" "https://overpass-api.de/api/interpreter" --data-urlencode 'data=[out:json][timeout:15];nwr["amenity"="atm"](around:3000,42.875,74.59);out center tags 3;'
-          head -c 160 /tmp/o; echo
+          for q in "Rostock Trelleborg" "Trelleborg Fähre" "Trelleborg" "Rostock - Trelleborg"; do
+            echo "== Nominatim: $q"
+            curl -s -m 30 -A "$UA" -e "$R" "https://nominatim.openstreetmap.org/search?q=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "$q")&format=jsonv2&limit=15" | python3 -c "import json,sys;[print(' ',x.get('category'),x.get('type'),'|',x.get('name'),'|',x.get('osm_type'),x.get('osm_id')) for x in json.load(sys.stdin)]"
+            echo "== Photon: $q"
+            curl -s -m 30 -A "$UA" "https://photon.komoot.io/api/?q=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "$q")&limit=15" | python3 -c "import json,sys;[print(' ',f['properties'].get('osm_key'),f['properties'].get('osm_value'),'|',f['properties'].get('name'),'|',f['properties'].get('osm_type'),f['properties'].get('osm_id'),f['geometry']['coordinates']) for f in json.load(sys.stdin)['features']]"
+          done
+          echo "== Nominatim featuretype / amenity=ferry_terminal Trelleborg"
+          curl -s -m 30 -A "$UA" -e "$R" "https://nominatim.openstreetmap.org/search?q=ferry+terminal+Trelleborg&format=jsonv2&limit=10" | python3 -c "import json,sys;[print(' ',x.get('category'),x.get('type'),'|',x.get('name'),x.get('lat'),x.get('lon')) for x in json.load(sys.stdin)]"
           exit 0
       - name: Grundkarte an Beispielorten untersuchen
         run: |
