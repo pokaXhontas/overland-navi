@@ -1,0 +1,20 @@
+name: Wanderwege prüfen
+on:
+  workflow_dispatch:
+    inputs:
+      file:
+        description: 'Länderdatei (Geofabrik-Kennung), z. B. kyrgyzstan'
+        required: true
+      areas:
+        description: 'Gebiete als JSON [{"name":"..","box":[w,s,e,n]}]'
+        required: true
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install --quiet pmtiles mapbox-vector-tile
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download wanderwege -p "${{ github.event.inputs.file }}.pmtiles" -R ${{ github.repository }}
+      - run: python3 scripts/check_trails.py "${{ github.event.inputs.file }}.pmtiles" '${{ github.event.inputs.areas }}'
