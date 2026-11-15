@@ -3,41 +3,41 @@
 'use strict';
 
 const POI_CATS = [
-  { id: 'supermarket', label: 'Supermärkte', one: 'Supermarkt', color: '#2F9E44', q: ['nwr["shop"~"^(supermarket|wholesale)$"]'], pm: ['supermarket'],
+  { id: 'supermarket', nom: ['supermarket'], types: ['supermarket', 'wholesale'], label: 'Supermärkte', one: 'Supermarkt', color: '#2F9E44', q: ['nwr["shop"~"^(supermarket|wholesale)$"]'], pm: ['supermarket'],
     words: ['supermarkt', 'supermärkte', 'einkaufen', 'lebensmittel', 'supermarket'], d: 'M3 4h2l2.4 11h10.2L20 7H6.3M9 20h.01M17 20h.01' },
-  { id: 'shop', label: 'Läden & Kioske', one: 'Laden', color: '#5C940D', q: ['nwr["shop"~"^(convenience|general|kiosk|greengrocer|bakery|butcher)$"]'], pm: ['convenience', 'bakery'],
+  { id: 'shop', nom: ['convenience store', 'bakery', 'kiosk'], types: ['convenience', 'general', 'kiosk', 'greengrocer', 'bakery', 'butcher'], label: 'Läden & Kioske', one: 'Laden', color: '#5C940D', q: ['nwr["shop"~"^(convenience|general|kiosk|greengrocer|bakery|butcher)$"]'], pm: ['convenience', 'bakery'],
     words: ['laden', 'kiosk', 'bäcker', 'bäckerei', 'späti', 'tante emma', 'shop', 'magazin'], d: 'M4 9h16l-1 11H5ZM8 9V7a4 4 0 0 1 8 0v2' },
-  { id: 'market', label: 'Märkte', one: 'Markt', color: '#E8590C', q: ['nwr["amenity"="marketplace"]'], pm: ['marketplace'],
+  { id: 'market', nom: ['marketplace'], types: ['marketplace'], label: 'Märkte', one: 'Markt', color: '#E8590C', q: ['nwr["amenity"="marketplace"]'], pm: ['marketplace'],
     words: ['markt', 'märkte', 'basar', 'bazar', 'basar', 'market'], d: 'M3 10h18l-2-6H5ZM5 10v10h14V10M9 20v-5h6v5' },
-  { id: 'restaurant', label: 'Restaurants', one: 'Restaurant', color: '#C2255C', q: ['nwr["amenity"~"^(restaurant|fast_food|food_court)$"]'], pm: ['restaurant', 'fast_food'],
+  { id: 'restaurant', nom: ['restaurant', 'fast food'], types: ['restaurant', 'fast_food', 'food_court'], label: 'Restaurants', one: 'Restaurant', color: '#C2255C', q: ['nwr["amenity"~"^(restaurant|fast_food|food_court)$"]'], pm: ['restaurant', 'fast_food'],
     words: ['restaurant', 'restaurants', 'essen', 'imbiss', 'fast food', 'lokal', 'gaststätte'], d: 'M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10M16 21V3c-2 1-3 4-3 8h3' },
-  { id: 'cafe', label: 'Cafés', one: 'Café', color: '#8B5A2B', q: ['nwr["amenity"="cafe"]'], pm: ['cafe'],
+  { id: 'cafe', nom: ['cafe'], types: ['cafe'], label: 'Cafés', one: 'Café', color: '#8B5A2B', q: ['nwr["amenity"="cafe"]'], pm: ['cafe'],
     words: ['café', 'cafe', 'kaffee', 'coffee'], d: 'M4 9h12v5a5 5 0 0 1-10 0ZM16 10h2a2 2 0 0 1 0 4h-2M8 3v3M12 3v3' },
-  { id: 'atm', label: 'Geldautomaten', one: 'Geldautomat', color: '#1C6DD0', q: ['nwr["amenity"="atm"]', 'nwr["amenity"="bank"]["atm"="yes"]'], pm: ['atm'],
+  { id: 'atm', nom: ['atm'], types: ['atm', 'bank'], label: 'Geldautomaten', one: 'Geldautomat', color: '#1C6DD0', q: ['nwr["amenity"="atm"]', 'nwr["amenity"="bank"]["atm"="yes"]'], pm: ['atm'],
     words: ['geldautomat', 'geldautomaten', 'atm', 'bankautomat', 'bargeld', 'geld abheben'], d: 'M3 6h18v12H3ZM3 10h18M7 15h3' },
-  { id: 'bank', label: 'Banken & Wechselstuben', one: 'Bank', color: '#364FC7', q: ['nwr["amenity"~"^(bank|bureau_de_change|money_transfer)$"]'], pm: ['bank', 'bureau_de_change'],
+  { id: 'bank', nom: ['bank', 'bureau de change'], types: ['bank', 'bureau_de_change', 'money_transfer'], label: 'Banken & Wechselstuben', one: 'Bank', color: '#364FC7', q: ['nwr["amenity"~"^(bank|bureau_de_change|money_transfer)$"]'], pm: ['bank', 'bureau_de_change'],
     words: ['bank', 'banken', 'wechselstube', 'geld wechseln', 'exchange', 'wechsel'], d: 'M3 10 12 4l9 6M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18' },
-  { id: 'fuel', label: 'Tankstellen', one: 'Tankstelle', color: '#495057', q: ['nwr["amenity"="fuel"]'], pm: ['fuel'],
+  { id: 'fuel', nom: ['fuel'], types: ['fuel'], label: 'Tankstellen', one: 'Tankstelle', color: '#495057', q: ['nwr["amenity"="fuel"]'], pm: ['fuel'],
     words: ['tankstelle', 'tankstellen', 'tanken', 'diesel', 'benzin', 'fuel'], d: 'M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12M4 10h10M14 8l3 3v6a1.5 1.5 0 0 0 3 0V9l-3-3' },
-  { id: 'repair', label: 'Werkstätten & Reifen', one: 'Werkstatt', color: '#6741D9', q: ['nwr["shop"~"^(car_repair|tyres|car_parts)$"]', 'nwr["amenity"="vehicle_inspection"]'], pm: ['car_repair'],
+  { id: 'repair', nom: ['car repair', 'tyres'], types: ['car_repair', 'tyres', 'car_parts', 'vehicle_inspection'], label: 'Werkstätten & Reifen', one: 'Werkstatt', color: '#6741D9', q: ['nwr["shop"~"^(car_repair|tyres|car_parts)$"]', 'nwr["amenity"="vehicle_inspection"]'], pm: ['car_repair'],
     words: ['werkstatt', 'werkstätten', 'reifen', 'mechaniker', 'autowerkstatt', 'ersatzteile', 'reparatur'], d: 'M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4Z' },
-  { id: 'hardware', label: 'Baumärkte', one: 'Baumarkt', color: '#A61E4D', q: ['nwr["shop"~"^(hardware|doityourself|outdoor)$"]'], pm: ['hardware', 'doityourself'],
+  { id: 'hardware', nom: ['hardware store', 'doityourself'], types: ['hardware', 'doityourself', 'outdoor'], label: 'Baumärkte', one: 'Baumarkt', color: '#A61E4D', q: ['nwr["shop"~"^(hardware|doityourself|outdoor)$"]'], pm: ['hardware', 'doityourself'],
     words: ['baumarkt', 'eisenwaren', 'werkzeug', 'outdoor', 'hardware'], d: 'M14 4l6 6-3 3-6-6ZM11 7l-8 8 3 3 8-8' },
-  { id: 'pharmacy', label: 'Apotheken', one: 'Apotheke', color: '#E03131', q: ['nwr["amenity"="pharmacy"]'], pm: ['pharmacy'],
+  { id: 'pharmacy', nom: ['pharmacy'], types: ['pharmacy'], label: 'Apotheken', one: 'Apotheke', color: '#E03131', q: ['nwr["amenity"="pharmacy"]'], pm: ['pharmacy'],
     words: ['apotheke', 'apotheken', 'pharmacy', 'medikamente'], d: 'M10 4h4v6h6v4h-6v6h-4v-6H4v-4h6Z' },
-  { id: 'doctor', label: 'Ärzte & Kliniken', one: 'Arzt', color: '#C92A2A', q: ['nwr["amenity"~"^(hospital|clinic|doctors|dentist)$"]'], pm: ['hospital', 'clinic', 'doctors', 'dentist'],
+  { id: 'doctor', nom: ['hospital', 'clinic', 'doctors'], types: ['hospital', 'clinic', 'doctors', 'dentist'], label: 'Ärzte & Kliniken', one: 'Arzt', color: '#C92A2A', q: ['nwr["amenity"~"^(hospital|clinic|doctors|dentist)$"]'], pm: ['hospital', 'clinic', 'doctors', 'dentist'],
     words: ['arzt', 'ärzte', 'krankenhaus', 'klinik', 'hospital', 'zahnarzt', 'notaufnahme'], d: 'M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10ZM12 9v5M9.5 11.5h5' },
-  { id: 'water', label: 'Trinkwasser', one: 'Trinkwasser', color: '#1C7ED6', q: ['nwr["amenity"~"^(drinking_water|water_point)$"]'], pm: ['drinking_water'],
+  { id: 'water', nom: ['drinking water'], types: ['drinking_water', 'water_point'], label: 'Trinkwasser', one: 'Trinkwasser', color: '#1C7ED6', q: ['nwr["amenity"~"^(drinking_water|water_point)$"]'], pm: ['drinking_water'],
     words: ['wasser', 'trinkwasser', 'water'], d: 'M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z' },
-  { id: 'laundry', label: 'Wäschereien', one: 'Wäscherei', color: '#0B7285', q: ['nwr["shop"~"^(laundry|dry_cleaning)$"]'], pm: ['laundry'],
+  { id: 'laundry', nom: ['laundry'], types: ['laundry', 'dry_cleaning'], label: 'Wäschereien', one: 'Wäscherei', color: '#0B7285', q: ['nwr["shop"~"^(laundry|dry_cleaning)$"]'], pm: ['laundry'],
     words: ['wäscherei', 'waschsalon', 'laundry', 'wäsche'], d: 'M5 3h14v18H5ZM5 7h14M12 17a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z' },
-  { id: 'toilets', label: 'Toiletten & Duschen', one: 'Toilette', color: '#868E96', q: ['nwr["amenity"~"^(toilets|shower)$"]'], pm: ['toilets'],
+  { id: 'toilets', nom: ['toilets', 'shower'], types: ['toilets', 'shower'], label: 'Toiletten & Duschen', one: 'Toilette', color: '#868E96', q: ['nwr["amenity"~"^(toilets|shower)$"]'], pm: ['toilets'],
     words: ['toilette', 'toiletten', 'wc', 'dusche', 'duschen', 'shower'], d: 'M7 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3ZM17 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3ZM5 21v-6H4l1.5-6h3L10 15H9v6M15 21V9h4v12M12 3v18' },
-  { id: 'mobile', label: 'SIM-Karten & Handyläden', one: 'Handyladen', color: '#1098AD', q: ['nwr["shop"~"^(mobile_phone|telecommunication)$"]'], pm: ['mobile_phone', 'electronics'],
+  { id: 'mobile', nom: ['mobile phone shop'], types: ['mobile_phone', 'telecommunication'], label: 'SIM-Karten & Handyläden', one: 'Handyladen', color: '#1098AD', q: ['nwr["shop"~"^(mobile_phone|telecommunication)$"]'], pm: ['mobile_phone', 'electronics'],
     words: ['sim', 'simkarte', 'sim-karte', 'handy', 'handyladen', 'mobilfunk', 'telefon'], d: 'M7 2h10v20H7ZM11 18h2' },
-  { id: 'post', label: 'Post', one: 'Post', color: '#F59F00', q: ['nwr["amenity"="post_office"]'], pm: ['post_office'],
+  { id: 'post', nom: ['post office'], types: ['post_office'], label: 'Post', one: 'Post', color: '#F59F00', q: ['nwr["amenity"="post_office"]'], pm: ['post_office'],
     words: ['post', 'postamt', 'paket'], d: 'M3 6h18v12H3ZM3 6l9 7 9-7' },
-  { id: 'camp', label: 'Camping & Unterkünfte', one: 'Unterkunft', color: '#2B8A3E', q: ['nwr["tourism"~"^(camp_site|caravan_site|hostel|guest_house|motel|hotel)$"]'], pm: ['camp_site', 'hotel', 'hostel'],
+  { id: 'camp', nom: ['camp site', 'hotel', 'hostel', 'guest house'], types: ['camp_site', 'caravan_site', 'hostel', 'guest_house', 'motel', 'hotel'], label: 'Camping & Unterkünfte', one: 'Unterkunft', color: '#2B8A3E', q: ['nwr["tourism"~"^(camp_site|caravan_site|hostel|guest_house|motel|hotel)$"]'], pm: ['camp_site', 'hotel', 'hostel'],
     words: ['camping', 'campingplatz', 'hotel', 'hostel', 'gästehaus', 'unterkunft', 'übernachten', 'pension'], d: 'M3 20h18M5 20V10l7-6 7 6v10M10 20v-5h4v5' }
 ];
 const POI = Object.fromEntries(POI_CATS.map((c) => [c.id, c]));
@@ -145,12 +145,11 @@ const Poi = {
 
   errors: [],
   async overpass(cat, at) {
-    this.errors = [];
     const body = '[out:json][timeout:25];(' + cat.q.map((q) => `${q}(around:${Math.round(at.r)},${at.lat.toFixed(5)},${at.lon.toFixed(5)});`).join('') + ');out center tags 200;';
     for (const u of POI_OVERPASS) {
       try {
         const ctl = new AbortController();
-        const timer = setTimeout(() => ctl.abort(), 20000);
+        const timer = setTimeout(() => ctl.abort(), 12000);
         const r = await originalFetch(u, { method: 'POST', body: 'data=' + encodeURIComponent(body), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ctl.signal });
         clearTimeout(timer);
         if (!r.ok) { this.errors.push(u.split('/')[2] + ': HTTP ' + r.status); continue; }
@@ -163,6 +162,37 @@ const Poi = {
       } catch (e) { this.errors.push(u.split('/')[2] + ': ' + (e.name === 'AbortError' ? 'Zeitüberschreitung' : e.message)); }
     }
     return null;
+  },
+
+  /* Nominatim (OpenStreetMap-Suche): schnell und mit Öffnungszeiten, Telefon, Website; höchstens 1 Anfrage pro Sekunde */
+  async nominatim(cat, at) {
+    const dLat = at.r / 111195, dLon = at.r / (111195 * Math.cos(at.lat * Math.PI / 180));
+    const box = [at.lon - dLon, at.lat + dLat, at.lon + dLon, at.lat - dLat].map((v) => v.toFixed(5)).join(',');
+    const seen = new Map();
+    let ok = false;
+    for (let i = 0; i < cat.nom.length; i++) {
+      if (i) await new Promise((r) => setTimeout(r, 1100));
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cat.nom[i])}&viewbox=${box}&bounded=1&extratags=1&addressdetails=1&format=jsonv2&limit=50&accept-language=de`;
+      try {
+        const ctl = new AbortController();
+        const timer = setTimeout(() => ctl.abort(), 15000);
+        const r = await originalFetch(url, { signal: ctl.signal });
+        clearTimeout(timer);
+        if (!r.ok) { this.errors.push('nominatim: HTTP ' + r.status); continue; }
+        ok = true;
+        for (const x of await r.json()) {
+          if (!cat.types.includes(x.type)) continue;
+          const a = x.address || {};
+          const tags = { ...(x.extratags || {}), [x.category]: x.type };
+          if (x.name) tags.name = x.name;
+          if (a.road && !tags['addr:street']) tags['addr:street'] = a.road;
+          if (a.house_number && !tags['addr:housenumber']) tags['addr:housenumber'] = a.house_number;
+          if (!tags['addr:city']) tags['addr:city'] = a.city || a.town || a.village || '';
+          seen.set(x.osm_type + x.osm_id, { lat: +x.lat, lon: +x.lon, tags, osm: x.osm_type + '/' + x.osm_id });
+        }
+      } catch (e) { this.errors.push('nominatim: ' + (e.name === 'AbortError' ? 'Zeitüberschreitung' : e.message)); }
+    }
+    return ok ? [...seen.values()] : null;
   },
 
   /* offline: was in den geladenen Kartenkacheln steht (nur Name und Art) */
@@ -196,7 +226,9 @@ const Poi = {
     }
     this.busy = true;
     renderSearchResults([], `${cat.label} ${at.name} werden gesucht …`);
-    let list = navigator.onLine ? await this.overpass(cat, at) : null;
+    this.errors = [];
+    let list = navigator.onLine ? await this.nominatim(cat, at) : null;
+    if (!list && navigator.onLine) list = await this.overpass(cat, at);
     let note = '';
     if (!list) {
       list = this.offline(cat, at);
