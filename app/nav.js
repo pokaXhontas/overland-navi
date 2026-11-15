@@ -183,6 +183,11 @@ const Nav = {
         out.maneuvers.push({ ...m, idx: m.idx + off, ...(!last && [4, 5, 6].includes(m.type) ? { type: 5 } : {}) });
       }
       for (const f of p.ferries || []) out.ferries.push({ ...f, idx: f.idx + off, endIdx: (f.endIdx || f.idx) + off });
+      // zweite Hälfte der Überfahrt (vom Punkt auf See bis zum Hafen) der Fähre zurechnen
+      if (k > 0 && pts[k].ferry && out.ferries.length && p.maneuvers[0]) {
+        const f = out.ferries[out.ferries.length - 1];
+        f.km += p.maneuvers[0].km || 0; f.time += p.maneuvers[0].sec || 0;
+      }
       for (const t of p.tolls || []) out.tolls.push({ ...t, idx: t.idx + off });
       out.time += p.time;
     });
@@ -235,7 +240,7 @@ const Nav = {
             ferries.push({ idx: off + m.begin_shape_index, name, km: m.length || 0, time: m.time || 0 });
         }
         if (m.toll) tolls.push({ idx: off + m.begin_shape_index, name, km: m.length || 0 });
-        man.push({ idx: off + m.begin_shape_index, type: m.type, text: m.instruction,
+        man.push({ idx: off + m.begin_shape_index, type: m.type, text: m.instruction, km: m.length || 0, sec: m.time || 0,
           alert: m.verbal_transition_alert_instruction || m.verbal_pre_transition_instruction || m.instruction, exit: m.roundabout_exit_count || 0,
           verbal: m.verbal_pre_transition_instruction || m.instruction, street: (m.street_names || [])[0] || '' });
       }
