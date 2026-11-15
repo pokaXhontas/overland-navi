@@ -306,6 +306,10 @@ def main():
         if t.get("ways"):
             lines = scan.zone.get(t["id"], [])
             print(f"  Wege im Gebiet: {len(lines)}", flush=True)
+        if not lines and t.get("mode") == "line":
+            # Gelände ohne eingetragene Pfade: Punkte direkt verbinden
+            lines = [[p["coord"] for p in pts if p["on_route"]]]
+            print("  direkt verbunden (keine Pfade eingetragen)", flush=True)
         if not lines:
             via = [p["coord"] for p in pts if p["on_route"]]
             l = route(via) if len(via) >= 2 else None
