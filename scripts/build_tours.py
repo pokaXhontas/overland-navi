@@ -82,7 +82,7 @@ class Scan(osmium.SimpleHandler):
         self.need = need
         self.geom = {}
         self.cands = {}   # (Tour, Punkt) → [(Abstand, Lage, Name)]
-        self.area = {}    # Tour → [Linien]
+        self.zone = {}    # Tour → [Linien]
 
     def check_point(self, tags, c):
         for t in self.tours:
@@ -117,7 +117,7 @@ class Scan(osmium.SimpleHandler):
             if a.get("name") and not re.search(a["name"], tags.get("name", "")):
                 continue
             if any(dist(c, a["near"]) <= a.get("radius", 1500) for c in line[:: max(1, len(line) // 8)]):
-                self.area.setdefault(t["id"], []).append(line)
+                self.zone.setdefault(t["id"], []).append(line)
 
 
 def stitch(segs, near):
@@ -242,7 +242,7 @@ def main():
             if not routes:
                 print("  Wanderroute nicht gefunden:", t["relation"], flush=True)
         if t.get("ways"):
-            lines = scan.area.get(t["id"], [])
+            lines = scan.zone.get(t["id"], [])
             print(f"  Wege im Gebiet: {len(lines)}", flush=True)
         if not lines:
             via = [p["coord"] for p in pts if p["on_route"]]
