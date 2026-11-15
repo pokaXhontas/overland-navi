@@ -117,6 +117,8 @@ class Points(osmium.SimpleHandler):
 # ---------- Touren-Paket: die bekanntesten Wanderrouten ----------
 TOUR_COLORS = ["#C2255C", "#2F9E44", "#E8590C", "#7048E8", "#1098AD", "#B5482A", "#5C940D", "#D6336C", "#1C6DD0", "#AE3EC9"]
 cands = {}        # Relations-ID → Infos
+supers = {}       # Fernwege aus Etappen (Superroute) → Infos
+rel_ways = {}     # alle Wanderrouten → Weg-IDs
 cand_ways = defaultdict(list)
 geom = {}
 way_sac = {}
@@ -151,7 +153,13 @@ class Rels(osmium.SimpleHandler):
             member[w].append(idx)
         t = {x.k: x.v for x in r.tags}
         nm = t.get("name:de") or t.get("name:en") or t.get("name")
-        if nm and ways and t.get("type") == "route" and t.get("state") not in ("proposed", "disused"):
+        subs = [m.ref for m in r.members if m.type == "r"]
+        rel_ways[r.id] = ways
+        if t.get("state") in ("proposed", "disused") or not nm:
+            return
+        if subs and (t.get("type") == "superroute" or not ways):
+            supers[r.id] = {"t": t, "name": nm, "subs": subs}
+        elif ways and t.get("type") == "route":
             cands[r.id] = {"t": t, "name": nm, "ways": ways, "score": tour_score(t)}
 
 
@@ -292,7 +300,11 @@ def write_tours(path):
     feats = []
     picked = []
     for rid, c in sorted(cands.items(), key=lambda x: (-x[1]["score"], -len(x[1]["ways"]))):
-        lines = stitch([geom[w] for w in c["ways"] if w in geom])
+        have = [w for w in c["ways"] if w in geom]
+        # an der Landesgrenze abgeschnittene Routen weglassen (Wege fehlen im Länderauszug)
+        if len(have) < 0.85 * len(c["ways"]):
+            continue
+        lines = stitch([geom[w] for w in have])
         if not lines:
             continue
         km = sum(length(l) for l in lines) / 1000
@@ -301,13 +313,19 @@ def write_tours(path):
         # Tageswanderungen und Mehrtagestouren vor sehr langen Fernwegen, bei gleicher Bekanntheit
         bonus = 1 if 5 <= km <= 120 else 0
         picked.append((c["score"] + bonus, km, rid, c, lines))
-        if len(picked) >= 120:
+        if len(picked) >= 200:
             break
     # Namen ohne Aussage („Pass 3160m“, „Route 12“) weglassen; bei genug Auswahl nur Routen mit Hinweis auf Bekanntheit
     picked = [x for x in picked if not GENERIC_RE.match(x[3]["name"])]
     if sum(1 for x in picked if x[0] > 1) >= 15:
         picked = [x for x in picked if x[0] > 1]
-    picked.sort(key=lambda x: (-x[0], x[1]))
+    # gleicher Name nur einmal (die längste Fassung)
+    best = {}
+    for x in picked:
+        k = x[3]["name"].strip().lower()
+        if k not in best or (x[0], x[1]) > (best[k][0], best[k][1]):
+            best[k] = x
+    picked = sorted(best.values(), key=lambda x: (-x[0], x[1]))
     for n, (sc, km, rid, c, lines) in enumerate(picked[:40]):
         t = c["t"]
         tol = 8 if km < 30 else 20 if km < 150 else 40
@@ -347,8 +365,18 @@ def write_tours(path):
 
 Rels().apply_file(src)
 print(f"{len(routes)} Wanderrouten", flush=True)
+# Fernwege aus Etappen als eine Tour; die einzelnen Etappen nicht extra
+stages = set()
+for rid, sp in supers.items():
+    ways = [w for sub in sp["subs"] for w in rel_ways.get(sub, [])]
+    if ways:
+        cands[rid] = {"t": sp["t"], "name": sp["name"], "ways": ways, "score": tour_score(sp["t"]) + 1}
+        stages.update(sp["subs"])
+for rid in stages:
+    if rid in cands and rid not in supers:
+        cands[rid]["score"] -= 3
 # Kandidaten fürs Touren-Paket: die bekanntesten zuerst, Geometrie nur für diese merken
-top = sorted(cands.items(), key=lambda x: (-x[1]["score"], -len(x[1]["ways"])))[:120]
+top = sorted(cands.items(), key=lambda x: (-x[1]["score"], -len(x[1]["ways"])))[:250]
 cands = dict(top) if dst_tours else {}
 need_geom = {w for c in cands.values() for w in c["ways"]}
 with open(dst, "w", encoding="utf-8") as out:
