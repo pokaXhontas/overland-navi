@@ -13,7 +13,7 @@ import urllib.request
 
 def http_source(url):
     def get(offset, length):
-        req = urllib.request.Request(url, headers={"Range": f"bytes={offset}-{offset + length - 1}"})
+        req = urllib.request.Request(url, headers={"Range": f"bytes={offset}-{offset + length - 1}", "User-Agent": "Mozilla/5.0 overland-navi"})
         return urllib.request.urlopen(req, timeout=60).read()
     return get
 
