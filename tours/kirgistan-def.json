@@ -49,11 +49,11 @@
      ]
     },
     {
-     "label": "Ak-Suu",
+     "label": "Ak-Suu, Ortsrand",
      "icon": "end",
      "near": [
-      78.52239,
-      42.49968
+      78.53013,
+      42.47351
      ]
     }
    ]
@@ -187,11 +187,19 @@
    "info": "canyons",
    "points": [
     {
-     "label": "Skazka Parkplatz",
+     "label": "Abzweig Hauptstraße",
      "icon": "start",
      "near": [
       77.346,
       42.1658
+     ]
+    },
+    {
+     "label": "Steile Aussicht",
+     "icon": "view",
+     "near": [
+      77.35827,
+      42.15676
      ]
     },
     {
@@ -211,27 +219,11 @@
      ]
     },
     {
-     "label": "Aufstieg Aussichtshügel",
+     "label": "Aussichtshügel",
      "icon": "view",
      "near": [
       77.35194,
       42.15475
-     ]
-    },
-    {
-     "label": "Steile Aussicht",
-     "icon": "view",
-     "near": [
-      77.35827,
-      42.15676
-     ]
-    },
-    {
-     "label": "Zurück zum Parkplatz",
-     "icon": "end",
-     "near": [
-      77.3461,
-      42.1657
      ]
     }
    ],
@@ -246,35 +238,19 @@
    "relation_id": 19628981,
    "points": [
     {
-     "label": "Abzweig Krasnyj Most",
+     "label": "Parkplatz (km 2)",
      "icon": "start",
      "near": [
-      75.80447,
-      42.57914
-     ]
-    },
-    {
-     "label": "Konorchek-Canyons",
-     "icon": "view",
-     "near": [
-      75.78303,
-      42.60264
+      75.8134,
+      42.59881
      ]
     },
     {
      "label": "Aussicht am Canyonende",
      "icon": "view",
      "near": [
-      75.75911,
-      42.591
-     ]
-    },
-    {
-     "label": "Aussicht Konorchek",
-     "icon": "view",
-     "near": [
-      75.72436,
-      42.60684
+      75.75921,
+      42.590815
      ]
     }
    ]
