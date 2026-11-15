@@ -256,10 +256,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const tryTravel = async (travel, from, to, name) => {
     await page.evaluate((travel, from, to) => { Nav.travel = travel; Nav.plan([from, to], 'route'); }, travel, from, to);
     await page.waitForFunction((n) => Nav.pending && Nav.pending.list[0].target.name === n, { timeout: 90000 }, to.name).catch(() => {});
-    return page.evaluate(() => Nav.pending ? Nav.pending.list.map((r) => r.transit ? r.transit.dep + '–' + r.transit.arr + ' ' + r.transit.legs.map((l) => l.what).join(' › ') : Math.round(r.time / 60) + ' min/' + (Math.round(r.total / 100) / 10) + ' km').join(' | ') + ' · Knopf: ' + $('#na-go').textContent : 'nichts');
+    return page.evaluate(() => Nav.pending ? Nav.pending.list.map((r) => r.transit ? r.transit.dep + '–' + r.transit.arr + ' ' + r.transit.legs.map((l) => l.what).join(' › ') : Math.round(r.time / 60) + ' min/' + (Math.round(r.total / 100) / 10) + ' km ' + r.source + (r.walk ? ' (' + r.walk.routePct + ' % Wanderroute, ' + r.walk.roadPct + ' % Straße)' : '')).join(' | ') + ' · ' + $('#na-sub').textContent + ' · Knopf: ' + $('#na-go').textContent : 'nichts');
   };
   console.log('Zu Fuß:', await tryTravel('foot', { name: 'Alplager', lat: 42.5625, lon: 74.4824 }, { name: 'Ak-Sai-Wasserfall', lat: 42.5465, lon: 74.5173 }));
   await shot('12e-zu-fuss');
+  await page.evaluate(() => { if (Nav.pending) $('#na-cancel').click(); });
+  console.log('Zu Fuß Stadt→Stadt:', await tryTravel('foot', { name: 'Bad Urach', lat: 48.493, lon: 9.398 }, { name: 'Reutlingen', lat: 48.491, lon: 9.204 }));
+  await shot('12e2-zu-fuss-staedte');
   await page.evaluate(() => { if (Nav.pending) $('#na-cancel').click(); });
   console.log('Bus & Bahn:', await tryTravel('transit', { name: 'Alexanderplatz', lat: 52.5219, lon: 13.4132 }, { name: 'Checkpoint Charlie', lat: 52.5076, lon: 13.3904 }));
   await shot('12f-bus-bahn');

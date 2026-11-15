@@ -777,3 +777,8 @@ html.dark .na-tag.ferry { color: #74C0FC; } html.dark .na-tag.toll { color: #FFC
 .na-credit { margin: 6px 2px 0; }
 .na-credit[hidden] { display: none; }
 .na-credit a { color: var(--accent); }
+
+/* Routenauswahl: Liste scrollt in sich, Wischen nur am Griff */
+.nav-choose .na-list { max-height: 42vh; overflow-y: auto; touch-action: pan-y; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.nav-choose .na-list .na-row { touch-action: pan-y; }
+@media (max-width: 600px) { .nav-choose .na-list { max-height: 36vh; } }

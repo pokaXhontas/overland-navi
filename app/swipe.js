@@ -119,6 +119,8 @@ const Swipe = {
     const alts = $('#nav-alts');
     this.attach(alts, {
       dir: () => (alts.classList.contains('peek') ? 'up' : 'down'),
+      // nur oben am Griff und an der Überschrift wischen, die Liste selbst scrollt normal
+      handle: () => '.grab, .na-peek, #na-title, #na-sub',
       onDismiss: (d) => { alts.classList.toggle('peek', d === 'down'); }
     });
     this.foldable(alts, 'peek', '.na-peek-txt, .grab');

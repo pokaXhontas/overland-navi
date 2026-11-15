@@ -4,6 +4,7 @@
 
 const VALHALLA = 'https://valhalla1.openstreetmap.de/route';
 const TRANSIT = 'https://api.transitous.org';
+const BROUTER = 'https://brouter.de/brouter';
 const OSRM = 'https://routing.openstreetmap.de/routed-car/route/v1/driving/';
 
 /* Mitgelieferte Stimmen: kurze Bausteine („In 300 Metern“ + „rechts abbiegen“), offline nutzbar.
@@ -164,20 +165,70 @@ const Nav = {
     return [j.trip, ...(j.alternates || []).map((a) => a.trip)].filter(Boolean).map((t) => this.parseTrip(t));
   },
 
-  /* Zu Fuß / Wandern: Valhalla als Fußgänger, Wanderwege bis zur eingestellten SAC-Stufe */
+  /* Zu Fuß / Wandern: zuerst BRouter (Wander-Profil, folgt markierten Wanderrouten),
+     dazu Valhalla als Fußgänger mit der eingestellten SAC-Stufe */
   async foot(pts) {
+    const jobs = [this.brouterFoot(pts), this.valhallaFoot(pts)];
+    const res = await Promise.allSettled(jobs);
+    const list = [];
+    for (const r of res) if (r.status === 'fulfilled') list.push(...r.value);
+    if (!list.length) throw (res.find((r) => r.status === 'rejected') || {}).reason || new Error('Kein Weg gefunden');
+    for (const x of list) x.len = x.len || trackLength(x.coords);
+    // doppelte Vorschläge (fast gleich lang) weglassen, Wanderrouten-Vorschlag zuerst
+    const uniq = [];
+    for (const r of list) if (!uniq.some((u) => Math.abs(u.len - r.len) < Math.max(80, u.len * 0.03))) uniq.push(r);
+    return uniq.slice(0, 4);
+  },
+
+  async valhallaFoot(pts) {
     const locs = pts.map((p) => ({ lat: p.lat, lon: p.lon, type: 'break' }));
     const max = typeof Hike !== 'undefined' ? Hike.max() : 3;
     const q = { locations: locs, costing: 'pedestrian',
       costing_options: { pedestrian: { max_hiking_difficulty: max, use_tracks: 1, walking_speed: 4.5, use_hills: 0.5 } },
       directions_options: { units: 'kilometers', language: 'de-DE' } };
-    if (pts.length === 2) q.alternates = 2;
+    if (pts.length === 2) q.alternates = 1;
     const r = await fetch(VALHALLA + '?json=' + encodeURIComponent(JSON.stringify(q)));
     const j = await r.json();
     if (!r.ok || !j.trip) throw new Error((j && (j.error || j.status_message)) || 'Kein Weg gefunden');
-    const list = [j.trip, ...(j.alternates || []).map((a) => a.trip)].filter(Boolean).map((t) => ({ ...this.parseTrip(t), travel: 'foot' }));
-    for (const x of list) x.len = trackLength(x.coords);
-    return list.sort((a, b) => a.time - b.time);
+    return [j.trip, ...(j.alternates || []).map((a) => a.trip)].filter(Boolean).map((t) => ({ ...this.parseTrip(t), travel: 'foot', source: 'Valhalla' }));
+  },
+
+  async brouterFoot(pts) {
+    const ll = pts.map((p) => p.lon.toFixed(6) + ',' + p.lat.toFixed(6)).join('|');
+    const r = await fetch(`${BROUTER}?lonlats=${ll}&profile=hiking-mountain&alternativeidx=0&format=geojson&timode=3`);
+    if (!r.ok) throw new Error('BRouter: ' + (await r.text()).slice(0, 120));
+    const j = await r.json();
+    const f = j.features && j.features[0];
+    if (!f) throw new Error('BRouter: kein Weg');
+    const p = f.properties;
+    const coords = f.geometry.coordinates.map((c) => [c[0], c[1]]);
+    // Anteil auf markierten Wanderrouten und an größeren Straßen, schwierigste Stelle
+    const msgs = p.messages || [];
+    const hdr = msgs[0] || [];
+    const wi = hdr.indexOf('WayTags'), di = hdr.indexOf('Distance');
+    let tot = 0, route = 0, road = 0, sac = 0;
+    const SACN = { hiking: 1, mountain_hiking: 2, demanding_mountain_hiking: 3, alpine_hiking: 4, demanding_alpine_hiking: 5, difficult_alpine_hiking: 6 };
+    for (const m of msgs.slice(1)) {
+      const d = +m[di] || 0, tags = m[wi] || '';
+      tot += d;
+      if (/route_(hiking|foot)_/.test(tags)) route += d;
+      if (/highway=(primary|secondary|tertiary|trunk)(_link)?\b/.test(tags)) road += d;
+      const sm = tags.match(/sac_scale=(\w+)/);
+      if (sm && SACN[sm[1]]) sac = Math.max(sac, SACN[sm[1]]);
+    }
+    // Abbiegehinweise: [Punkt, Befehl, Ausfahrt, Abstand, Winkel]
+    const CMD = { 2: 15, 3: 16, 4: 14, 5: 10, 6: 9, 7: 11, 8: 24, 9: 23, 10: 13, 11: 13, 12: 13, 14: 26, 15: 26 };
+    const TXT = { 15: 'Links abbiegen', 16: 'Halb links', 14: 'Scharf links', 10: 'Rechts abbiegen', 9: 'Halb rechts', 11: 'Scharf rechts', 24: 'Links halten', 23: 'Rechts halten', 13: 'Umdrehen', 26: 'Im Kreisverkehr' };
+    const man = [{ idx: 0, type: 1, text: 'Loslaufen', alert: 'Loslaufen', verbal: 'Loslaufen', street: '' }];
+    for (const v of p.voicehints || []) {
+      const t = CMD[v[1]];
+      if (!t) continue;
+      const text = t === 26 ? `Im Kreisverkehr die ${v[2] || ''}. Ausfahrt nehmen` : TXT[t];
+      man.push({ idx: v[0], type: t, text, alert: text, verbal: text, street: '', exit: v[2] || 0 });
+    }
+    man.push({ idx: coords.length - 1, type: 4, text: 'Ziel erreicht', alert: 'erreichst du dein Ziel', verbal: 'Du hast dein Ziel erreicht.', street: '' });
+    const walk = { routePct: tot ? Math.round(100 * route / tot) : 0, roadPct: tot ? Math.round(100 * road / tot) : 0, sac };
+    return [{ coords, maneuvers: man, time: +p['total-time'] || tot / 1.2, source: 'BRouter', travel: 'foot', len: +p['track-length'] || tot, walk, up: +p['filtered ascend'] || 0 }];
   },
 
   /* Bus & Bahn: Verbindungen von Transitous (freie Fahrplandaten, MOTIS) */
@@ -534,7 +585,14 @@ const Nav = {
         if (r.tolls && r.tolls.length) {
           const names = [...new Set(r.tolls.flatMap((t) => t.names))].slice(0, 2).join(', ');
           info.push(`<span class="na-tag toll">€ Maut${names ? ': ' + this.esc(names) : ''}</span>`);
-        } else if (r.source === 'Valhalla' && list.some((x) => x.tolls && x.tolls.length)) info.push('<span class="na-tag free">ohne Maut</span>');
+        } else if (r.source === 'Valhalla' && r.travel !== 'foot' && list.some((x) => x.tolls && x.tolls.length)) info.push('<span class="na-tag free">ohne Maut</span>');
+        if (r.walk) {
+          if (r.walk.routePct >= 20) info.push(`<span class="na-tag free">🥾 ${r.walk.routePct} % auf markierten Wanderwegen</span>`);
+          else info.push('<span class="na-tag toll">⚠ kaum markierte Wanderwege</span>');
+          if (r.walk.roadPct >= 15) info.push(`<span class="na-tag toll">${r.walk.roadPct} % an Straßen</span>`);
+          if (r.walk.sac) info.push(`<span class="na-tag">bis ${SAC_INFO[r.walk.sac].t}</span>`);
+          if (r.up) info.push(`<span class="na-tag">↗ ${r.up.toLocaleString('de-DE')} Hm</span>`);
+        } else if (r.travel === 'foot') info.push('<span class="na-tag">beliebige Fußwege und Straßen</span>');
         // OSRM erkennt Maut auf langen Brücken nicht zuverlässig: dann lieber nichts behaupten
         if (r.transit) {
           const t = r.transit;
@@ -565,6 +623,10 @@ const Nav = {
     $('#na-title').textContent = list[0].travel === 'transit' ? 'Verbindung auswählen' : list.length > 1 ? 'Route auswählen' : 'Deine Route';
     $('#na-credit').hidden = list[0].travel !== 'transit';
     $('#na-sub').textContent = list.length > 1 ? 'Antippen zeigt sie auf der Karte' : ((list[0].vias.length ? list[0].vias.length + (list[0].vias.length === 1 ? ' Zwischenstopp' : ' Zwischenstopps') : 'Direkt') + ' · ' + (list[0].startPt && !list[0].startPt.gps ? 'ab ' + list[0].startPt.name : 'ab deinem Standort'));
+    const best = list.find((x) => x.walk);
+    if (list[0].travel === 'foot' && (!best || best.walk.routePct < 20)) {
+      $('#na-sub').textContent = 'Hinweis: Für diese Strecke gibt es keine durchgehende markierte Wanderroute. Der Weg führt über normale Wege' + (best && best.walk.roadPct >= 15 ? ' und ein Stück an Straßen entlang.' : '.');
+    }
     box.hidden = false;
     this.draw();
     const b = new maplibregl.LngLatBounds(list[0].coords[0], list[0].coords[0]);
