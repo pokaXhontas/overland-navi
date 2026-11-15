@@ -264,6 +264,7 @@
   </div>
   <div class="sheet-body">
     <label class="row"><span><b>Wanderwege anzeigen</b><small>Gestrichelt, Farbe nach Schwierigkeit, ab Zoomstufe 11</small></span><input type="checkbox" class="switch" id="hk-on"></label>
+    <label class="row"><span><b>Feld- und Fahrwege</b><small>Pisten und Feldwege, die oft Teil von Wanderungen sind (ab Zoomstufe 12)</small></span><input type="checkbox" class="switch" id="hk-tracks"></label>
     <h2>Zeige Wege bis</h2>
     <div class="seg hk-seg" role="radiogroup" aria-label="Schwierigkeit bis">
       <button role="radio" data-hkmax="1">T1</button><button role="radio" data-hkmax="2">T2</button><button role="radio" data-hkmax="3">T3</button>
@@ -271,7 +272,8 @@
     </div>
     <h2>Schwierigkeit (SAC-Skala)</h2>
     <div class="hk-legend" id="hk-legend"></div>
-    <div class="hk-leg"><span class="hk-dash" style="--c:#8A5A2B"></span><span class="hk-badge" style="background:#8A5A2B">–</span><span><b>Pfad ohne Angabe</b><small>Schwierigkeit nicht eingetragen</small></span></div>
+    <div class="hk-leg"><span class="hk-dash" style="--c:#8A5A2B"></span><span class="hk-badge" style="background:#8A5A2B">–</span><span><b>Pfad ohne Angabe</b><small>Pfad, Fußweg oder Saumpfad ohne eingetragene Schwierigkeit</small></span></div>
+    <div class="hk-leg"><span class="hk-dash hk-dash-long" style="--c:#9C7B57"></span><span class="hk-badge" style="background:#9C7B57">F</span><span><b>Feld- und Fahrweg</b><small>Piste oder Feldweg, mit dem Schalter oben ein- und ausblendbar</small></span></div>
     <div class="hk-leg"><span class="hk-band"></span><span class="hk-badge" style="background:#C2255C">R</span><span><b>Wanderroute</b><small>Breites farbiges Band, z. B. Fernwanderwege</small></span></div>
     <p class="muted small" id="hk-status"></p>
     <p class="muted small">Tippe auf einen Weg für Infos. Daten: © OpenStreetMap-Mitwirkende, monatlich aktualisiert.</p>

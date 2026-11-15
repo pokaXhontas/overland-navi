@@ -658,3 +658,5 @@ body.drawing .fab, body.drawing .hud { display: none; }
   :root { --ctl: 46px; }
   .controls { gap: 8px; }
 }
+
+.hk-dash-long { border-top-style: dashed; border-top-width: 3px; opacity: .9; }

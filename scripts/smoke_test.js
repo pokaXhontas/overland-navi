@@ -102,6 +102,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const f = map.getLayer('hike-line') ? map.queryRenderedFeatures({ layers: ['hike-line'] }) : [];
     const sac = {};
     for (const x of f) sac['T' + x.properties.s] = (sac['T' + x.properties.s] || 0) + 1;
+    sac.Feldwege = map.getLayer('hike-track') ? map.queryRenderedFeatures({ layers: ['hike-track'] }).length : 0;
     return 'Länder: ' + regs + ' · sichtbare Wegstücke: ' + f.length + ' ' + JSON.stringify(sac);
   }));
   await page.evaluate(() => { const f = map.queryRenderedFeatures({ layers: ['hike-line'] }).find((x) => x.properties.s >= 2) || map.queryRenderedFeatures({ layers: ['hike-line'] })[0]; if (f) Hike.showInfo(f, map.getCenter()); });

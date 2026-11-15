@@ -69,7 +69,11 @@ const Hike = {
   layers(dark, sat) {
     if (!this.on() || !this.regions().length) return { lines: [], labels: [] };
     const max = this.max();
-    const f = ['any', ['==', ['get', 's'], 0], ['<=', ['get', 's'], max]];
+    const isTrack = ['all', ['==', ['get', 'h'], 't'], ['==', ['get', 's'], 0], ['!', ['has', 'net']]];
+    const sacOk = ['any', ['==', ['get', 's'], 0], ['<=', ['get', 's'], max]];
+    const f = ['all', sacOk, ['!', isTrack]];
+    const ft = store.get('hikeTracks', true) ? isTrack : ['==', 1, 0];
+    const any = ['any', f, ft];
     const sacColor = ['match', ['get', 's'], 1, '#E3A700', 2, '#D62828', 3, '#D62828', 4, '#1C6DD0', 5, '#1C6DD0', 6, '#1C6DD0', dark || sat ? '#C9A27A' : '#8A5A2B'];
     const routeColor = ['match', ['coalesce', ['get', 'c'], ''], ...Object.entries(ROUTE_COLORS).flat(), '#C2255C'];
     const w = (a, b) => ['interpolate', ['linear'], ['zoom'], 11, a, 16, b];
@@ -77,11 +81,13 @@ const Hike = {
       lines: [
         { id: 'hike-route', type: 'line', source: 'hike', 'source-layer': 'wege', filter: ['all', f, ['has', 'net']], layout: { 'line-cap': 'round', 'line-join': 'round' },
           paint: { 'line-color': routeColor, 'line-opacity': 0.28, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 3, 12, 7, 16, 12] } },
+        { id: 'hike-track', type: 'line', source: 'hike', 'source-layer': 'wege', filter: ft, layout: { 'line-join': 'round' },
+          paint: { 'line-color': dark || sat ? '#B89A78' : '#9C7B57', 'line-opacity': 0.85, 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 1, 16, 2.4], 'line-dasharray': [4, 2] } },
         { id: 'hike-casing', type: 'line', source: 'hike', 'source-layer': 'wege', filter: f, minzoom: 11, layout: { 'line-join': 'round' },
           paint: { 'line-color': dark || sat ? 'rgba(11,15,18,0.65)' : 'rgba(255,255,255,0.85)', 'line-width': w(2.6, 5.4) } },
         { id: 'hike-line', type: 'line', source: 'hike', 'source-layer': 'wege', filter: f, layout: { 'line-join': 'round' },
           paint: { 'line-color': sacColor, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1, 11, 1.4, 16, 3.2], 'line-dasharray': [2, 1.3] } },
-        { id: 'hike-hit', type: 'line', source: 'hike', 'source-layer': 'wege', filter: f, minzoom: 11, paint: { 'line-color': '#000', 'line-opacity': 0, 'line-width': 18 } }
+        { id: 'hike-hit', type: 'line', source: 'hike', 'source-layer': 'wege', filter: any, minzoom: 11, paint: { 'line-color': '#000', 'line-opacity': 0, 'line-width': 18 } }
       ],
       labels: [
         { id: 'hike-label', type: 'symbol', source: 'hike', 'source-layer': 'wege', filter: f, minzoom: 13,
@@ -105,7 +111,7 @@ const Hike = {
     const esc = (t) => String(t).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
     const html = `<div class="hk-pop">
       ${s ? `<div class="hk-head"><span class="hk-badge" style="background:${s.color}">${s.t}</span><b>${s.name}</b></div><p>${s.text}</p>`
-          : '<div class="hk-head"><span class="hk-badge" style="background:#8A5A2B">–</span><b>Pfad ohne Schwierigkeitsangabe</b></div>'}
+          : `<div class="hk-head"><span class="hk-badge" style="background:#8A5A2B">–</span><b>${{ t: 'Feld- oder Fahrweg', f: 'Fußweg', b: 'Saumpfad', s: 'Treppe', k: 'Klettersteig' }[p.h] || 'Pfad'} ohne Schwierigkeitsangabe</b></div>`}
       ${p.n ? `<div class="hk-row"><span>Name</span><b>${esc(p.n)}</b></div>` : ''}
       ${p.v ? `<div class="hk-row"><span>Wegspur</span><b>${VIS_TEXT[p.v]}</b></div>` : ''}
       ${p.r ? `<div class="hk-row"><span>Wanderroute</span><b>${esc(p.r)}${p.ref ? ' (' + esc(p.ref) + ')' : ''}</b></div>` : ''}
@@ -125,6 +131,7 @@ const Hike = {
 
   renderSheet() {
     $('#hk-on').checked = this.on();
+    $('#hk-tracks').checked = store.get('hikeTracks', true);
     document.querySelectorAll('[data-hkmax]').forEach((b) => b.setAttribute('aria-checked', String(+b.dataset.hkmax === this.max())));
     const legend = $('#hk-legend');
     legend.innerHTML = '';
@@ -157,6 +164,7 @@ const Hike = {
     $('#btn-hike').onclick = () => ($('#hike-sheet').hidden ? this.open() : this.close());
     $('#hk-close').onclick = () => this.close();
     $('#hk-on').onchange = () => { store.set('hikeOn', $('#hk-on').checked); refreshStyle(); };
+    $('#hk-tracks').onchange = () => { store.set('hikeTracks', $('#hk-tracks').checked); refreshStyle(); };
     document.querySelectorAll('[data-hkmax]').forEach((b) => {
       b.onclick = () => { store.set('hikeMax', +b.dataset.hkmax); this.renderSheet(); refreshStyle(); };
     });
