@@ -147,7 +147,7 @@ const Hike = {
 
   /* Kartenebenen; werden in buildStyle eingefügt */
   layers(dark, sat) {
-    if (!this.on() || (!this.keys().length && !this.local.size)) return { lines: [], labels: [] };
+    if (!this.on() || (!this.keys().length && !this.local.size)) return { lines: [], labels: [], top: [] };
     const max = this.max();
     const isTrack = ['all', ['==', ['get', 'h'], 't'], ['==', ['get', 's'], 0], ['!', ['has', 'net']]];
     const sacOk = ['any', ['==', ['get', 's'], 0], ['<=', ['get', 's'], max]];
@@ -176,6 +176,8 @@ const Hike = {
               ['concat', 'T', ['to-string', ['get', 's']], ['case', ['has', 'n'], ['concat', ' · ', ['get', 'n']], '']],
               ['coalesce', ['get', 'n'], ['get', 'ref'], '']] },
           paint: { 'text-color': sacColor, 'text-halo-color': dark || sat ? '#0B0F12' : '#FFFFFF', 'text-halo-width': 1.6 } },
+      ],
+      top: [
         ...(this.pts().length ? [{ id: 'hike-pts', type: 'symbol', source: 'hike', 'source-layer': 'punkte', filter: ['in', ['get', 'k'], ['literal', this.pts()]],
           layout: { 'icon-image': ['concat', 'hkpt-', ['get', 'k']], 'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.7, 14, 1],
             'icon-allow-overlap': ['step', ['zoom'], false, 13, true], 'symbol-sort-key': ['match', ['get', 'k'], 'biwak', 0, 'huette', 1, 'unterstand', 2, 3],

@@ -297,7 +297,7 @@ function buildStyle() {
   if (at < 0) at = baseLayers.length;
   const layers = [...baseLayers.slice(0, at), hill, contourLine, ...baseLayers.slice(at), contourText];
   // Wanderwege über den Straßen, unter den Ortsnamen
-  const hk = typeof Hike !== 'undefined' ? Hike.layers(dark, sat) : { lines: [], labels: [] };
+  const hk = typeof Hike !== 'undefined' ? Hike.layers(dark, sat) : { lines: [], labels: [], top: [] };
   if (hk.lines.length) {
     let li = layers.findIndex((l) => l.type === 'symbol' && l.id !== 'contour-labels');
     if (li < 0) li = layers.length;
@@ -306,6 +306,7 @@ function buildStyle() {
   }
 
   if (typeof Tours !== 'undefined') layers.push(...Tours.layers(dark));
+  if (hk.top) layers.push(...hk.top);
   layers.push(
     {
       id: 'tracks-highlight', type: 'line', source: 'tracks', filter: ['==', ['get', 'id'], '__keiner__'],
