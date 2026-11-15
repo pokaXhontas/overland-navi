@@ -185,6 +185,32 @@ jobs:
           sed -i "s/__BUILD__/${GITHUB_SHA::7}/g" site/sw.js site/index.html
           du -sh site
 
+      - name: Navigationsstimmen aus dem Zwischenspeicher holen
+        id: voices
+        uses: actions/cache@v4
+        with:
+          path: voices-build
+          key: voices-${{ hashFiles('scripts/build_voices.py') }}
+
+      - name: Python für die Sprachsynthese
+        if: steps.voices.outputs.cache-hit != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Navigationsstimmen erzeugen (Piper)
+        if: steps.voices.outputs.cache-hit != 'true'
+        run: |
+          pip install --quiet piper-tts==1.2.0
+          python scripts/build_voices.py voices-build
+          du -sh voices-build; cat voices-build/index.json
+
+      - name: Stimmen in die Seite legen
+        run: |
+          mkdir -p site/voices
+          if [ -f voices-build/index.json ]; then cp -r voices-build/. site/voices/; else echo '{"v":1,"voices":[],"keys":[]}' > site/voices/index.json; fi
+          ls site/voices
+
       - name: Online-Dienste für Route und Luftbild prüfen
         continue-on-error: true
         run: |
