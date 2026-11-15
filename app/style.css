@@ -552,3 +552,11 @@ body.drawing .fab, body.drawing .hud { display: none; }
 .field select { border-radius: 14px; border: 1px solid var(--line); background: var(--faint); color: var(--text); padding: 13px 14px; font-size: 16px; -webkit-appearance: none; appearance: none; }
 .field input[type="range"] { padding: 0; border: 0; background: transparent; accent-color: var(--accent); height: 32px; }
 .field > span em { font-style: normal; color: var(--text); margin-left: 6px; letter-spacing: 0; text-transform: none; }
+/* Spurhinweise */
+.nb-lanes { display: flex; gap: 4px; margin-top: 6px; }
+.nb-lanes[hidden] { display: none; }
+.nb-lanes .lane { width: 34px; height: 38px; border-radius: 8px; background: rgba(127,127,127,.18); display: grid; place-items: center; }
+.nb-lanes .lane svg { width: 26px; height: 26px; fill: none; stroke: var(--muted); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; opacity: .55; }
+.nb-lanes .lane.ok { background: #2F80ED; }
+.nb-lanes .lane.ok svg { stroke: #fff; opacity: 1; }
+.nav-banner.mini .nb-lanes { display: none; }

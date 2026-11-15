@@ -212,7 +212,10 @@ const Nav = {
         }
         idx = best;
         const text = this.osrmText(s);
-        man.push({ idx, type: typeOf(s), text, alert: text, verbal: text, street: s.name || '', exit: s.maneuver.exit || 0 });
+        // Fahrspuren vor der Kreuzung (aus OpenStreetMap, wenn eingetragen)
+        const ix = s.intersections && s.intersections[0];
+        const lanes = ix && ix.lanes && ix.lanes.length > 1 ? ix.lanes.map((l) => ({ ind: l.indications || ['none'], ok: !!l.valid })) : null;
+        man.push({ idx, type: typeOf(s), text, alert: text, verbal: text, street: s.name || '', exit: s.maneuver.exit || 0, lanes });
       }
     }
     return { coords, maneuvers: man, time: route.duration, source: 'OSRM' };
@@ -417,6 +420,7 @@ const Nav = {
     this.active = null;
     store.set('nav', null);
     this.showUI(false);
+    if (map) map.easeTo({ pitch: 0, padding: { top: 0, bottom: 0, left: 0, right: 0 }, duration: 600 });
     this.draw();
     if (!silent) toast('Navigation beendet');
     if ('speechSynthesis' in window) speechSynthesis.cancel();
@@ -574,6 +578,7 @@ const Nav = {
       $('#nf-eta').textContent = 'Luftlinie, kein Straßenverlauf';
       return;
     }
+    if ($('#nb-lanes')) $('#nb-lanes').hidden = true;
     if (!a.joined) {
       const s = { lon: a.coords[0][0], lat: a.coords[0][1] };
       icon.innerHTML = `<svg viewBox="0 0 24 24" style="transform:rotate(${bearingDeg(pos, s) - map.getBearing()}deg)"><path d="M12 21V4M6 10l6-6 6 6"/></svg>`;
@@ -588,6 +593,7 @@ const Nav = {
       const m = this.next();
       icon.innerHTML = this.icon(m ? m.type : 4, m && m.exit);
       dist.textContent = fmtDist(m ? m.at - a.along : a.remaining);
+      this.renderLanes(m, m ? m.at - a.along : Infinity);
       text.textContent = m ? m.text : 'Ziel: ' + (a.target.name || '');
     }
     const left = a.total ? a.time * (a.remaining / a.total) : 0;
@@ -632,7 +638,59 @@ const Nav = {
     const p = gps.pos;
     gps.follow = true;
     $('#btn-locate').classList.add('active');
-    if (p) map.easeTo({ center: [p.lon, p.lat], zoom: Math.max(map.getZoom(), 15.5), duration: 900, essential: true });
+    const cam = p && this.camera(p, gps.speed);
+    if (cam) map.easeTo({ ...cam, duration: 900 });
+    else if (p) map.easeTo({ center: [p.lon, p.lat], zoom: Math.max(map.getZoom(), 15.5), duration: 900, essential: true });
+  },
+
+  /* Navi-Kamera: je schneller, desto weiter weg; vor Abzweigungen nah heran, Karte gekippt, Fahrzeug im unteren Drittel */
+  camera(cur, speed) {
+    const a = this.active;
+    if (!a || a.mode !== 'route' || !a.joined || !store.get('navCam', true)) return null;
+    const v = (speed || 0) * 3.6;
+    let z = v < 20 ? 17.4 : v < 40 ? 17 : v < 60 ? 16.6 : v < 90 ? 16 : 15.3;
+    const m = this.next();
+    const d = m ? m.at - a.along : Infinity;
+    if (d < Math.max(200, (speed || 0) * 14)) z = Math.max(z, v > 70 ? 16.8 : 17.8);
+    const h = map.getContainer().clientHeight;
+    const center = a.off < 25 && a.proj ? a.proj : [cur.lon, cur.lat];
+    const brg = this.routeBearing();
+    return {
+      center, zoom: z, pitch: store.get('navPitch', true) ? 55 : 0,
+      bearing: brg === null ? map.getBearing() : brg,
+      padding: { top: Math.round(h * 0.42), bottom: 0, left: 0, right: 0 },
+      duration: 1000, easing: (t) => t, essential: true
+    };
+  },
+
+  /* Richtung der Route ein Stück voraus: ruhiger als der GPS-Kurs, auch bei Schritttempo */
+  routeBearing() {
+    const a = this.active;
+    if (!a || !a.coords.length || a.off > 40) return gps.heading;
+    const from = a.proj || a.coords[a.seg];
+    let i = a.seg + 1;
+    while (i < a.coords.length - 1 && a.cum[i] < a.along + 30) i++;
+    const to = a.coords[Math.min(i, a.coords.length - 1)];
+    if (!to || (to[0] === from[0] && to[1] === from[1])) return gps.heading;
+    return bearingDeg({ lon: from[0], lat: from[1] }, { lon: to[0], lat: to[1] });
+  },
+
+  /* Spurhinweis als kleine Pfeile */
+  laneSvg(ind) {
+    const P = { straight: 'M12 21V5M7 10l5-5 5 5', none: 'M12 21V5M7 10l5-5 5 5',
+      'slight right': 'M10 21v-8l6-7M11 6h5v5', 'slight left': 'M14 21v-8L8 6M13 6H8v5',
+      right: 'M9 21v-7a4 4 0 0 1 4-4h6M15 6l4 4-4 4', left: 'M15 21v-7a4 4 0 0 0-4-4H5M9 6 5 10l4 4',
+      'sharp right': 'M9 21V9l8 8M17 11v6h-6', 'sharp left': 'M15 21V9l-8 8M7 11v6h6',
+      uturn: 'M15 21V10a4 4 0 0 0-8 0v4M4 11l3 3 3-3' };
+    return `<svg viewBox="0 0 24 24">${ind.map((k) => `<path d="${P[k] || P.straight}"/>`).join('')}</svg>`;
+  },
+  renderLanes(m, d) {
+    const box = $('#nb-lanes');
+    if (!box) return;
+    const show = m && m.lanes && d < 1200 && m.lanes.some((l) => !l.ok);
+    box.hidden = !show;
+    if (!show) return;
+    box.innerHTML = m.lanes.map((l) => `<span class="lane${l.ok ? ' ok' : ''}">${this.laneSvg(l.ind)}</span>`).join('');
   },
 
   overview() {
@@ -643,7 +701,8 @@ const Nav = {
     for (const p of pts) b.extend(p);
     gps.follow = false;
     $('#btn-locate').classList.remove('active');
-    map.fitBounds(b, { padding: { top: 140, bottom: 140, left: 60, right: 90 }, maxZoom: 15, bearing: 0, duration: 800 });
+    map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
+    map.fitBounds(b, { padding: { top: 140, bottom: 140, left: 60, right: 90 }, maxZoom: 15, bearing: 0, pitch: 0, duration: 800 });
   },
 
   showUI(on) {
@@ -766,6 +825,11 @@ const Nav = {
       setTimeout(() => { test.textContent = 'Probe hören'; }, 1800);
       if (!ok) toast('Kein Ton möglich. Ist das iPad stumm oder ganz leise gestellt?', 4500);
     };
+    for (const [id, key] of [['#t-navcam', 'navCam'], ['#t-navpitch', 'navPitch']]) {
+      const el = $(id);
+      el.checked = store.get(key, true);
+      el.onchange = () => { store.set(key, el.checked); if (this.active && gps.pos) this.follow(); };
+    }
     const silent = $('#voice-silent');
     silent.checked = store.get('voiceSilent', true);
     silent.onchange = () => { store.set('voiceSilent', silent.checked); Pack.unlock(); };

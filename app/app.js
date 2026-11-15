@@ -456,12 +456,19 @@ function onPosition(p) {
   if (!meMarker) buildMeMarker();
   meMarker.setLngLat([cur.lon, cur.lat]);
   updateMeMarker();
-  if (typeof Nav !== 'undefined' && Nav.active) Nav.update(cur);
+  if (typeof Nav !== 'undefined' && Nav.active) {
+    Nav.update(cur);
+    // auf der Route: Fahrzeug auf die Linie setzen, damit es nicht neben der Straße fährt
+    const na = Nav.active;
+    if (na && na.mode === 'route' && na.joined && na.proj && na.off < 25) meMarker.setLngLat(na.proj);
+  }
 
   if (!gps.hadFix) {
     gps.hadFix = true;
     if (gps.follow && !editor.open) map.jumpTo({ center: [cur.lon, cur.lat], zoom: Math.max(map.getZoom(), 14) });
   }
+  const cam = gps.follow && !editor.open && typeof Nav !== 'undefined' ? Nav.camera(cur, speed) : null;
+  if (cam) { map.easeTo(cam); return; }
   if (gps.follow && !editor.open) {
     const moving = speed !== null && speed > 1.5;
     const opts = { center: [cur.lon, cur.lat], duration: 700, essential: true };
@@ -2234,8 +2241,9 @@ async function main() {
     style: buildStyle(),
     center: view.center,
     zoom: view.zoom,
-    maxZoom: 18,
+    maxZoom: 19,
     minZoom: 3,
+    maxPitch: 65,
     attributionControl: { compact: true },
     dragRotate: true,
     pitchWithRotate: false

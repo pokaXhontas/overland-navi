@@ -64,7 +64,7 @@
 
 <section class="nav-banner panel" id="nav-banner" aria-label="Navigation" hidden>
   <div class="nb-icon" id="nb-icon"></div>
-  <div class="nb-main"><b id="nb-dist">–</b><span id="nb-text"></span></div>
+  <div class="nb-main"><b id="nb-dist">–</b><span id="nb-text"></span><div class="nb-lanes" id="nb-lanes" hidden></div></div>
   <button class="round" id="nb-voice" aria-label="Sprachansagen an oder aus"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path class="wave" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path class="mute" d="M16 9l6 6M22 9l-6 6"/></svg></button>
 </section>
 <section class="nav-foot panel" id="nav-foot" aria-label="Restweg" hidden>
@@ -117,8 +117,10 @@
       <span><b>GPX, KML oder ZIP öffnen</b><small>Tracks und Orte aus MapOut, iOverlander und anderen Apps</small></span>
     </label>
 
-    <h2>Sprachansagen</h2>
+    <h2>Navigation &amp; Ansagen</h2>
     <label class="row"><span><b>Ansagen bei der Navigation</b><small>Auch unterwegs über den Lautsprecher-Knopf</small></span><input type="checkbox" class="switch" id="voice-on"></label>
+    <label class="row"><span><b>Navi-Kamera</b><small>Zoomt vor Abzweigungen heran, Fahrzeug im unteren Drittel</small></span><input type="checkbox" class="switch" id="t-navcam"></label>
+    <label class="row"><span><b>3D-Ansicht beim Navigieren</b><small>Karte nach vorn gekippt</small></span><input type="checkbox" class="switch" id="t-navpitch"></label>
     <label class="row"><span><b>Auch im Stummmodus ansagen</b><small>Am iPhone trotz Stummschalter hörbar. Laufende Musik pausiert dafür kurz.</small></span><input type="checkbox" class="switch" id="voice-silent"></label>
     <label class="field"><span>Stimme</span><select id="voice-select"></select></label>
     <label class="field"><span>Tempo <em id="voice-rate-val">100 %</em></span><input type="range" id="voice-rate" min="0.7" max="1.3" step="0.05"></label>

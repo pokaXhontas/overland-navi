@@ -44,6 +44,26 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.waitForFunction(() => Nav.active || Nav.pending, { timeout: 60000 });
   console.log('Vorschläge Berlin–Potsdam:', await page.evaluate(() => Nav.pending ? Nav.pending.list.map((r) => Math.round(r.time / 60) + ' min/' + Math.round(r.total / 1000) + ' km').join(', ') : 'nur eine Route'));
   await shot('2a-vorschlaege');
+  // Navi-Kamera und Spurhinweise auf der schnellsten Route
+  await page.evaluate(() => { if (Nav.pending) $('#na-go').click(); });
+  await sleep(4800);
+  const laneInfo = await page.evaluate(async () => {
+    const a = Nav.active;
+    const ms = a.maneuvers.filter((x) => x.lanes && x.lanes.some((l) => !l.ok));
+    const m = ms[Math.min(2, ms.length - 1)];
+    if (!m) return 'keine Spurdaten (' + a.source + ')';
+    let i = 0;
+    while (i < a.cum.length - 1 && a.cum[i] < m.at - 220) i++;
+    for (let k = Math.max(0, i - 8); k <= i; k++) {
+      onPosition({ coords: { latitude: a.coords[k][1], longitude: a.coords[k][0], accuracy: 5, speed: 13, heading: null, altitude: 40 }, timestamp: Date.now() + k * 1000 });
+      await new Promise((r) => setTimeout(r, 120));
+    }
+    await new Promise((r) => setTimeout(r, 1600));
+    return ms.length + ' Abzweigungen mit Spurdaten (' + a.source + ') · ' + m.text + ' · ' + m.lanes.map((l) => (l.ok ? '[' : '(') + l.ind.join('/') + (l.ok ? ']' : ')')).join(' ') + ' · Zoom ' + map.getZoom().toFixed(1) + ', Neigung ' + Math.round(map.getPitch()) + '° · Spuren sichtbar: ' + !$('#nb-lanes').hidden;
+  });
+  console.log('Navi-Kamera:', laneInfo);
+  await shot('2b-navi-kamera');
+  await page.evaluate(() => Nav.stop(true));
   for (const prof of ['road', 'short']) {
     await page.evaluate((p) => { if (Nav.pending) $('#na-cancel').click(); Nav.stop(true); Nav.profile = p; gps.pos = { lat: 52.4766, lon: 13.4295 }; return Nav.start({ lat: 52.4876, lon: 13.4106, name: 'Test' }, 'route'); }, prof);
     await page.waitForFunction(() => Nav.active || Nav.pending, { timeout: 60000 });
