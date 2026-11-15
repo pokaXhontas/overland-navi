@@ -123,7 +123,7 @@ class Scan(osmium.SimpleHandler):
 
 
 def stitch(segs, near):
-    """Wegstücke einer Route der Reihe nach zu Linien verbinden (Beginn nahe 'near')."""
+    """Wegstücke einer Route zu Linien verbinden: vorn oder hinten anhängen, Beginn nahe 'near'."""
     if not segs:
         return []
     i0, end = min(((i, e) for i in range(len(segs)) for e in (0, -1)), key=lambda x: dist(segs[x[0]][x[1]], near))
@@ -131,18 +131,29 @@ def stitch(segs, near):
     used = {i0}
     lines = [line]
     while len(used) < len(segs):
-        tail = line[-1]
-        i = min((i for i in range(len(segs)) if i not in used), key=lambda i: min(dist(tail, segs[i][0]), dist(tail, segs[i][-1])))
-        s = segs[i]
-        gap = min(dist(tail, s[0]), dist(tail, s[-1]))
+        best = None
+        for i in range(len(segs)):
+            if i in used:
+                continue
+            s = segs[i]
+            for where, pt in (("tail", line[-1]), ("head", line[0])):
+                for flip in (False, True):
+                    piece = s[::-1] if flip else s
+                    g = dist(pt, piece[0] if where == "tail" else piece[-1])
+                    if best is None or g < best[0]:
+                        best = (g, i, where, piece)
+        g, i, where, piece = best
         used.add(i)
-        piece = s if dist(tail, s[0]) <= dist(tail, s[-1]) else s[::-1]
-        if gap > 300:
+        if g > 300:
             line = list(piece)
             lines.append(line)
-        else:
+        elif where == "tail":
             line += piece[1:]
-    return lines
+        else:
+            line[:0] = piece[:-1]
+    # kurze lose Reste (z. B. Abstecher) weglassen, damit Höhenprofil und Navigation sauber bleiben
+    main = max(length(l) for l in lines)
+    return [l for l in lines if length(l) >= min(1000, main * 0.2)]
 
 
 def decode6(s):

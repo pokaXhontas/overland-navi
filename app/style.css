@@ -663,7 +663,7 @@ body.drawing .fab, body.drawing .hud { display: none; }
 
 /* Empfohlene Touren */
 #tour-sheet { z-index: 11; }
-.to-region { margin: -4px 0 0; }
+.to-region { margin: 4px 0 0; }
 .to-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
 .to-item { width: 100%; text-align: left; padding: 10px 12px; border-radius: 14px; background: var(--faint); border: 0; color: inherit; font: inherit; min-height: 52px; }
 .to-item .ti-color { flex-shrink: 0; }
