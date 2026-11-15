@@ -387,7 +387,8 @@ const Nav = {
         if (r.tolls && r.tolls.length) {
           const names = [...new Set(r.tolls.flatMap((t) => t.names))].slice(0, 2).join(', ');
           info.push(`<span class="na-tag toll">€ Maut${names ? ': ' + this.esc(names) : ''}</span>`);
-        } else if (list.some((x) => x.tolls && x.tolls.length)) info.push('<span class="na-tag free">ohne Maut</span>');
+        } else if (r.source === 'Valhalla' && list.some((x) => x.tolls && x.tolls.length)) info.push('<span class="na-tag free">ohne Maut</span>');
+        // OSRM erkennt Maut auf langen Brücken nicht zuverlässig: dann lieber nichts behaupten
         b.innerHTML = `<span class="na-main"><b>${this.fmtTime(r.time)}</b><span>${fmtDist(r.total)}${extra}</span></span>${info.length ? `<span class="na-info">${info.join('')}</span>` : ''}`;
         b.onclick = () => { this.pending.sel = i; render(); this.draw(); };
         rows.appendChild(b);

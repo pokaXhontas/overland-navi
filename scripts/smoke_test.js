@@ -227,7 +227,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.waitForFunction(() => Nav.pending && Nav.pending.list[0].target.name === 'Arvidsjaur', { timeout: 120000 }).catch(() => {});
   console.log('Berlin → Arvidsjaur:', await page.evaluate(() => Nav.pending ? Nav.pending.list.map((r) => Math.round(r.time / 3600 * 10) / 10 + ' h/' + Math.round(r.total / 1000) + ' km' +
     (r.ferries.length ? ' · Fähre ' + r.ferries.map((f) => (f.name || '?') + ' ' + Math.round(f.time / 60) + ' min').join('+') : '') +
-    (r.tolls.length ? ' · Maut ' + r.tolls.map((t) => t.names.join('/') || '?').join(', ') : ' · ohne Maut') + ' (' + r.source + ')').join(' | ') : 'keine Route'));
+    (r.tolls.length ? ' · Maut ' + r.tolls.map((t) => t.names.join('/') || '?').join(', ') : r.source === 'Valhalla' ? ' · ohne Maut' : '') + ' (' + r.source + ')').join(' | ') : 'keine Route'));
   await shot('12c-faehre-maut');
   await page.evaluate(() => { if (Nav.pending) $('#na-cancel').click(); });
 
