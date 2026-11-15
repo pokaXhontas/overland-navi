@@ -44,7 +44,8 @@ const Planner = {
       const role = i === 0 ? 'start' : i === n - 1 ? 'end' : 'via';
       const row = document.createElement('div');
       row.className = 'pl-stop';
-      row.innerHTML = `<span class="pl-dot ${role}">${role === 'via' ? i : ''}</span><input type="text" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search"><button class="round pl-x" type="button"></button>`;
+      row.innerHTML = `<span class="pl-dot ${role}">${role === 'via' ? i : ''}</span><input type="text" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search"><span class="pl-grip" aria-label="Zum Verschieben ziehen" role="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14M5 12h14M5 16h14"/></svg></span><button class="round pl-x" type="button"></button>`;
+      this.dragable(row.querySelector('.pl-grip'), row, i);
       const inp = row.querySelector('input');
       inp.value = this.label(s);
       inp.placeholder = role === 'start' ? 'Start' : role === 'end' ? 'Ziel' : 'Zwischenstopp';
@@ -71,6 +72,50 @@ const Planner = {
     $('#pl-line').hidden = !(ready && this.stops.length === 2 && this.stops[0].gps);
     $('#pl-add').disabled = this.stops.length >= 10;
     if (this.active < 0) this.showRecent();
+  },
+
+  /* Halte-Griff: Zeile mit dem Finger nach oben oder unten ziehen, die anderen rutschen nach */
+  dragable(grip, row, i) {
+    grip.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const rows = [...document.querySelectorAll('#pl-stops .pl-stop')];
+      const step = rows.length > 1 ? rows[1].getBoundingClientRect().top - rows[0].getBoundingClientRect().top : row.offsetHeight + 6;
+      const y0 = e.clientY;
+      let to = i;
+      row.classList.add('dragging');
+      grip.setPointerCapture(e.pointerId);
+      const move = (ev) => {
+        const dy = ev.clientY - y0;
+        row.style.transform = `translateY(${dy}px)`;
+        to = Math.max(0, Math.min(rows.length - 1, i + Math.round(dy / step)));
+        rows.forEach((r, k) => {
+          if (r === row) return;
+          let shift = 0;
+          if (to > i && k > i && k <= to) shift = -step;
+          if (to < i && k < i && k >= to) shift = step;
+          r.style.transform = shift ? `translateY(${shift}px)` : '';
+        });
+      };
+      const up = () => {
+        grip.removeEventListener('pointermove', move);
+        grip.removeEventListener('pointerup', up);
+        grip.removeEventListener('pointercancel', up);
+        rows.forEach((r) => { r.style.transform = ''; });
+        row.classList.remove('dragging');
+        if (to !== i) {
+          const [s] = this.stops.splice(i, 1);
+          this.stops.splice(to, 0, s);
+          this.active = -1;
+          this.save();
+          if (navigator.vibrate) navigator.vibrate(10);
+        }
+        this.render();
+      };
+      grip.addEventListener('pointermove', move);
+      grip.addEventListener('pointerup', up);
+      grip.addEventListener('pointercancel', up);
+    });
   },
 
   focus(i, fromInput) {
