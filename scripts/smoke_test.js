@@ -246,6 +246,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await shot('12d-faehre-trelleborg');
   await page.evaluate(() => { if (Nav.pending) $('#na-cancel').click(); });
 
+  // Bus & Bahn auf der Karte (Bischkek)
+  await page.evaluate(() => { store.set('oevOn', true); refreshStyle(); map.jumpTo({ center: [74.6122, 42.8746], zoom: 15, bearing: 0, pitch: 0 }); });
+  await sleep(6000);
+  console.log('Bus & Bahn Karte:', await page.evaluate(() => ['oev-line', 'oev-halt'].map((l) => l + ' ' + (map.getLayer(l) ? map.queryRenderedFeatures({ layers: [l] }).length : 'fehlt')).join(', ') + ' | Index kyrgyzstan: ' + JSON.stringify(Hike.index.kyrgyzstan && Hike.index.kyrgyzstan.date)));
+  await shot('4i-bus-bahn-karte');
+  await page.evaluate(() => { store.set('oevOn', false); refreshStyle(); });
   // Zu Fuß und mit Bus & Bahn
   const tryTravel = async (travel, from, to, name) => {
     await page.evaluate((travel, from, to) => { Nav.travel = travel; Nav.plan([from, to], 'route'); }, travel, from, to);
