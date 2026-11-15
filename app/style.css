@@ -547,3 +547,5 @@ body.drawing .fab, body.drawing .hud { display: none; }
 .hud { transition: translate .25s ease; }
 .hud.tucked { translate: calc(-100% + 14px - var(--gap)) 0; cursor: pointer; }
 .hud.tucked::after { content: "›"; position: absolute; right: 2px; top: 50%; transform: translateY(-50%); font-size: 22px; font-weight: 700; color: var(--muted); }
+.nav-choose, .nav-banner, .nav-foot, .draw-bar, .hud, .toast, .grab, .sheet-head, .pl-head, .search-bar > svg {
+  -webkit-user-select: none; user-select: none; -webkit-user-drag: none; -webkit-touch-callout: none; }
