@@ -141,7 +141,7 @@
   function svg(id, color) {
     const v = V[id];
     if (!v) return '';
-    return `<svg viewBox="-1 0 66 38" xmlns="http://www.w3.org/2000/svg">${v.draw(color || COLORS[0][0])}</svg>`;
+    return `<svg viewBox="-1 0 66 38" xmlns="http://www.w3.org/2000/svg"><g stroke="none">${v.draw(color || COLORS[0][0])}</g></svg>`;
   }
 
   self.Vehicles = { list: Object.keys(V).map((id) => ({ id, name: V[id].name })), colors: COLORS, svg };

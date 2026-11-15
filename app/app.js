@@ -263,7 +263,7 @@ function buildStyle() {
     const over = settings.mapType === 'hybrid'
       ? B.layers('protomaps', B.namedFlavor('dark'), { lang: 'de' })
         .filter((l) => l.type === 'symbol' || (l.type === 'line' && /^(roads|boundaries)/.test(l.id) && !/casing/.test(l.id)))
-        .map((l) => ({ ...l, id: 'hy-' + l.id, ...(l.type === 'line' ? { paint: { ...l.paint, 'line-opacity': 0.75 } } : {}) }))
+        .map((l) => ({ ...l, id: 'hy-' + l.id, ...(l.type === 'line' ? { paint: { ...l.paint, 'line-opacity': 0.6, ...(/^roads/.test(l.id) ? { 'line-color': /major|highway/.test(l.id) ? '#FFE08A' : '#FFFFFF' } : {}) } } : {}) }))
       : [];
     baseLayers = [...under, satLayer, ...over];
   }

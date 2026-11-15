@@ -79,6 +79,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   // iPhone-Größe mit Navigation
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   await page.evaluate(() => { closeSheet(); return Nav.start({ lat: 42.4901, lon: 78.3936, name: 'Karakol' }, 'route'); });
+  await sleep(5000);
   await page.evaluate(() => { const c = Nav.active.coords; onPosition({ coords: { latitude: c[30][1], longitude: c[30][0], accuracy: 6, speed: 14, heading: null, altitude: 800 }, timestamp: Date.now() }); map.jumpTo({ zoom: 15 }); });
   await shot('8-iphone-navigation');
 

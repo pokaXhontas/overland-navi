@@ -48,7 +48,7 @@ const Nav = {
       coords.push(...(coords.length ? pts.slice(1) : pts));
       for (const m of leg.maneuvers) {
         man.push({ idx: off + m.begin_shape_index, type: m.type, text: m.instruction,
-          alert: m.verbal_transition_alert_instruction || m.verbal_pre_transition_instruction || m.instruction,
+          alert: m.verbal_transition_alert_instruction || m.verbal_pre_transition_instruction || m.instruction, exit: m.roundabout_exit_count || 0,
           verbal: m.verbal_pre_transition_instruction || m.instruction, street: (m.street_names || [])[0] || '' });
       }
     }
@@ -90,7 +90,7 @@ const Nav = {
         }
         idx = best;
         const text = this.osrmText(s);
-        man.push({ idx, type: typeOf(s), text, alert: text, verbal: text, street: s.name || '' });
+        man.push({ idx, type: typeOf(s), text, alert: text, verbal: text, street: s.name || '', exit: s.maneuver.exit || 0 });
       }
     }
     return { coords, maneuvers: man, time: route.duration, source: 'OSRM' };
@@ -150,7 +150,12 @@ const Nav = {
       gps.follow = true;
       $('#btn-locate').classList.add('active');
       this.update(from);
-      if (this.active.mode === 'route') this.overview();
+      if (this.active.mode === 'route') {
+        this.overview();
+        const a = this.active;
+        clearTimeout(this.followTimer);
+        this.followTimer = setTimeout(() => { if (this.active === a) this.follow(); }, 4000);
+      }
       this.say(this.active.mode === 'route' ? 'Route gestartet.' : 'Luftlinie zum Ziel.');
     } finally { this.busy = false; }
   },
@@ -274,11 +279,11 @@ const Nav = {
     return (Math.round(d / 50) * 50 || 50) + ' Metern';
   },
 
-  icon(type) {
+  icon(type, exit) {
     const arrow = (deg) => `<svg viewBox="0 0 24 24" style="transform:rotate(${deg}deg)"><path d="M12 21V8M6 13l6-6 6 6"/></svg>`;
     const turn = (flip) => `<svg viewBox="0 0 24 24" style="${flip ? 'transform:scaleX(-1)' : ''}"><path d="M7 21v-7a5 5 0 0 1 5-5h7M15 5l4 4-4 4"/></svg>`;
     const uturn = '<svg viewBox="0 0 24 24"><path d="M8 21V9a5 5 0 0 1 10 0v4M14 10l4 4 4-4" transform="translate(-3 0)"/></svg>';
-    const round = '<svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="4.5"/><path d="M12 21v-3.5M15.2 9.8 19 6M15.5 5.6H19v3.4"/></svg>';
+    const round = `<svg viewBox="0 0 24 24"><path d="M17.3 6.7A7.5 7.5 0 1 0 19.5 12"/><path d="M13.6 6.4l3.7.3.3-3.7"/>${exit ? `<text x="12" y="16.3" text-anchor="middle" font-size="11" font-weight="800" fill="#fff" stroke="none">${exit}</text>` : ''}</svg>`;
     const flag = '<svg viewBox="0 0 24 24"><path d="M6 21V4M6 4h11l-2.5 4L17 12H6"/></svg>';
     if ([4, 5, 6].includes(type)) return flag;
     if ([26, 27].includes(type)) return round;
@@ -313,7 +318,7 @@ const Nav = {
       text.textContent = navigator.onLine ? 'Abseits der Route · wird neu berechnet …' : 'Abseits der Route · zurück zur Linie';
     } else {
       const m = this.next();
-      icon.innerHTML = this.icon(m ? m.type : 4);
+      icon.innerHTML = this.icon(m ? m.type : 4, m && m.exit);
       dist.textContent = fmtDist(m ? m.at - a.along : a.remaining);
       text.textContent = m ? m.text : 'Ziel: ' + (a.target.name || '');
     }
@@ -341,6 +346,13 @@ const Nav = {
   draw(pos) {
     const src = map && map.getSource && map.getSource('route');
     if (src) src.setData(this.geojson(pos));
+  },
+
+  follow() {
+    const p = gps.pos;
+    gps.follow = true;
+    $('#btn-locate').classList.add('active');
+    if (p) map.easeTo({ center: [p.lon, p.lat], zoom: Math.max(map.getZoom(), 15.5), duration: 900, essential: true });
   },
 
   overview() {
