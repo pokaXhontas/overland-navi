@@ -463,6 +463,7 @@ const Nav = {
     }
     return { target, mode, coords, cum, total: cum[cum.length - 1] || 0, maneuvers, time: res ? res.time : 0, source: res ? res.source : '', ferries, tolls,
       travel: (res && res.travel) || (mode === 'route' && res && res.source !== 'Track' ? this.travel : 'car'), transit: res ? res.transit || null : null,
+      walk: res ? res.walk || null : null, up: res ? res.up || 0 : 0,
       vias, stops: extra.stops || null, joined: extra.joined !== false, startPt: extra.startPt || null,
       along: 0, seg: 0, off: 0, offCount: 0, lastReroute: Date.now(), spoken: {}, created: Date.now() };
   },

@@ -32,6 +32,7 @@ const Swipe = {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       const handle = opts.handle && opts.handle();
       if (handle && !e.target.closest(handle)) return;
+      if (opts.exclude && e.target.closest(opts.exclude)) return;
       if (e.target.closest('input, textarea, select, .switch, .maplibregl-canvas')) return;
       if (opts.enabled && !opts.enabled()) return;
       const dir = opts.dir();
@@ -119,8 +120,8 @@ const Swipe = {
     const alts = $('#nav-alts');
     this.attach(alts, {
       dir: () => (alts.classList.contains('peek') ? 'up' : 'down'),
-      // nur oben am Griff und an der Überschrift wischen, die Liste selbst scrollt normal
-      handle: () => '.grab, .na-peek, #na-title, #na-sub',
+      // in der Liste wird gescrollt, nicht weggewischt
+      exclude: '.na-list',
       onDismiss: (d) => { alts.classList.toggle('peek', d === 'down'); }
     });
     this.foldable(alts, 'peek', '.na-peek-txt, .grab');
