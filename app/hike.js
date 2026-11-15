@@ -14,6 +14,44 @@ const SAC_INFO = [
 const VIS_TEXT = [null, 'sehr gut sichtbar', 'gut sichtbar', 'stellenweise undeutlich', 'kaum sichtbar', 'nur mit Orientierung', 'weglos'];
 const ROUTE_COLORS = { red: '#D62828', blue: '#1C6DD0', yellow: '#E3A700', green: '#2F9E44', orange: '#E8590C', purple: '#7048E8', black: '#343A40', white: '#ADB5BD', brown: '#8B5A2B' };
 
+/* Punkte in den Wanderwege-Dateien */
+const HK_PTS = {
+  biwak: { label: 'Biwak', long: 'Biwak oder unbewirtschaftete Hütte', color: '#B5482A', d: 'M3 19 12 5l9 14ZM9.5 19l2.5-4 2.5 4' },
+  huette: { label: 'Hütte', long: 'Bewirtschaftete Hütte', color: '#C92A2A', d: 'M4 20v-9l8-6 8 6v9M3 20h18M10 20v-5h4v5' },
+  unterstand: { label: 'Unterstand', long: 'Unterstand oder Schutzdach', color: '#6741D9', d: 'M3 9l18-4M5 8.6V20M19 5.4V20M3 20h18' },
+  wasser: { label: 'Trinkwasser', long: 'Trinkwasser', color: '#1C7ED6', d: 'M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z' },
+  quelle: { label: 'Quelle', long: 'Quelle', color: '#0B7285', d: 'M12 4s5 5.5 5 9.2a5 5 0 0 1-10 0C7 9.5 12 4 12 4ZM4 21c2-1.3 4-1.3 6 0s4 1.3 6 0 3-1 4-.5' }
+};
+const HK_SHELTER = { basic_hut: 'einfache Hütte', lean_to: 'offener Unterstand', rock_shelter: 'Felsunterstand', weather_shelter: 'Wetterschutz' };
+
+function hikePointImage(k) {
+  const c = HK_PTS[k];
+  const ratio = 2, size = 34;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = size * ratio;
+  const g = cv.getContext('2d');
+  g.scale(ratio, ratio);
+  g.beginPath();
+  if (k === 'biwak' || k === 'huette') {
+    // eckig, damit Unterkünfte von Wasserstellen gut zu unterscheiden sind
+    const r = 6, x = 4, y = 4, w = size - 8;
+    g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + w, r); g.arcTo(x + w, y + w, x, y + w, r); g.arcTo(x, y + w, x, y, r); g.arcTo(x, y, x + w, y, r);
+  } else g.arc(size / 2, size / 2, 13, 0, Math.PI * 2);
+  g.fillStyle = c.color;
+  g.fill();
+  g.lineWidth = 2.5;
+  g.strokeStyle = '#FFFFFF';
+  g.stroke();
+  g.translate(size / 2 - 8.4, size / 2 - 8.4);
+  g.scale(0.7, 0.7);
+  g.strokeStyle = '#FFFFFF';
+  g.lineWidth = 2.6;
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  g.stroke(new Path2D(c.d));
+  return { image: g.getImageData(0, 0, size * ratio, size * ratio), ratio };
+}
+
 const Hike = {
   index: store.get('hikeIndex', {}),   // Kennung → { size, date, bbox, name, iso }
   local: new Map(),                     // Gebiet → Set der offline gespeicherten Kennungen
@@ -21,6 +59,7 @@ const Hike = {
 
   on() { return store.get('hikeOn', true); },
   max() { return store.get('hikeMax', 6); },
+  pts() { return store.get('hikePts', Object.keys(HK_PTS)); },
   keys() { return Object.keys(this.index); },
   url(key) { return Tiles.sources.hike ? Tiles.sources.hike.replace('{id}', key) : null; },
 
@@ -136,7 +175,13 @@ const Hike = {
             'text-field': ['case', ['>', ['get', 's'], 0],
               ['concat', 'T', ['to-string', ['get', 's']], ['case', ['has', 'n'], ['concat', ' · ', ['get', 'n']], '']],
               ['coalesce', ['get', 'n'], ['get', 'ref'], '']] },
-          paint: { 'text-color': sacColor, 'text-halo-color': dark || sat ? '#0B0F12' : '#FFFFFF', 'text-halo-width': 1.6 } }
+          paint: { 'text-color': sacColor, 'text-halo-color': dark || sat ? '#0B0F12' : '#FFFFFF', 'text-halo-width': 1.6 } },
+        ...(this.pts().length ? [{ id: 'hike-pts', type: 'symbol', source: 'hike', 'source-layer': 'punkte', filter: ['in', ['get', 'k'], ['literal', this.pts()]],
+          layout: { 'icon-image': ['concat', 'hkpt-', ['get', 'k']], 'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.7, 14, 1],
+            'icon-allow-overlap': ['step', ['zoom'], false, 13, true], 'symbol-sort-key': ['match', ['get', 'k'], 'biwak', 0, 'huette', 1, 'unterstand', 2, 3],
+            'text-field': ['step', ['zoom'], '', 12, ['coalesce', ['get', 'n'], '']], 'text-font': ['Noto Sans Medium'], 'text-size': 11,
+            'text-offset': [0, 1.3], 'text-anchor': 'top', 'text-optional': true, 'text-max-width': 9 },
+          paint: { 'text-color': dark || sat ? '#E9EEF1' : '#3B2A1A', 'text-halo-color': dark || sat ? '#0B0F12' : '#FFFFFF', 'text-halo-width': 1.5 } }] : [])
       ]
     };
   },
@@ -161,6 +206,48 @@ const Hike = {
     this.popup = new maplibregl.Popup({ closeButton: true, maxWidth: '300px', className: 'hk-popup' }).setLngLat(lngLat).setHTML(html).addTo(map);
   },
 
+  showPoint(f) {
+    const p = f.properties || {};
+    const c = HK_PTS[p.k];
+    if (!c) return;
+    const esc = (t) => String(t).replace(/[<>&"]/g, (ch) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[ch]));
+    const yn = (v) => ({ yes: 'ja', no: 'nein', required: 'nötig', recommended: 'empfohlen' }[v] || v);
+    const rows = [
+      ['Art', p.st && HK_SHELTER[p.st] ? HK_SHELTER[p.st] : c.long],
+      ['Höhe', p.e ? p.e.toLocaleString('de-DE') + ' m' : ''],
+      ['Schlafplätze', p.cap || ''],
+      ['Feuerstelle/Ofen', p.fp ? yn(p.fp) : ''],
+      ['Abgeschlossen', p.lk ? yn(p.lk) : ''],
+      ['Trinkbar', p.dw ? yn(p.dw) : ''],
+      ['Reservierung', p.res ? yn(p.res) : ''],
+      ['Gebühr', p.fee ? yn(p.fee) : ''],
+      ['Geöffnet', p.oh || ''],
+      ['Betreiber', p.op || '']
+    ].filter((r) => r[1] !== '' && r[1] !== undefined);
+    const web = p.web && /^https?:\/\//.test(p.web) ? `<a class="hk-link" href="${esc(p.web)}" target="_blank" rel="noopener">Website öffnen</a>` : '';
+    const ll = f.geometry.coordinates;
+    const html = `<div class="hk-pop">
+      <div class="hk-head"><span class="hk-badge" style="background:${c.color}">${c.label[0]}</span><b>${esc(p.n || c.label)}</b></div>
+      ${rows.map((r) => `<div class="hk-row"><span>${r[0]}</span><b>${esc(r[1])}</b></div>`).join('')}
+      ${web}
+      <p class="small">Angaben aus OpenStreetMap, vor Ort können sie abweichen.</p>
+      <div class="hk-actions"><button type="button" class="btn small-btn" data-a="save">Als Ort speichern</button><button type="button" class="btn primary small-btn" data-a="nav">Hierhin</button></div>
+    </div>`;
+    if (this.popup) this.popup.remove();
+    this.popup = new maplibregl.Popup({ closeButton: true, maxWidth: '300px', className: 'hk-popup' }).setLngLat(ll).setHTML(html).addTo(map);
+    const el = this.popup.getElement();
+    el.querySelector('[data-a="nav"]').onclick = () => { this.popup.remove(); Nav.choose({ lon: ll[0], lat: ll[1], name: p.n || c.label }); };
+    el.querySelector('[data-a="save"]').onclick = () => {
+      this.popup.remove();
+      openEditor(null, { lat: ll[1], lon: ll[0] });
+      editor.draft.name = p.n || c.label;
+      if (p.e) editor.draft.ele = p.e;
+      editor.draft.note = rows.map((r) => r[0] + ': ' + r[1]).join('\n');
+      $('#spot-name').value = editor.draft.name;
+      $('#spot-note').value = editor.draft.note;
+    };
+  },
+
   /* Wandermenü */
   open() {
     closeSearch(); closeSheet();
@@ -170,11 +257,28 @@ const Hike = {
     if (typeof Tours !== 'undefined') Tours.renderList();
     $('#hike-sheet').hidden = false;
   },
-  close() { $('#hike-sheet').hidden = true; },
+  close() { $('#hike-sheet').hidden = true; if (typeof Tours !== 'undefined' && Tours.browsing) Tours.closeBrowser(); },
 
   renderSheet() {
     $('#hk-on').checked = this.on();
     $('#hk-tracks').checked = store.get('hikeTracks', true);
+    const chips = $('#hk-pts');
+    chips.innerHTML = '';
+    for (const [k, c] of Object.entries(HK_PTS)) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'hk-chip';
+      b.setAttribute('aria-pressed', String(this.pts().includes(k)));
+      b.innerHTML = `<span class="hk-chip-dot" style="background:${c.color}"></span>${c.label}`;
+      b.onclick = () => {
+        const on = new Set(this.pts());
+        if (on.has(k)) on.delete(k); else on.add(k);
+        store.set('hikePts', Object.keys(HK_PTS).filter((x) => on.has(x)));
+        this.renderSheet();
+        refreshStyle();
+      };
+      chips.appendChild(b);
+    }
     document.querySelectorAll('[data-hkmax]').forEach((b) => b.setAttribute('aria-checked', String(+b.dataset.hkmax === this.max())));
     const legend = $('#hk-legend');
     legend.innerHTML = '';
@@ -212,9 +316,23 @@ const Hike = {
     document.querySelectorAll('[data-hkmax]').forEach((b) => {
       b.onclick = () => { store.set('hikeMax', +b.dataset.hkmax); this.renderSheet(); refreshStyle(); };
     });
-    map.on('click', 'hike-hit', (e) => {
+    map.on('styleimagemissing', (e) => {
+      if (!e.id || !e.id.startsWith('hkpt-') || map.hasImage(e.id) || !HK_PTS[e.id.slice(5)]) return;
+      const { image, ratio } = hikePointImage(e.id.slice(5));
+      map.addImage(e.id, image, { pixelRatio: ratio });
+    });
+    map.on('click', 'hike-pts', (e) => {
       if ((typeof Draw !== 'undefined' && Draw.active) || editor.open || editor.moving) return;
-      if (map.queryRenderedFeatures(e.point, { layers: ['places-icon', 'tracks-hit', 'tours-hit', 'tours-pt'].filter((l) => map.getLayer(l)) }).length) return;
+      if (map.queryRenderedFeatures(e.point, { layers: ['places-icon'].filter((l) => map.getLayer(l)) }).length) return;
+      const f = e.features && e.features[0];
+      if (f) { this._ptTap = e.originalEvent; this.showPoint(f); }
+    });
+    map.on('mouseenter', 'hike-pts', () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', 'hike-pts', () => { map.getCanvas().style.cursor = ''; });
+    map.on('click', 'hike-hit', (e) => {
+      if (this._ptTap === e.originalEvent) return;
+      if ((typeof Draw !== 'undefined' && Draw.active) || editor.open || editor.moving) return;
+      if (map.queryRenderedFeatures(e.point, { layers: ['places-icon', 'tracks-hit', 'tours-hit', 'tours-pt', 'hike-pts'].filter((l) => map.getLayer(l)) }).length) return;
       const f = e.features && e.features[0];
       if (f) this.showInfo(f, e.lngLat);
     });

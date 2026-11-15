@@ -8,7 +8,7 @@ on:
         default: false
   push:
     branches: [main]
-    paths: ['tours/*-def.json', 'scripts/build_tours.py']
+    paths: ['tours/*-def.json', 'scripts/build_tours.py', 'scripts/tours_index.py']
 permissions:
   contents: write
   actions: write
@@ -38,6 +38,7 @@ jobs:
             python3 scripts/build_tours.py "$def" land.osm.pbf "app/tours/$name.geojson"
             ls -l "app/tours/$name.geojson"
           done
+          python3 scripts/tours_index.py
       - name: Ergebnis speichern und App neu bauen
         if: github.event.inputs.explore != 'true'
         env:

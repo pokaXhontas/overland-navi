@@ -686,3 +686,32 @@ body.drawing .fab, body.drawing .hud { display: none; }
 .md-row > div:first-child { grid-column: 1 / -1; font-weight: 600; }
 .md-row .lbl { font-size: 11px; }
 .to-sources li { word-break: break-word; }
+
+/* Wandermenü: Punkte, Touren-Pakete */
+.hk-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.hk-chip { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 14px 0 10px; border-radius: 20px; border: 1px solid var(--line); background: var(--panel-solid); color: var(--muted); font: inherit; font-size: 14px; }
+.hk-chip[aria-pressed="true"] { color: var(--text); border-color: var(--text); font-weight: 600; }
+.hk-chip-dot { width: 14px; height: 14px; border-radius: 4px; opacity: .35; }
+.hk-chip[aria-pressed="true"] .hk-chip-dot { opacity: 1; }
+.to-pack { border-radius: 14px; background: var(--faint); }
+.to-pack summary { list-style: none; display: flex; align-items: center; gap: 10px; padding: 12px 14px; cursor: pointer; min-height: 52px; }
+.to-pack summary::-webkit-details-marker { display: none; }
+.to-pack summary::after { content: ''; margin-left: auto; width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); transition: transform .2s; flex-shrink: 0; }
+.to-pack[open] summary::after { transform: rotate(-135deg); }
+.to-pack .to-item { background: transparent; border-top: 1px solid var(--line); border-radius: 0; }
+.to-pack .to-item:last-child { border-radius: 0 0 14px 14px; }
+#hk-more { margin-top: 8px; }
+.to-packrow { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: var(--faint); }
+.to-packrow .pi-txt { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.to-packrow .to-top { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.to-packrow button { flex-shrink: 0; }
+#hk-search { width: 100%; }
+.hk-legend-box { margin-top: 12px; }
+.hk-legend-box summary { cursor: pointer; font-size: 13px; color: var(--muted); padding: 8px 0; }
+.hk-actions { display: flex; gap: 8px; margin-top: 10px; }
+.hk-actions .btn { flex: 1; }
+.hk-link { display: inline-block; margin-top: 6px; color: var(--accent); }
+.hk-pop p.small { font-size: 12px; margin: 8px 0 0; }
+#hk-back { margin-right: 4px; }
+#hike-sheet .sheet-head h1 { flex-grow: 1; }
+#hk-back[hidden], #to-general-h[hidden], #to-facts[hidden] { display: none; }

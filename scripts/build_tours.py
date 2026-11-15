@@ -329,7 +329,8 @@ def main():
                 print(f"  Fußweg berechnet über {len(via)} Punkte", flush=True)
         km = sum(length(l) for l in lines) / 1000
         print(f"  Länge: {km:.1f} km (erwartet {t.get('expect_km')})", flush=True)
-        feats.append({"type": "Feature", "properties": {"id": t["id"], "kind": "tour", "name": t["name"], "color": t["color"], "km": round(km, 1), "info": t.get("info", t["id"])},
+        feats.append({"type": "Feature", "properties": {"id": t["id"], "kind": "tour", "name": t["name"], "color": t["color"], "km": round(km, 1), "info": t.get("info", t["id"]),
+                                     **({"osm": t["relation_id"]} if t.get("relation_id") else {})},
                       "geometry": {"type": "MultiLineString", "coordinates": lines}})
         for p in pts:
             feats.append({"type": "Feature", "properties": {"id": t["id"], "kind": "point", "label": p["label"], "icon": p["icon"]},

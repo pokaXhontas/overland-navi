@@ -122,6 +122,9 @@ geom = {}
 way_sac = {}
 
 
+GENERIC_RE = re.compile(r"^\s*(pass|route|trail|weg|tour|path|перевал|маршрут)?\s*[\d.,]+\s*(m|м)?\s*(pass|перевал)?\s*$", re.I)
+
+
 def tour_score(t):
     sc = 0
     if t.get("wikidata") or t.get("wikipedia"):
@@ -300,6 +303,10 @@ def write_tours(path):
         picked.append((c["score"] + bonus, km, rid, c, lines))
         if len(picked) >= 120:
             break
+    # Namen ohne Aussage („Pass 3160m“, „Route 12“) weglassen; bei genug Auswahl nur Routen mit Hinweis auf Bekanntheit
+    picked = [x for x in picked if not GENERIC_RE.match(x[3]["name"])]
+    if sum(1 for x in picked if x[0] > 1) >= 15:
+        picked = [x for x in picked if x[0] > 1]
     picked.sort(key=lambda x: (-x[0], x[1]))
     for n, (sc, km, rid, c, lines) in enumerate(picked[:40]):
         t = c["t"]

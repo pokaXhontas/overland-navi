@@ -131,6 +131,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   console.log('Touren:', tourInfo);
   await shot('4d-tour');
   await page.evaluate(() => Tours.close());
+  await page.evaluate(() => { Hike.open(); Tours.openBrowser(); });
+  await shot('4e-touren-laden');
+  await page.evaluate(() => { Tours.closeBrowser(); Hike.close(); });
+  console.log('Punkte-Ebene:', await page.evaluate(() => !!map.getLayer('hike-pts')));
 
   // Luftbild und Hybrid
   for (const t of ['sat', 'hybrid']) {

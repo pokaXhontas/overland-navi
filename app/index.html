@@ -259,27 +259,44 @@
 <aside class="sheet spot" id="hike-sheet" aria-label="Wandern" hidden>
   <div class="grab sheet-grab" aria-hidden="true"></div>
   <div class="sheet-head">
-    <h1>Wandern</h1>
+    <button class="round" id="hk-back" aria-label="Zurück" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <h1 id="hk-title">Wandern</h1>
     <button class="round" id="hk-close" aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
   </div>
   <div class="sheet-body">
+   <div id="hk-main">
     <label class="row"><span><b>Wanderwege anzeigen</b><small>Gestrichelt, Farbe nach Schwierigkeit, ab Zoomstufe 11</small></span><input type="checkbox" class="switch" id="hk-on"></label>
     <label class="row"><span><b>Feld- und Fahrwege</b><small>Pisten und Feldwege, die oft Teil von Wanderungen sind (ab Zoomstufe 12)</small></span><input type="checkbox" class="switch" id="hk-tracks"></label>
-    <h2>Empfohlene Touren</h2>
-    <label class="row"><span><b>Touren auf der Karte</b><small>Ausgewählte Wanderungen mit Infos zu Anreise, Kosten, Unterkünften und Gefahren</small></span><input type="checkbox" class="switch" id="hk-tours"></label>
+
+    <h2>Übernachten und Wasser</h2>
+    <div class="hk-chips" id="hk-pts" role="group" aria-label="Punkte auf der Karte"></div>
+    <p class="muted small">Tippe auf ein Symbol für Höhe, Schlafplätze, Ofen und mehr.</p>
+
+    <h2>Touren</h2>
+    <label class="row"><span><b>Touren auf der Karte</b><small id="hk-tour-count"></small></span><input type="checkbox" class="switch" id="hk-tours"></label>
     <div class="to-list" id="hk-tour-list"></div>
+    <button class="btn wide" id="hk-more">Touren für ein Land laden</button>
+
     <h2>Zeige Wege bis</h2>
     <div class="seg hk-seg" role="radiogroup" aria-label="Schwierigkeit bis">
       <button role="radio" data-hkmax="1">T1</button><button role="radio" data-hkmax="2">T2</button><button role="radio" data-hkmax="3">T3</button>
       <button role="radio" data-hkmax="4">T4</button><button role="radio" data-hkmax="5">T5</button><button role="radio" data-hkmax="6">T6</button>
     </div>
-    <h2>Schwierigkeit (SAC-Skala)</h2>
-    <div class="hk-legend" id="hk-legend"></div>
-    <div class="hk-leg"><span class="hk-dash" style="--c:#8A5A2B"></span><span class="hk-badge" style="background:#8A5A2B">–</span><span><b>Pfad ohne Angabe</b><small>Pfad, Fußweg oder Saumpfad ohne eingetragene Schwierigkeit</small></span></div>
-    <div class="hk-leg"><span class="hk-dash hk-dash-long" style="--c:#9C7B57"></span><span class="hk-badge" style="background:#9C7B57">F</span><span><b>Feld- und Fahrweg</b><small>Piste oder Feldweg, mit dem Schalter oben ein- und ausblendbar</small></span></div>
-    <div class="hk-leg"><span class="hk-band"></span><span class="hk-badge" style="background:#C2255C">R</span><span><b>Wanderroute</b><small>Breites farbiges Band, z. B. Fernwanderwege</small></span></div>
+    <details class="hk-legend-box">
+      <summary>Legende: Schwierigkeit (SAC-Skala)</summary>
+      <div class="hk-legend" id="hk-legend"></div>
+      <div class="hk-leg"><span class="hk-dash" style="--c:#8A5A2B"></span><span class="hk-badge" style="background:#8A5A2B">–</span><span><b>Pfad ohne Angabe</b><small>Pfad, Fußweg oder Saumpfad ohne eingetragene Schwierigkeit</small></span></div>
+      <div class="hk-leg"><span class="hk-dash hk-dash-long" style="--c:#9C7B57"></span><span class="hk-badge" style="background:#9C7B57">F</span><span><b>Feld- und Fahrweg</b><small>Piste oder Feldweg, mit dem Schalter oben ein- und ausblendbar</small></span></div>
+      <div class="hk-leg"><span class="hk-band"></span><span class="hk-badge" style="background:#C2255C">R</span><span><b>Wanderroute</b><small>Breites farbiges Band, z. B. Fernwanderwege</small></span></div>
+    </details>
     <p class="muted small" id="hk-status"></p>
-    <p class="muted small">Tippe auf einen Weg für Infos. Daten: © OpenStreetMap-Mitwirkende, monatlich aktualisiert.</p>
+    <p class="muted small">Tippe auf einen Weg für Infos. Daten: © OpenStreetMap-Mitwirkende, vierteljährlich aktualisiert.</p>
+   </div>
+   <div id="hk-packs" hidden>
+    <p class="muted small">Pro Land: ★ von Hand recherchierte Touren mit Infos zu Anreise, Kosten, Unterkünften und Gefahren, dazu bekannte Routen aus OpenStreetMap. Geladene Touren gehen auch offline.</p>
+    <label class="field"><span>Land suchen</span><input id="hk-search" type="search" autocomplete="off" enterkeyhint="search" placeholder="z. B. Schweiz"></label>
+    <div class="to-list" id="hk-pack-list"></div>
+   </div>
   </div>
 </aside>
 
@@ -309,7 +326,7 @@
     <div class="to-points" id="to-points"></div>
     <h2>Infos</h2>
     <div class="to-md" id="to-md"></div>
-    <h2>Für alle Touren</h2>
+    <h2 id="to-general-h">Für alle Touren</h2>
     <div class="to-md" id="to-general"></div>
     <h2>Quellen</h2>
     <div class="to-md to-sources" id="to-sources"></div>
