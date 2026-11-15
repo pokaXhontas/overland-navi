@@ -38,6 +38,9 @@
   <button class="ctl panel" id="btn-layers" aria-label="Karten und Ebenen">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/></svg>
   </button>
+  <button class="ctl panel" id="btn-draw" aria-label="Route zeichnen">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20c2-5 5-1 7-5s4-3 6-7"/><circle cx="4" cy="20" r="1.6"/><path d="m15.5 3.5 4 4-2 2-4-4Z"/></svg>
+  </button>
   <button class="ctl panel" id="btn-compass" aria-label="Karte in Fahrtrichtung oder nach Norden">
     <svg viewBox="0 0 24 24" id="needle" aria-hidden="true"><path class="fill-accent" d="M12 2.5 16.5 12h-9Z"/><path class="fill-muted" d="M12 21.5 7.5 12h9Z"/></svg>
     <span class="ctl-label" id="compass-label">N</span>
@@ -75,6 +78,20 @@
   <button class="btn primary wide" id="nc-route">Route berechnen</button>
   <button class="btn wide" id="nc-line">Luftlinie (auch offline)</button>
   <button class="btn wide flat-btn" id="nc-cancel">Abbrechen</button>
+</section>
+
+<section class="draw-bar panel" id="draw-bar" aria-label="Route zeichnen" hidden>
+  <div class="db-head"><span><small id="db-title">Route zeichnen</small><b id="db-len">0 km</b></span><small class="muted" id="db-info"></small></div>
+  <div class="seg db-seg" role="radiogroup" aria-label="Verbindung">
+    <button role="radio" data-dmode="road">Wegen folgen</button>
+    <button role="radio" data-dmode="line">Gerade Linie</button>
+  </div>
+  <div class="db-btns">
+    <button class="btn" id="db-undo">Zurück</button>
+    <button class="btn" id="db-reverse" aria-label="Richtung umkehren">⇄</button>
+    <button class="btn danger" id="db-cancel">Verwerfen</button>
+    <button class="btn primary" id="db-done">Fertig</button>
+  </div>
 </section>
 
 <section class="nav-choose panel" id="nav-alts" aria-label="Route auswählen" hidden>
@@ -222,8 +239,15 @@
     <h2>Höhenprofil</h2>
     <div class="profile" id="ti-profile"></div>
     <p class="muted small" id="ti-src"></p>
+    <label class="field"><span>Infos</span><textarea id="ti-note" rows="4" placeholder="Zustand der Piste, Furten, beste Jahreszeit, Hinweise …"></textarea></label>
     <h2>Farbe</h2>
     <div class="colors" id="ti-colors"></div>
+    <div class="seg ti-seg" role="radiogroup" aria-label="Linie">
+      <button role="radio" data-dash="0">Durchgezogen</button>
+      <button role="radio" data-dash="1">Gestrichelt</button>
+    </div>
+    <button class="btn primary wide" id="ti-follow">Diesem Track folgen</button>
+    <button class="btn wide" id="ti-edit">Route bearbeiten</button>
     <button class="btn wide" id="ti-fit">Ganzen Track zeigen</button>
     <div class="spot-actions">
       <button class="btn" id="ti-hide">Ausblenden</button>
@@ -248,5 +272,6 @@
 <script src="vehicles.js"></script>
 <script src="app.js"></script>
 <script src="nav.js"></script>
+<script src="draw.js"></script>
 </body>
 </html>

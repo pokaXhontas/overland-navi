@@ -73,6 +73,26 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   }
   await page.evaluate(() => { settings.mapType = 'topo'; refreshStyle(); });
 
+  // Route zeichnen: echte Taps auf die Karte
+  await page.evaluate(() => { map.jumpTo({ center: [74.60, 42.87], zoom: 13, bearing: 0 }); Draw.start(); });
+  await sleep(1500);
+  for (const [x, y] of [[560, 640], [760, 520], [900, 380]]) { await page.mouse.click(x, y); await sleep(400); }
+  await page.waitForFunction(() => Draw.pending === 0, { timeout: 60000 });
+  console.log('Gezeichnet:', await page.evaluate(() => Draw.pts.length + ' Punkte, ' + $('#db-len').textContent + ', Verbindungen: ' + Draw.legs.map((l) => l.mode + '/' + l.coords.length).join(' ')));
+  await page.mouse.click(760, 520); await sleep(500);
+  console.log('Nach Antippen eines Punkts:', await page.evaluate(() => Draw.pts.length + ' Punkte'));
+  await page.evaluate(() => Draw.undo());
+  await page.waitForFunction(() => Draw.pending === 0, { timeout: 60000 });
+  await shot('9-zeichnen');
+  await page.evaluate(() => Draw.finish());
+  await sleep(1500);
+  console.log('Gespeichert:', await page.evaluate(() => { const t = tracks[tracks.length - 1]; return t && t.source + ' · ' + t.name + ' · ' + Math.round(t.length) + ' m'; }));
+  await shot('10-track-infos');
+  await page.evaluate(() => { $('#ti-follow').click(); });
+  await sleep(1000);
+  console.log('Track folgen:', await page.evaluate(() => Nav.active && Nav.active.track ? 'aktiv, ' + $('#nf-rem').textContent : 'nicht aktiv'));
+  await page.evaluate(() => Nav.stop(true));
+
   // Menü: Fahrzeugauswahl und Länderliste
   await page.evaluate(() => $('#btn-layers').click());
   await page.evaluate(() => $('#veh-grid').scrollIntoView());

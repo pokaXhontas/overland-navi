@@ -213,9 +213,26 @@ const Nav = {
     }
   },
 
+  /* einem gespeicherten Track folgen (auch offline) */
+  followTrack(t) {
+    let coords = [];
+    for (const seg of t.segments) coords.push(...seg.map((c) => [c[0], c[1]]));
+    if (coords.length < 2) return;
+    const s = coords[0], e = coords[coords.length - 1];
+    if (gps.pos && distance(gps.pos, { lon: e[0], lat: e[1] }) < distance(gps.pos, { lon: s[0], lat: s[1] })) {
+      coords = coords.reverse();
+      toast('Du bist näher am Ende: Track wird rückwärts gefahren.', 3500);
+    }
+    const last = coords[coords.length - 1];
+    const len = trackLength(coords);
+    this.active = this.prepare({ lon: last[0], lat: last[1], name: t.name }, { coords, maneuvers: [], time: len / (35 / 3.6), source: 'Track' }, 'route');
+    this.active.track = true;
+    this.go(gps.pos);
+  },
+
   async reroute(pos) {
     const a = this.active;
-    if (!a || a.mode !== 'route' || this.busy || !navigator.onLine) return;
+    if (!a || a.mode !== 'route' || a.track || this.busy || !navigator.onLine) return;
     this.busy = true;
     a.lastReroute = Date.now();
     try {
@@ -368,7 +385,7 @@ const Nav = {
       const back = distance(pos, { lon: a.proj[0], lat: a.proj[1] });
       icon.innerHTML = `<svg viewBox="0 0 24 24" style="transform:rotate(${bearingDeg(pos, { lon: a.proj[0], lat: a.proj[1] }) - map.getBearing()}deg)"><path d="M12 21V4M6 10l6-6 6 6"/></svg>`;
       dist.textContent = fmtDist(back);
-      text.textContent = navigator.onLine ? 'Abseits der Route · wird neu berechnet …' : 'Abseits der Route · zurück zur Linie';
+      text.textContent = a.track ? 'Abseits des Tracks · zurück zur Linie' : navigator.onLine ? 'Abseits der Route · wird neu berechnet …' : 'Abseits der Route · zurück zur Linie';
     } else {
       const m = this.next();
       icon.innerHTML = this.icon(m ? m.type : 4, m && m.exit);

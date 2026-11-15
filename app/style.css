@@ -444,3 +444,27 @@ body.navigating .fab { display: none; }
   .nav-foot .btn { padding: 0 10px; }
   body.navigating .hud { bottom: calc(var(--safe-b) + var(--gap) + 92px); }
 }
+
+/* Route zeichnen */
+.draw-bar { position: fixed; z-index: 7; top: calc(var(--safe-t) + var(--gap)); left: calc(var(--safe-l) + var(--gap) + 296px);
+  width: min(520px, calc(100vw - 296px - 2 * var(--gap) - var(--ctl) - 40px)); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.draw-bar[hidden] { display: none; }
+.db-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.db-head > span { display: flex; flex-direction: column; }
+.db-head > span small { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent-text); }
+.db-head b { font-size: 26px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.db-head > small { text-align: right; font-size: 13px; }
+.db-seg { grid-template-columns: 1fr 1fr; margin: 0; }
+.db-btns { display: grid; grid-template-columns: 1fr auto 1fr 1.3fr; gap: 8px; }
+.db-btns .btn { padding: 0 10px; }
+body.drawing .fab, body.drawing .hud { display: none; }
+#btn-draw svg circle { fill: currentColor; }
+.ti-seg { grid-template-columns: 1fr 1fr; margin-top: 12px; }
+@media (max-width: 600px) {
+  .draw-bar { left: calc(var(--safe-l) + var(--gap)); width: calc(100vw - 3 * var(--gap) - var(--ctl) - var(--safe-l) - var(--safe-r)); padding: 10px; gap: 8px; }
+  body.drawing .topright { display: none; }
+  .db-head b { font-size: 20px; }
+  .db-head > small { font-size: 11.5px; }
+  .db-btns { grid-template-columns: 1fr 1fr; }
+  #db-reverse { display: none; }
+}

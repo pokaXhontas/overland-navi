@@ -309,9 +309,14 @@ function buildStyle() {
       paint: { 'line-color': dark ? '#0B0F12' : '#FFFFFF', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 4, 14, 8], 'line-opacity': 0.9 }
     },
     {
-      id: 'tracks-line', type: 'line', source: 'tracks',
+      id: 'tracks-line', type: 'line', source: 'tracks', filter: ['!=', ['get', 'dash'], true],
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: { 'line-color': ['get', 'color'], 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 2.2, 14, 4.5] }
+    },
+    {
+      id: 'tracks-dash', type: 'line', source: 'tracks', filter: ['==', ['get', 'dash'], true],
+      layout: { 'line-join': 'round' },
+      paint: { 'line-color': ['get', 'color'], 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 2.6, 14, 5], 'line-dasharray': [2, 1.4] }
     },
     {
       id: 'tracks-hit', type: 'line', source: 'tracks',
@@ -325,6 +330,15 @@ function buildStyle() {
   );
   const navBlue = '#2F80ED';
   layers.push(
+    { id: 'draw-casing', type: 'line', source: 'draw', filter: ['==', ['get', 'kind'], 'leg'], layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': dark || sat ? '#0B0F12' : '#FFFFFF', 'line-width': 9 } },
+    { id: 'draw-line', type: 'line', source: 'draw', filter: ['all', ['==', ['get', 'kind'], 'leg'], ['==', ['get', 'mode'], 'road']], layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': '#FF7A1A', 'line-width': 5, 'line-opacity': ['case', ['get', 'busy'], 0.45, 1] } },
+    { id: 'draw-straight', type: 'line', source: 'draw', filter: ['all', ['==', ['get', 'kind'], 'leg'], ['!=', ['get', 'mode'], 'road']],
+      paint: { 'line-color': '#FF7A1A', 'line-width': 5, 'line-dasharray': [1.6, 1.1], 'line-opacity': ['case', ['get', 'busy'], 0.45, 1] } },
+    { id: 'draw-points', type: 'circle', source: 'draw', filter: ['==', ['get', 'kind'], 'pt'],
+      paint: { 'circle-radius': ['match', ['get', 'role'], 'mid', 7, 10], 'circle-color': '#FFFFFF',
+        'circle-stroke-width': 3.5, 'circle-stroke-color': ['match', ['get', 'role'], 'start', '#2F9E44', 'end', '#C2255C', '#FF7A1A'] } },
     { id: 'route-alt', type: 'line', source: 'route', filter: ['==', ['get', 'kind'], 'alt'], layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: { 'line-color': '#7FA9E0', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 4, 15, 8], 'line-opacity': 0.8 } },
     { id: 'route-casing', type: 'line', source: 'route', filter: ['==', ['get', 'kind'], 'route'], layout: { 'line-join': 'round', 'line-cap': 'round' },
@@ -372,6 +386,7 @@ function buildStyle() {
         })]
       },
       places: { type: 'geojson', data: placesGeoJSON() },
+      draw: { type: 'geojson', data: typeof Draw !== 'undefined' ? Draw.geojson() : { type: 'FeatureCollection', features: [] } },
       route: { type: 'geojson', data: typeof Nav !== 'undefined' ? Nav.geojson() : { type: 'FeatureCollection', features: [] } },
       sat: {
         type: 'raster', tileSize: 256, maxzoom: 19,
@@ -873,15 +888,16 @@ function newPlaceHere() {
 
 function renderPlaceList() { renderDataCats(); refreshCatPage(); }
 function exportGPX() {
-  if (!places.length) { toast('Noch keine Orte gespeichert.'); return; }
+  if (!places.length && !tracks.length) { toast('Noch keine Orte oder Tracks gespeichert.'); return; }
   const esc = (s) => String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
   const wpts = places.map((p) => {
     const feats = p.feats.map((f) => (FEATS.find((x) => x[0] === f) || [f, f])[1]);
     const desc = [p.rating ? p.rating + '/5 Sterne' : '', feats.join(', '), p.note].filter(Boolean).join('\n');
     return `  <wpt lat="${p.lat}" lon="${p.lon}">${p.ele ? `<ele>${p.ele}</ele>` : ''}<time>${p.time}</time><name>${esc(p.name)}</name>${desc ? `<desc>${esc(desc)}</desc>` : ''}<type>${esc((CAT[p.cat] || CAT.other).label)}</type></wpt>`;
   }).join('\n');
-  const gpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Overland-Navi" xmlns="http://www.topografix.com/GPX/1/1">\n${wpts}\n</gpx>\n`;
-  const file = new File([gpx], 'overland-orte.gpx', { type: 'application/gpx+xml' });
+  const trks = tracks.map((t) => `  <trk><name>${esc(t.name)}</name>${t.note ? `<desc>${esc(t.note)}</desc>` : ''}${t.segments.map((seg) => '<trkseg>' + seg.map((c) => `<trkpt lat="${c[1]}" lon="${c[0]}">${typeof c[2] === 'number' ? `<ele>${Math.round(c[2])}</ele>` : ''}</trkpt>`).join('') + '</trkseg>').join('')}</trk>`).join('\n');
+  const gpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Overland-Navi" xmlns="http://www.topografix.com/GPX/1/1">\n${wpts}\n${trks}\n</gpx>\n`;
+  const file = new File([gpx], 'overland-daten.gpx', { type: 'application/gpx+xml' });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     navigator.share({ files: [file], title: 'Overland-Orte' }).catch(() => {});
   } else {
@@ -923,7 +939,7 @@ function setupLongPress() {
   const cancel = () => { clearTimeout(timer); timer = null; };
   map.on('touchstart', (e) => {
     cancel();
-    if (editor.open || !e.originalEvent || e.originalEvent.touches.length !== 1) return;
+    if (editor.open || (typeof Draw !== 'undefined' && Draw.active) || !e.originalEvent || e.originalEvent.touches.length !== 1) return;
     start = e.point;
     const ll = e.lngLat;
     timer = setTimeout(() => {
@@ -936,7 +952,7 @@ function setupLongPress() {
   map.on('touchend', cancel);
   map.on('touchcancel', cancel);
   map.on('movestart', (e) => { if (e.originalEvent) cancel(); });
-  map.on('contextmenu', (e) => { if (!editor.open) openEditor(null, { lat: e.lngLat.lat, lon: e.lngLat.lng }); });
+  map.on('contextmenu', (e) => { if (!editor.open && !(typeof Draw !== 'undefined' && Draw.active)) openEditor(null, { lat: e.lngLat.lat, lon: e.lngLat.lng }); });
 }
 
 /* ---------- Offline-Karten herunterladen ---------- */
@@ -1293,6 +1309,7 @@ function setupUI() {
   $('#btn-gpx').onclick = exportGPX;
   setupVehiclePicker();
   Nav.setup();
+  Draw.setup();
   document.querySelectorAll('[data-maptype]').forEach((b) => {
     b.setAttribute('aria-checked', String(b.dataset.maptype === settings.mapType));
     b.onclick = () => {
@@ -1598,7 +1615,7 @@ function closeSearch() {
 }
 
 /* ---------- Tracks ---------- */
-const TRACK_COLORS = ['#4F6FE0', '#C2255C', '#2F9E44', '#7048E8', '#0B7285', '#E8590C', '#5C940D'];
+const TRACK_COLORS = ['#4F6FE0', '#C2255C', '#2F9E44', '#7048E8', '#0B7285', '#E8590C', '#5C940D', '#F59F00', '#E64980', '#1098AD', '#8B5A2B', '#212529'];
 let tracks = [];
 
 function trackLength(coords) {
@@ -1613,7 +1630,7 @@ function tracksGeoJSON() {
     features: (settings.hidden.includes('tracks') ? [] : tracks.filter((t) => t.visible)).map((t) => ({
       type: 'Feature',
       geometry: { type: 'MultiLineString', coordinates: t.segments.map((seg) => seg.map((c) => [c[0], c[1]])) },
-      properties: { id: t.id, name: t.name, color: t.color }
+      properties: { id: t.id, name: t.name, color: t.color, dash: !!t.dash }
     }))
   };
 }
@@ -1859,10 +1876,19 @@ async function openTrackInfo(t) {
   highlightTrack(t.id);
 
   $('#ti-name').value = t.name;
+  $('#ti-note').value = t.note || '';
+  $('#ti-edit').hidden = !t.draw;
+  document.querySelectorAll('[data-dash]').forEach((b) => {
+    b.setAttribute('aria-checked', String((b.dataset.dash === '1') === !!t.dash));
+    b.onclick = () => {
+      t.dash = b.dataset.dash === '1'; saveTrack(t); updateTracksSource();
+      document.querySelectorAll('[data-dash]').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+    };
+  });
   $('#ti-delete').textContent = 'Track löschen';
   $('#ti-len').textContent = fmtDist(t.length);
   for (const id of ['#ti-up', '#ti-down', '#ti-max', '#ti-min']) $(id).textContent = '…';
-  $('#ti-src').textContent = (t.source ? 'Importiert aus ' + t.source + '. ' : '') + `${t.segments.reduce((s, g) => s + g.length, 0).toLocaleString('de-DE')} Punkte`;
+  $('#ti-src').textContent = (t.source === 'Gezeichnet' ? 'Selbst gezeichnet. ' : t.source ? 'Importiert aus ' + t.source + '. ' : '') + `${t.segments.reduce((s, g) => s + g.length, 0).toLocaleString('de-DE')} Punkte`;
   $('#ti-profile').innerHTML = '<p class="muted small">Höhenprofil wird berechnet …</p>';
 
   // Abstand zu mir
@@ -1923,6 +1949,8 @@ function closeTrackInfo() {
   const t = trackInfo.track;
   const name = $('#ti-name').value.trim();
   if (t && name && name !== t.name) { t.name = name; saveTrack(t); updateTracksSource(); }
+  const note = $('#ti-note').value.trim();
+  if (t && note !== (t.note || '')) { t.note = note; saveTrack(t); }
   trackInfo.open = false;
   trackInfo.track = null;
   $('#trackinfo').hidden = true;
@@ -1931,6 +1959,9 @@ function closeTrackInfo() {
 
 function setupTrackInfoUI() {
   $('#ti-close').onclick = closeTrackInfo;
+  $('#ti-note').addEventListener('change', () => { const t = trackInfo.track; if (t) { t.note = $('#ti-note').value.trim(); saveTrack(t); } });
+  $('#ti-edit').onclick = () => { const t = trackInfo.track; if (t) { closeTrackInfo(); Draw.start(t); } };
+  $('#ti-follow').onclick = () => { const t = trackInfo.track; if (t) { closeTrackInfo(); Nav.followTrack(t); } };
   $('#ti-done').onclick = closeTrackInfo;
   $('#ti-fit').onclick = () => { const t = trackInfo.track; if (t) map.fitBounds(trackBounds(t), { padding: 60, maxZoom: 15 }); };
   $('#ti-hide').onclick = () => {
@@ -2218,13 +2249,13 @@ async function main() {
     map.addImage(e.id, image, { pixelRatio: ratio });
   });
   map.on('click', 'places-icon', (e) => {
-    if (editor.moving) return;
+    if (editor.moving || (typeof Draw !== 'undefined' && Draw.active)) return;
     const f = e.features && e.features[0];
     const p = f && places.find((x) => x.id === f.properties.id);
     if (p) openEditor(p);
   });
   map.on('click', 'tracks-hit', (e) => {
-    if (editor.moving || editor.open) return;
+    if (editor.moving || editor.open || (typeof Draw !== 'undefined' && Draw.active)) return;
     if (map.queryRenderedFeatures(e.point, { layers: ['places-icon'] }).length) return;
     const f = e.features && e.features[0];
     const t = f && tracks.find((x) => x.id === f.properties.id);
