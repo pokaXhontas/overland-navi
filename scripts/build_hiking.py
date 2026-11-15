@@ -5,7 +5,8 @@ GeoJSON-Zeilen für tippecanoe.
 Je Weg: SAC-Schwierigkeit (T1–T6), Name, Wegspur, Wegart und die Wanderrouten, zu denen er gehört.
 Dazu Punkte (Biwaks, Hütten, Unterstände, Wasser) und die bekanntesten Wanderrouten des Landes
 als Touren-Paket für die App.
-Aufruf: build_hiking.py <gefiltert.osm.pbf> <wege.geojsonseq> [punkte.geojsonseq] [touren.json]
+Dazu Bus- und Bahnnetz (Linien und Haltestellen) in Städten ab 50.000 Einwohnern.
+Aufruf: build_hiking.py <gefiltert.osm.pbf> <wege.geojsonseq> [punkte.geojsonseq] [touren.json] [oev.geojsonseq]
 """
 import json
 import math
@@ -23,6 +24,7 @@ NET = {"iwn": 4, "nwn": 3, "rwn": 2, "lwn": 1}
 src, dst = sys.argv[1], sys.argv[2]
 dst_pts = sys.argv[3] if len(sys.argv) > 3 else None
 dst_tours = sys.argv[4] if len(sys.argv) > 4 else None
+dst_oev = sys.argv[5] if len(sys.argv) > 5 else None
 routes = []
 member = defaultdict(list)
 
@@ -419,3 +421,133 @@ if dst_pts:
     print(f"{ph.n} Punkte (Biwaks, Hütten, Unterstände, Wasser)", flush=True)
 if dst_tours:
     write_tours(dst_tours)
+
+
+# ---------- Bus und Bahn in großen Städten ----------
+OEV_MODES = {"train": "bahn", "subway": "ubahn", "light_rail": "sbahn", "monorail": "ubahn", "tram": "tram", "bus": "bus", "trolleybus": "bus", "share_taxi": "bus", "minibus": "bus"}
+OEV_RANK = {"bahn": 5, "ubahn": 4, "sbahn": 3, "tram": 2, "bus": 1}
+OEV_MINZOOM = {"bahn": 9, "ubahn": 10, "sbahn": 10, "tram": 11, "bus": 12}
+
+
+def population(t):
+    m = re.match(r"^\s*([\d.,' ]+)", t.get("population", ""))
+    if not m:
+        return 0
+    try:
+        return int(re.sub(r"[.,' ]", "", m.group(1)))
+    except ValueError:
+        return 0
+
+
+class OevNodes(osmium.SimpleHandler):
+    """Städte ab 50.000 Einwohnern und alle Haltestellen."""
+
+    def __init__(self):
+        super().__init__()
+        self.cities = []
+        self.stops = []
+
+    def node(self, n):
+        if not n.tags:
+            return
+        t = n.tags
+        if t.get("place") in ("city", "town"):
+            pop = population({"population": t.get("population", "")})
+            if pop >= 50000:
+                # Umkreis wächst mit der Größe: 50.000 → 5 km, 500.000 → 12 km, 3,5 Mio. → 25 km
+                r = 2500 * (pop / 10000) ** 0.4
+                self.cities.append((n.location.lon, n.location.lat, min(r, 30000)))
+            return
+        kind = None
+        if t.get("railway") in ("station", "halt"):
+            st = t.get("station", "")
+            kind = "ubahn" if st == "subway" else "sbahn" if st == "light_rail" else "tram" if st == "tram" else "bahn"
+        elif t.get("railway") == "tram_stop":
+            kind = "tram"
+        elif t.get("highway") == "bus_stop":
+            kind = "bus"
+        if kind:
+            name = t.get("name:de") or t.get("name") or ""
+            self.stops.append((n.location.lon, n.location.lat, kind, name[:50]))
+
+
+def in_city(cities, lon, lat):
+    for cx, cy, r in cities:
+        if abs(cy - lat) * 111195 < r and dist((cx, cy), (lon, lat)) < r:
+            return True
+    return False
+
+
+class OevRels(osmium.SimpleHandler):
+    def __init__(self):
+        super().__init__()
+        self.ways = defaultdict(list)   # Weg → [(Art, Linie, Farbe)]
+
+    def relation(self, r):
+        t = r.tags
+        mode = OEV_MODES.get(t.get("route", ""))
+        if not mode or t.get("type") != "route":
+            return
+        ref = (t.get("ref") or t.get("name") or "")[:14]
+        col = t.get("colour", "")[:9]
+        for m in r.members:
+            if m.type == "w" and m.role in ("", "forward", "backward", "main"):
+                self.ways[m.ref].append((mode, ref, col))
+
+
+class OevWays(osmium.SimpleHandler):
+    def __init__(self, out, ways, cities):
+        super().__init__()
+        self.out, self.ways, self.cities = out, ways, cities
+        self.n = 0
+
+    def way(self, w):
+        lines = self.ways.get(w.id)
+        if not lines:
+            return
+        try:
+            coords = [(round(n.lon, 6), round(n.lat, 6)) for n in w.nodes]
+        except osmium.InvalidLocationError:
+            return
+        if len(coords) < 2 or not any(in_city(self.cities, *coords[k]) for k in (0, len(coords) // 2, -1)):
+            return
+        mode = max((x[0] for x in lines), key=lambda m: OEV_RANK[m])
+        refs = sorted({x[1] for x in lines if x[1]}, key=lambda r: (len(r), r))
+        p = {"m": mode, "n": len(refs)}
+        if refs:
+            p["r"] = " · ".join(refs)[:70]
+        col = next((x[2] for x in lines if x[0] == mode and x[2]), "")
+        if col:
+            p["c"] = col
+        f = {"type": "Feature", "properties": p, "tippecanoe": {"layer": "oev", "minzoom": OEV_MINZOOM[mode]},
+             "geometry": {"type": "LineString", "coordinates": coords}}
+        self.out.write(json.dumps(f, ensure_ascii=False, separators=(",", ":")) + "\n")
+        self.n += 1
+
+
+if dst_oev:
+    nodes = OevNodes()
+    nodes.apply_file(src)
+    rels = OevRels()
+    rels.apply_file(src)
+    print(f"{len(nodes.cities)} Städte ab 50.000 Einwohnern, {len(rels.ways)} Linienwege", flush=True)
+    with open(dst_oev, "w", encoding="utf-8") as out:
+        n_stops, seen = 0, set()
+        for lon, lat, kind, name in nodes.stops:
+            if not in_city(nodes.cities, lon, lat):
+                continue
+            key = (kind, name, round(lat * 400), round(lon * 400))   # gleiche Haltestelle auf beiden Straßenseiten nur einmal
+            if name and key in seen:
+                continue
+            seen.add(key)
+            p = {"k": kind}
+            if name:
+                p["n"] = name
+            f = {"type": "Feature", "properties": p, "tippecanoe": {"layer": "halt", "minzoom": 12 if kind != "bus" else 14},
+                 "geometry": {"type": "Point", "coordinates": [round(lon, 6), round(lat, 6)]}}
+            out.write(json.dumps(f, ensure_ascii=False, separators=(",", ":")) + "\n")
+            n_stops += 1
+        ow = OevWays(out, rels.ways, nodes.cities)
+        ow.apply_file(src, locations=True, idx="flex_mem")
+    print(f"Bus und Bahn: {n_stops} Haltestellen, {ow.n} Linienstücke", flush=True)
+

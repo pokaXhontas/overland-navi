@@ -84,9 +84,11 @@ jobs:
         run: |
           osmium tags-filter land.osm.pbf w/sac_scale w/highway=path,footway,bridleway,steps,via_ferrata,track r/route=hiking,foot \
             nw/tourism=alpine_hut,wilderness_hut,viewpoint,attraction nw/amenity=shelter,drinking_water,water_point n/natural=spring,cave_entrance \
-            nw/historic=ruins,castle,fort,city_gate,tower,archaeological_site,monument,memorial nw/building=ruins n/waterway=waterfall -o wege.osm.pbf --overwrite
+            nw/historic=ruins,castle,fort,city_gate,tower,archaeological_site,monument,memorial nw/building=ruins n/waterway=waterfall \
+            n/place=city,town r/route=bus,trolleybus,tram,subway,light_rail,train,monorail,share_taxi,minibus \
+            n/highway=bus_stop n/railway=station,halt,tram_stop -o wege.osm.pbf --overwrite
           rm land.osm.pbf
-          python3 scripts/build_hiking.py wege.osm.pbf wege.geojsonseq punkte.geojsonseq ${{ matrix.id }}-touren.json
+          python3 scripts/build_hiking.py wege.osm.pbf wege.geojsonseq punkte.geojsonseq ${{ matrix.id }}-touren.json oev.geojsonseq
 
       - name: Kartendatei bauen
         if: steps.size.outputs.skip != '1'
@@ -94,7 +96,7 @@ jobs:
           tippecanoe -o ${{ matrix.id }}.pmtiles -Z8 -z14 -P --read-parallel \
             --simplification=6 --drop-densest-as-needed \
             --attribution='© OpenStreetMap-Mitwirkende' -n "Wanderwege ${{ matrix.name }}" --force \
-            -L wege:wege.geojsonseq -L punkte:punkte.geojsonseq 2>&1 | tail -2
+            -L wege:wege.geojsonseq -L punkte:punkte.geojsonseq -L oev:oev.geojsonseq 2>&1 | tail -2
           ls -lh ${{ matrix.id }}.pmtiles
 
       - name: In die Downloads legen
