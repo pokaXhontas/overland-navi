@@ -10,6 +10,7 @@ repo = sys.argv[1]
 meta = {x["id"]: x for x in json.load(open(sys.argv[2]))} if len(sys.argv) > 2 else {}
 rel = json.loads(subprocess.check_output(["gh", "api", f"repos/{repo}/releases/tags/wanderwege"]))
 index = {}
+tours = {a["name"][:-12]: a for a in rel["assets"] if a["name"].endswith("-touren.json")}
 for a in rel["assets"]:
     if not a["name"].endswith(".pmtiles"):
         continue
@@ -25,5 +26,13 @@ for a in rel["assets"]:
     m = meta.get(key, {})
     index[key] = {"size": a["size"], "date": a["updated_at"][:10], "bbox": [round(w, 4), round(s, 4), round(e, 4), round(n, 4)],
                   "name": m.get("name", key), "iso": m.get("iso", [])}
+    t = tours.get(key)
+    if t:
+        try:
+            d = json.load(urllib.request.urlopen(t["browser_download_url"], timeout=120))
+            names = [f["properties"]["name"] for f in d["features"] if f["properties"].get("kind") == "tour"]
+            index[key]["tours"] = {"n": len(names), "size": t["size"], "top": names[:3]}
+        except Exception as e:
+            print("Touren-Paket nicht lesbar:", key, e)
 json.dump(index, open("index.json", "w"), ensure_ascii=False, separators=(",", ":"))
 print(len(index), "Wanderwege-Dateien")

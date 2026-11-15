@@ -82,16 +82,18 @@ jobs:
       - name: Wanderwege herausfiltern
         if: steps.size.outputs.skip != '1'
         run: |
-          osmium tags-filter land.osm.pbf w/sac_scale w/highway=path,footway,bridleway,steps,via_ferrata,track r/route=hiking,foot -o wege.osm.pbf --overwrite
+          osmium tags-filter land.osm.pbf w/sac_scale w/highway=path,footway,bridleway,steps,via_ferrata,track r/route=hiking,foot \
+            nw/tourism=alpine_hut,wilderness_hut nw/amenity=shelter,drinking_water,water_point n/natural=spring -o wege.osm.pbf --overwrite
           rm land.osm.pbf
-          python3 scripts/build_hiking.py wege.osm.pbf wege.geojsonseq
+          python3 scripts/build_hiking.py wege.osm.pbf wege.geojsonseq punkte.geojsonseq ${{ matrix.id }}-touren.json
 
       - name: Kartendatei bauen
         if: steps.size.outputs.skip != '1'
         run: |
-          tippecanoe -o ${{ matrix.id }}.pmtiles -l wege -Z8 -z14 -P --read-parallel \
+          tippecanoe -o ${{ matrix.id }}.pmtiles -Z8 -z14 -P --read-parallel \
             --simplification=6 --drop-densest-as-needed \
-            --attribution='© OpenStreetMap-Mitwirkende' -n "Wanderwege ${{ matrix.name }}" --force wege.geojsonseq 2>&1 | tail -2
+            --attribution='© OpenStreetMap-Mitwirkende' -n "Wanderwege ${{ matrix.name }}" --force \
+            -L wege:wege.geojsonseq -L punkte:punkte.geojsonseq 2>&1 | tail -2
           ls -lh ${{ matrix.id }}.pmtiles
 
       - name: In die Downloads legen
@@ -100,7 +102,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view wanderwege > /dev/null 2>&1 || gh release create wanderwege --title "Wanderwege" --notes "Wanderwege-Kartendateien für die App (werden automatisch erneuert)."
-          for i in 1 2 3; do gh release upload wanderwege ${{ matrix.id }}.pmtiles --clobber && break; sleep 20; done
+          for i in 1 2 3; do gh release upload wanderwege ${{ matrix.id }}.pmtiles ${{ matrix.id }}-touren.json --clobber && break; sleep 20; done
 
   liste:
     needs: [plan, land]
