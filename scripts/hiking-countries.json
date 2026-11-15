@@ -24,14 +24,6 @@
 ]
 },
 {
-"id": "american-oceania",
-"url": "https://download.geofabrik.de/australia-oceania/american-oceania-latest.osm.pbf",
-"name": "American Oceania",
-"iso": [
-"VU"
-]
-},
-{
 "id": "andorra",
 "url": "https://download.geofabrik.de/europe/andorra-latest.osm.pbf",
 "name": "Andorra",
@@ -593,7 +585,7 @@
 "url": "https://download.geofabrik.de/australia-oceania/ile-de-clipperton-latest.osm.pbf",
 "name": "Île de Clipperton",
 "iso": [
-"VU"
+"PF"
 ]
 },
 {
@@ -818,7 +810,9 @@
 "url": "https://download.geofabrik.de/asia/malaysia-singapore-brunei-latest.osm.pbf",
 "name": "Malaysia, Singapore, and Brunei",
 "iso": [
-"MY"
+"MY",
+"SG",
+"BN"
 ]
 },
 {
@@ -1098,7 +1092,7 @@
 "url": "https://download.geofabrik.de/australia-oceania/pitcairn-islands-latest.osm.pbf",
 "name": "Pitcairn Islands",
 "iso": [
-"MH"
+"PN"
 ]
 },
 {
@@ -1114,7 +1108,7 @@
 "url": "https://download.geofabrik.de/australia-oceania/polynesie-francaise-latest.osm.pbf",
 "name": "Polynésie française (French Polynesia)",
 "iso": [
-"VU"
+"PF"
 ]
 },
 {
@@ -1371,7 +1365,7 @@
 "url": "https://download.geofabrik.de/australia-oceania/tokelau-latest.osm.pbf",
 "name": "Tokelau",
 "iso": [
-"VU"
+"TK"
 ]
 },
 {
@@ -1507,7 +1501,7 @@
 "url": "https://download.geofabrik.de/australia-oceania/wallis-et-futuna-latest.osm.pbf",
 "name": "Wallis et Futuna",
 "iso": [
-"VU"
+"WF"
 ]
 },
 {
