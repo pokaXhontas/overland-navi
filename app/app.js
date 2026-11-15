@@ -263,7 +263,11 @@ function buildStyle() {
     const over = settings.mapType === 'hybrid'
       ? B.layers('protomaps', B.namedFlavor('dark'), { lang: 'de' })
         .filter((l) => l.type === 'symbol' || (l.type === 'line' && /^(roads|boundaries)/.test(l.id) && !/casing/.test(l.id)))
-        .map((l) => ({ ...l, id: 'hy-' + l.id, ...(l.type === 'line' ? { paint: { ...l.paint, 'line-opacity': 0.6, ...(/^roads/.test(l.id) ? { 'line-color': /major|highway/.test(l.id) ? '#FFE08A' : '#FFFFFF' } : {}) } } : {}) }))
+        .map((l) => ({ ...l, id: 'hy-' + l.id, ...(l.type === 'line' ? { paint: { ...l.paint, 'line-opacity': 0.6, ...(/^roads/.test(l.id) ? { 'line-color': /major|highway/.test(l.id) ? '#FFE08A' : '#FFFFFF' } : {}) } } : {}),
+          // Schrift auf dem Luftbild: weiß mit dunklem Rand, Gewässer hellblau
+          ...(l.type === 'symbol' && l.layout && l.layout['text-field'] ? { paint: { ...l.paint,
+            'text-color': /water|ocean|lake|river/.test(l.id) ? '#B9E3FF' : /roads/.test(l.id) ? '#F1F3F5' : '#FFFFFF',
+            'text-halo-color': 'rgba(0,0,0,0.85)', 'text-halo-width': 1.8, 'text-halo-blur': 0.4 } } : {}) }))
       : [];
     baseLayers = [...under, satLayer, ...over];
   }
