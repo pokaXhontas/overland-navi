@@ -35,3 +35,11 @@ jobs:
           curl -s -m 20 -o /tmp/o -w "HTTP %{http_code} in %{time_total}s\n" -A "$UA" -e "$R" "https://overpass-api.de/api/interpreter" --data-urlencode 'data=[out:json][timeout:15];nwr["amenity"="atm"](around:3000,42.875,74.59);out center tags 3;'
           head -c 160 /tmp/o; echo
           exit 0
+      - name: Grundkarte an Beispielorten untersuchen
+        run: |
+          set +e
+          pip install --quiet pmtiles mapbox-vector-tile
+          for d in $(seq 0 14); do D=$(date -u -d "-$d day" +%Y%m%d); if curl -sfI "https://build.protomaps.com/$D.pmtiles" > /dev/null; then break; fi; done
+          python3 scripts/inspect_basemap.py "https://build.protomaps.com/$D.pmtiles" '[{"name":"Burgruine Hohenurach","lat":48.4826,"lon":9.3833},{"name":"Burana-Turm","lat":42.7466,"lon":75.2503},{"name":"Burgruine Rötteln","lat":47.6378,"lon":7.6798},{"name":"Taschrabat","lat":40.8236,"lon":75.2889}]'
+          exit 0
+
