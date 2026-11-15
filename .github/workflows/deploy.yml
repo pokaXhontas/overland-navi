@@ -9,7 +9,7 @@ on:
     - cron: '23 4 * * 1'
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -203,14 +203,15 @@ jobs:
           sleep 2
           NODE_PATH=vendor-tmp/node_modules timeout 600 node scripts/smoke_test.js http://localhost:8080/
 
-      - name: Bildschirmfotos aufheben
+      - name: Bildschirmfotos im Zweig „shots“ ablegen
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: shots
-          path: shots
-          if-no-files-found: ignore
+        run: |
+          [ -d shots ] || exit 0
+          cd shots
+          git init -q && git checkout -q -b shots && git add .
+          git -c user.name=pokaXhontas -c user.email=pokaXhontas@users.noreply.github.com commit -qm "Bildschirmfotos"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" shots
 
       - uses: actions/configure-pages@v5
 
