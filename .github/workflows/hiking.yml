@@ -83,7 +83,8 @@ jobs:
         if: steps.size.outputs.skip != '1'
         run: |
           osmium tags-filter land.osm.pbf w/sac_scale w/highway=path,footway,bridleway,steps,via_ferrata,track r/route=hiking,foot \
-            nw/tourism=alpine_hut,wilderness_hut nw/amenity=shelter,drinking_water,water_point n/natural=spring -o wege.osm.pbf --overwrite
+            nw/tourism=alpine_hut,wilderness_hut,viewpoint,attraction nw/amenity=shelter,drinking_water,water_point n/natural=spring,cave_entrance \
+            nw/historic=ruins,castle,fort,city_gate,tower,archaeological_site,monument,memorial nw/building=ruins n/waterway=waterfall -o wege.osm.pbf --overwrite
           rm land.osm.pbf
           python3 scripts/build_hiking.py wege.osm.pbf wege.geojsonseq punkte.geojsonseq ${{ matrix.id }}-touren.json
 

@@ -19,7 +19,15 @@ const HK_PTS = {
   biwak: { label: 'Biwak', long: 'Biwak oder unbewirtschaftete Hütte', color: '#B5482A', d: 'M3 19 12 5l9 14ZM9.5 19l2.5-4 2.5 4' },
   huette: { label: 'Hütte', long: 'Bewirtschaftete Hütte', color: '#C92A2A', d: 'M4 20v-9l8-6 8 6v9M3 20h18M10 20v-5h4v5' },
   wasser: { label: 'Trinkwasser', long: 'Trinkwasser', color: '#1C7ED6', d: 'M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z' },
-  quelle: { label: 'Quelle', long: 'Quelle', color: '#0B7285', d: 'M12 4s5 5.5 5 9.2a5 5 0 0 1-10 0C7 9.5 12 4 12 4ZM4 21c2-1.3 4-1.3 6 0s4 1.3 6 0 3-1 4-.5' }
+  quelle: { label: 'Quelle', long: 'Quelle', color: '#0B7285', d: 'M12 4s5 5.5 5 9.2a5 5 0 0 1-10 0C7 9.5 12 4 12 4ZM4 21c2-1.3 4-1.3 6 0s4 1.3 6 0 3-1 4-.5' },
+  ruine: { label: 'Ruinen', long: 'Ruine', color: '#7A5230', g: 'see', d: 'M4 20v-9l2-2 2 2V7l2-2 2 2v13M14 20v-6l2-2 2 2v6M3 20h18' },
+  burg: { label: 'Burgen', long: 'Burg, Festung oder Turm', color: '#9C4221', g: 'see', d: 'M4 20V8h2.5v2H9V8h2.5v2H14V8h2.5v2H19V8h1v12ZM10 20v-4a2 2 0 0 1 4 0v4' },
+  archaeologie: { label: 'Ausgrabungen', long: 'Archäologische Stätte', color: '#A0522D', g: 'see', d: 'M4 8h16M5 8l7-4 7 4M6.5 8v10M10.5 8v10M13.5 8v10M17.5 8v10M4 20h16' },
+  aussicht: { label: 'Aussicht', long: 'Aussichtspunkt', color: '#2B8A3E', g: 'see', d: 'M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12ZM12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Z' },
+  wasserfall: { label: 'Wasserfälle', long: 'Wasserfall', color: '#1971C2', g: 'see', d: 'M6 3v8c0 3 2 4 2 7M12 3v10c0 2 1 3 1 5M18 3v8c0 3-2 4-2 7M4 21h16' },
+  hoehle: { label: 'Höhlen', long: 'Höhleneingang', color: '#495057', g: 'see', d: 'M3 20a9 9 0 0 1 18 0ZM9 20a3 3 0 0 1 6 0' },
+  denkmal: { label: 'Denkmäler', long: 'Denkmal', color: '#6C757D', g: 'see', d: 'M10 20l1-13 1-3 1 3 1 13ZM7 20h10' },
+  sehenswert: { label: 'Sehenswürdigkeiten', long: 'Sehenswürdigkeit', color: '#D6336C', g: 'see', d: 'M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.5 6.7 19.4l1.2-6L3.4 9.3l6-.7Z' }
 };
 const HK_SHELTER = { basic_hut: 'einfache Hütte', lean_to: 'offener Unterstand', rock_shelter: 'Felsunterstand', weather_shelter: 'Wetterschutz' };
 
@@ -58,7 +66,11 @@ const Hike = {
 
   on() { return store.get('hikeOn', true); },
   max() { return store.get('hikeMax', 6); },
-  pts() { return store.get('hikePts', Object.keys(HK_PTS)).filter((k) => HK_PTS[k]); },
+  pts() {
+    const known = store.get('hikePtsKnown', ['biwak', 'huette', 'unterstand', 'wasser', 'quelle']);
+    const fresh = Object.keys(HK_PTS).filter((k) => !known.includes(k));   // neu dazugekommene Arten sind an
+    return [...store.get('hikePts', Object.keys(HK_PTS)), ...fresh].filter((k, i, a) => HK_PTS[k] && a.indexOf(k) === i);
+  },
   keys() { return Object.keys(this.index); },
   url(key) { return Tiles.sources.hike ? Tiles.sources.hike.replace('{id}', key) : null; },
 
@@ -179,8 +191,8 @@ const Hike = {
       top: [
         ...(this.pts().length ? [{ id: 'hike-pts', type: 'symbol', source: 'hike', 'source-layer': 'punkte', filter: ['in', ['get', 'k'], ['literal', this.pts()]],
           layout: { 'icon-image': ['concat', 'hkpt-', ['get', 'k']], 'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.7, 14, 1],
-            'icon-allow-overlap': ['step', ['zoom'], false, 13, true], 'symbol-sort-key': ['match', ['get', 'k'], 'biwak', 0, 'huette', 1, 2],
-            'text-field': ['step', ['zoom'], '', 12, ['coalesce', ['get', 'n'], '']], 'text-font': ['Noto Sans Medium'], 'text-size': 11,
+            'icon-allow-overlap': ['step', ['zoom'], false, 13, true], 'symbol-sort-key': ['match', ['get', 'k'], 'biwak', 0, 'huette', 1, 'ruine', 2, 'burg', 2, 'wasser', 3, 4],
+            'text-field': ['step', ['zoom'], '', 12, ['coalesce', ['get', 'n'], ['match', ['get', 'k'], 'ruine', 'Ruine', 'hoehle', 'Höhle', 'wasserfall', 'Wasserfall', 'aussicht', 'Aussicht', 'archaeologie', 'Ausgrabung', '']]], 'text-font': ['Noto Sans Medium'], 'text-size': 11,
             'text-offset': [0, 1.3], 'text-anchor': 'top', 'text-optional': true, 'text-max-width': 9 },
           paint: { 'text-color': dark || sat ? '#E9EEF1' : '#3B2A1A', 'text-halo-color': dark || sat ? '#0B0F12' : '#FFFFFF', 'text-halo-width': 1.5 } }] : [])
       ]
@@ -223,12 +235,17 @@ const Hike = {
       ['Reservierung', p.res ? yn(p.res) : ''],
       ['Gebühr', p.fee ? yn(p.fee) : ''],
       ['Geöffnet', p.oh || ''],
-      ['Betreiber', p.op || '']
+      ['Betreiber', p.op || ''],
+      ['Typ', p.ty ? String(p.ty).replace(/_/g, ' ') : ''],
+      ['Entstanden', p.sd || '']
     ].filter((r) => r[1] !== '' && r[1] !== undefined);
-    const web = p.web && /^https?:\/\//.test(p.web) ? `<a class="hk-link" href="${esc(p.web)}" target="_blank" rel="noopener">Website öffnen</a>` : '';
+    const web = [p.wp ? `<a class="hk-link" href="${esc(p.wp)}" target="_blank" rel="noopener">Wikipedia</a>` : '',
+      p.web && /^https?:\/\//.test(p.web) ? `<a class="hk-link" href="${esc(p.web)}" target="_blank" rel="noopener">Website öffnen</a>` : ''].filter(Boolean).join(' · ');
+    const desc = p.d ? `<p>${esc(p.d)}</p>` : '';
     const ll = f.geometry.coordinates;
     const html = `<div class="hk-pop">
       <div class="hk-head"><span class="hk-badge" style="background:${c.color}">${c.label[0]}</span><b>${esc(p.n || c.label)}</b></div>
+      ${desc}
       ${rows.map((r) => `<div class="hk-row"><span>${r[0]}</span><b>${esc(r[1])}</b></div>`).join('')}
       ${web}
       <p class="small">Angaben aus OpenStreetMap, vor Ort können sie abweichen.</p>
@@ -263,22 +280,25 @@ const Hike = {
   renderSheet() {
     $('#hk-on').checked = this.on();
     $('#hk-tracks').checked = store.get('hikeTracks', true);
-    const chips = $('#hk-pts');
-    chips.innerHTML = '';
-    for (const [k, c] of Object.entries(HK_PTS)) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'hk-chip';
-      b.setAttribute('aria-pressed', String(this.pts().includes(k)));
-      b.innerHTML = `<span class="hk-chip-dot" style="background:${c.color}"></span>${c.label}`;
-      b.onclick = () => {
-        const on = new Set(this.pts());
-        if (on.has(k)) on.delete(k); else on.add(k);
-        store.set('hikePts', Object.keys(HK_PTS).filter((x) => on.has(x)));
-        this.renderSheet();
-        refreshStyle();
-      };
-      chips.appendChild(b);
+    for (const [box, grp] of [[$('#hk-pts'), undefined], [$('#hk-see'), 'see']]) {
+      box.innerHTML = '';
+      for (const [k, c] of Object.entries(HK_PTS)) {
+        if (c.g !== grp) continue;
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'hk-chip';
+        b.setAttribute('aria-pressed', String(this.pts().includes(k)));
+        b.innerHTML = `<span class="hk-chip-dot" style="background:${c.color}"></span>${c.label}`;
+        b.onclick = () => {
+          const on = new Set(this.pts());
+          if (on.has(k)) on.delete(k); else on.add(k);
+          store.set('hikePts', Object.keys(HK_PTS).filter((x) => on.has(x)));
+          store.set('hikePtsKnown', Object.keys(HK_PTS));
+          this.renderSheet();
+          refreshStyle();
+        };
+        box.appendChild(b);
+      }
     }
     document.querySelectorAll('[data-hkmax]').forEach((b) => b.setAttribute('aria-checked', String(+b.dataset.hkmax === this.max())));
     const legend = $('#hk-legend');

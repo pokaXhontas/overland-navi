@@ -28,7 +28,9 @@ member = defaultdict(list)
 
 # ---------- Punkte: Biwaks, Hütten, Unterstände, Wasser ----------
 BIWAK_RE = re.compile(r"biwak|bivacc|bivouac|bivak|bivac|biwakschachtel|refuge non gard|abri", re.I)
-PT_MINZOOM = {"biwak": 9, "huette": 9, "wasser": 12, "quelle": 12}
+PT_MINZOOM = {"biwak": 9, "huette": 9, "wasser": 12, "quelle": 12, "ruine": 11, "burg": 11, "archaeologie": 11,
+              "denkmal": 13, "hoehle": 12, "wasserfall": 12, "aussicht": 12, "sehenswert": 12}
+MEMORIAL_SMALL = {"plaque", "stolperstein", "blue_plaque", "bench", "ghost_bike", "stone", "cross", "tree"}
 
 
 def point_kind(t):
@@ -44,6 +46,24 @@ def point_kind(t):
         return "wasser"
     if t.get("natural") == "spring":
         return "quelle"
+    # Sehenswertes unterwegs
+    hist = t.get("historic")
+    if hist == "ruins" or t.get("building") == "ruins" or (hist in ("castle", "fort") and t.get("ruins") == "yes"):
+        return "ruine"
+    if hist in ("castle", "fort", "city_gate", "tower"):
+        return "burg" if hist != "tower" or t.get("name") else None
+    if hist == "archaeological_site":
+        return "archaeologie"
+    if hist == "monument" or (hist == "memorial" and t.get("name") and t.get("memorial") not in MEMORIAL_SMALL):
+        return "denkmal"
+    if t.get("natural") == "cave_entrance":
+        return "hoehle"
+    if t.get("waterway") == "waterfall":
+        return "wasserfall"
+    if tour == "viewpoint":
+        return "aussicht"
+    if tour == "attraction" and t.get("name"):
+        return "sehenswert"
     return None
 
 
@@ -70,6 +90,19 @@ def point_props(k, t):
         p["web"] = web
     if t.get("opening_hours") and len(t["opening_hours"]) <= 60:
         p["oh"] = t["opening_hours"]
+    wp = re.match(r"^([a-z-]{2,12}):(.+)$", t.get("wikipedia", ""))
+    if wp:
+        p["wp"] = f"https://{wp.group(1)}.wikipedia.org/wiki/{wp.group(2).replace(' ', '_')}"[:160]
+    d = t.get("description:de") or t.get("description")
+    if d:
+        p["d"] = d[:200]
+    sd = t.get("start_date") or t.get("construction_date")
+    if sd and len(sd) <= 20:
+        p["sd"] = sd
+    for key in ("castle_type", "site_type", "memorial", "historic:civilization"):
+        if t.get(key) and len(t[key]) <= 30:
+            p["ty"] = t[key]
+            break
     return p
 
 
