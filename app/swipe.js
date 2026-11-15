@@ -109,6 +109,7 @@ const Swipe = {
     this.attach($('#sheet'), { dir: side, handle: sheetHandle, onDismiss: () => closeSheet() });
     this.attach($('#spot'), { dir: side, handle: sheetHandle, onDismiss: () => closeEditor(), enabled: () => !editor.moving });
     this.attach($('#trackinfo'), { dir: side, handle: sheetHandle, onDismiss: () => closeTrackInfo() });
+    this.attach($('#hike-sheet'), { dir: side, handle: sheetHandle, onDismiss: () => Hike.close() });
     // Suche und Planer nach oben (iPhone) bzw. zur Seite (iPad) wegschieben
     this.attach($('#search'), { dir: () => 'up', handle: () => '.search-bar, .grab', onDismiss: () => closeSearch() });
     this.attach($('#planner'), { dir: () => (this.phone() ? 'up' : 'left'), handle: () => (this.phone() ? '.pl-head, .grab' : null), onDismiss: () => Planner.close() });

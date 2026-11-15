@@ -43,7 +43,7 @@ jobs:
           tippecanoe --version
 
       - name: OpenStreetMap-Daten laden (Geofabrik)
-        run: curl -sfL -o land.osm.pbf "https://download.geofabrik.de/${{ matrix.osm }}-latest.osm.pbf" && ls -lh land.osm.pbf
+        run: curl -sfL --retry 6 --retry-delay 30 --retry-all-errors -o land.osm.pbf "https://download.geofabrik.de/${{ matrix.osm }}-latest.osm.pbf" && ls -lh land.osm.pbf
 
       - name: Wanderwege herausfiltern
         run: |

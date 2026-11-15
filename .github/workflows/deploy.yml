@@ -168,11 +168,24 @@ jobs:
               r['bbox'] = [min(ws), min(ss), max(es), max(ns)]
           cfg = json.load(open('config.json')) if os.path.exists('config.json') else {}
           proxy = (cfg.get('baseProxy') or '').rstrip('/')
+          # Wanderwege: welche Länder haben schon eine Datei (Liste aus den GitHub-Downloads)
+          hike = {}
+          try:
+              import urllib.request
+              with urllib.request.urlopen('https://github.com/' + os.environ['GITHUB_REPOSITORY'] + '/releases/download/wanderwege/index.json', timeout=30) as resp:
+                  hike = json.load(resp)
+          except Exception as e:
+              print('Wanderwege-Liste nicht gefunden:', e)
+          for r in regions:
+              if r['id'] in hike:
+                  r['hike'] = hike[r['id']]
+                  r['sizes']['hike'] = hike[r['id']]['size']
           out = {
               'build': build,
               'sources': {
                   'base': f'{proxy}/{build}.pmtiles' if proxy else f'https://build.protomaps.com/{build}.pmtiles',
-                  'dem': 'https://download.mapterhorn.com/planet.pmtiles'
+                  'dem': 'https://download.mapterhorn.com/planet.pmtiles',
+                  'hike': f'{proxy}/wander/{{id}}.pmtiles' if proxy else ''
               },
               'regions': regions
           }

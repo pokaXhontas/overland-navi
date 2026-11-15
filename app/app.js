@@ -296,6 +296,14 @@ function buildStyle() {
   if (at < 0) at = baseLayers.findIndex((l) => l.type === 'symbol');
   if (at < 0) at = baseLayers.length;
   const layers = [...baseLayers.slice(0, at), hill, contourLine, ...baseLayers.slice(at), contourText];
+  // Wanderwege über den Straßen, unter den Ortsnamen
+  const hk = typeof Hike !== 'undefined' ? Hike.layers(dark, sat) : { lines: [], labels: [] };
+  if (hk.lines.length) {
+    let li = layers.findIndex((l) => l.type === 'symbol' && l.id !== 'contour-labels');
+    if (li < 0) li = layers.length;
+    layers.splice(li, 0, ...hk.lines);
+    layers.push(...hk.labels);
+  }
 
   layers.push(
     {
@@ -388,6 +396,7 @@ function buildStyle() {
         })]
       },
       places: { type: 'geojson', data: placesGeoJSON() },
+      ...(hk.lines.length ? { hike: Hike.source() } : {}),
       draw: { type: 'geojson', data: typeof Draw !== 'undefined' ? Draw.geojson() : { type: 'FeatureCollection', features: [] } },
       route: { type: 'geojson', data: typeof Nav !== 'undefined' ? Nav.geojson() : { type: 'FeatureCollection', features: [] } },
       sat: {
@@ -980,7 +989,7 @@ async function cacheAssets() {
 
 function regionSize(r) {
   const s = r.sizes || {};
-  return (s.base || 0) + (s.dem || 0) + (s.search || 0);
+  return (s.base || 0) + (s.dem || 0) + (s.search || 0) + (s.hike || 0);
 }
 
 const downloadErrors = new Map();
@@ -1005,6 +1014,8 @@ function startDownload(region) {
       await Tiles.scanLocal(); Tiles.reset();
       renderRegions(); updateChip(); refreshStyle();
     }
+    if (m.type === 'hike') { job.phase = 'search'; job.note = `Wanderwege: ${fmtBytes(m.loaded)} von ${fmtBytes(m.total)}`; updateProgress(region.id); }
+    if (m.type === 'hike-done') { await Hike.scan(); refreshStyle(); }
     if (m.type === 'search') { job.phase = 'search'; job.note = `Karte fertig · Suchindex: Abschnitt ${m.done + 1} von ${m.total}`; updateProgress(region.id); }
     if (m.type === 'search-state') { region.searchState = { done: m.done, total: m.total, complete: m.complete }; saveAdded(); }
     if (m.type === 'done') {
@@ -1033,7 +1044,8 @@ function startDownload(region) {
   };
   worker.postMessage({
     id: region.id, boxes: region.boxes, maxzoom: region.maxzoom, demMaxzoom: region.demMaxzoom,
-    sources: Tiles.sources, searchUrl: region.search ? BASE + region.search : null, buildSearchIndex: !region.search
+    sources: Tiles.sources, searchUrl: region.search ? BASE + region.search : null, buildSearchIndex: !region.search,
+    hikeUrl: region.hike ? Hike.url(region) : null, hikeSize: region.hike ? region.hike.size : 0
   });
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 }
@@ -1041,7 +1053,7 @@ function startDownload(region) {
 async function deleteRegion(region, forget) {
   const root = await Tiles.opfs();
   if (!root) return;
-  const names = [`${region.id}-search.json`];
+  const names = [`${region.id}-search.json`, `${region.id}-hike.pmtiles`, `${region.id}-hike.ok`, `${region.id}-hike.state`];
   for (const layer of ['base', 'dem']) {
     for (const suffix of ['.idx.ok', '.idx', '.dat', '.state', '.pmtiles.ok', '.pmtiles']) names.push(`${region.id}-${layer}${suffix}`);
   }
@@ -1055,6 +1067,7 @@ async function deleteRegion(region, forget) {
     delete region.searchState; saveAdded();
   }
   await Tiles.scanLocal(); Tiles.reset();
+  await Hike.scan(); refreshStyle();
   toast(region.name + (forget ? ' aus der Liste entfernt' : ' gelöscht'));
   renderRegions(); updateStorage(); updateChip(); refreshStyle();
 }
@@ -1119,6 +1132,13 @@ function renderRegions() {
         if (!btn.dataset.sure) { btn.dataset.sure = '1'; btn.textContent = 'Wirklich löschen?'; return; }
         deleteRegion(r);
       };
+      if (r.hike && !Hike.local.has(r.id)) {
+        const hb = document.createElement('button');
+        hb.className = 'btn small-btn';
+        hb.textContent = 'Wanderwege laden';
+        hb.onclick = () => { if (!navigator.onLine) { toast('Dafür brauchst du Internet.'); return; } startDownload(r); };
+        div.querySelector('.region-top').insertBefore(hb, btn);
+      } else if (r.hike) state.append(' · mit Wanderwegen');
       const ss = r.searchState;
       if (ss && !ss.complete) {
         state.append(` · Suche ${ss.done} von ${ss.total} Abschnitten`);
@@ -1321,6 +1341,7 @@ function setupUI() {
   Planner.setup();
   Draw.setup();
   Swipe.setup();
+  Hike.setup();
   document.querySelectorAll('[data-maptype]').forEach((b) => {
     b.setAttribute('aria-checked', String(b.dataset.maptype === settings.mapType));
     b.onclick = () => {
@@ -2217,6 +2238,7 @@ async function main() {
     return;
   }
 
+  Hike.protocol();
   maplibregl.addProtocol('ovl', async (params) => {
     const m = params.url.match(/^ovl:\/\/(\w+)\/(\d+)\/(\d+)\/(\d+)/);
     if (!m) throw new Error('Ungültige Kachel');

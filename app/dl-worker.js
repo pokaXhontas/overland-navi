@@ -135,8 +135,47 @@ async function buildSearch(root, id, boxes, post) {
   return { done: done.size, total: chunks.length, complete: st.complete };
 }
 
+/* ganze Datei laden, bei Abbruch an der gleichen Stelle weiter (Wanderwege) */
+async function downloadFile(root, name, url, size, post) {
+  const st = await readJson(root, name + '.state');
+  if (st && st.complete && st.size === size && st.url === url && await exists(root, name.replace('.pmtiles', '.ok'))) return false;
+  const fh = await root.getFileHandle(name, { create: true });
+  const access = await fh.createSyncAccessHandle();
+  try {
+    let pos = st && st.url === url && st.size === size ? Math.min(access.getSize(), size) : 0;
+    if (pos === 0) access.truncate(0);
+    for (let attempt = 0; pos < size; attempt++) {
+      try {
+        const r = await fetch(url, { headers: { Range: `bytes=${pos}-` } });
+        if (r.status !== 206 && r.status !== 200) throw new Error('HTTP ' + r.status);
+        if (r.status === 200) { pos = 0; access.truncate(0); }
+        const reader = r.body.getReader();
+        let last = 0;
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          access.write(value, { at: pos });
+          pos += value.byteLength;
+          const now = Date.now();
+          if (now - last > 400) { last = now; post({ type: 'hike', loaded: pos, total: size }); access.flush(); await writeWhole(root, name + '.state', new TextEncoder().encode(JSON.stringify({ url, size, complete: false }))); }
+        }
+        if (pos < size) throw new Error('unvollständig');
+      } catch (err) {
+        if (attempt >= 6) throw err;
+        access.flush();
+        await new Promise((res) => setTimeout(res, 2000 * (attempt + 1)));
+      }
+    }
+    access.truncate(size);
+    access.flush();
+  } finally { access.close(); }
+  await writeWhole(root, name + '.state', new TextEncoder().encode(JSON.stringify({ url, size, complete: true })));
+  await root.getFileHandle(name.replace('.pmtiles', '.ok'), { create: true });
+  return true;
+}
+
 self.onmessage = async (e) => {
-  const { id, boxes, maxzoom, demMaxzoom, sources, searchUrl, buildSearchIndex, mode } = e.data;
+  const { id, boxes, maxzoom, demMaxzoom, sources, searchUrl, buildSearchIndex, mode, hikeUrl, hikeSize } = e.data;
   const post = (m) => self.postMessage(m);
   try {
     if (mode === 'estimate') {
@@ -195,6 +234,12 @@ self.onmessage = async (e) => {
     }
 
     post({ type: 'tiles-done' });
+    if (hikeUrl && hikeSize) {
+      try {
+        await downloadFile(root, `${id}-hike.pmtiles`, hikeUrl, hikeSize, post);
+        post({ type: 'hike-done' });
+      } catch (err) { post({ type: 'hike-error', message: String(err && err.message || err) }); }
+    }
     if (searchUrl) {
       try {
         const r = await fetch(searchUrl);
