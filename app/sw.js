@@ -68,7 +68,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Schriften und Kartensymbole: erst Cache, sonst Netz und merken
-  if (path.includes('/fonts/') || path.includes('/sprites/')) {
+  if (path.includes('/fonts/') || path.includes('/sprites/') || (path.includes('/voices/') && path.endsWith('.mp3'))) {
     event.respondWith((async () => {
       const cache = await caches.open(ASSET_CACHE);
       const hit = await cache.match(req);

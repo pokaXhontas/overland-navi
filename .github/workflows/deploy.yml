@@ -201,6 +201,7 @@ jobs:
       - name: Navigationsstimmen erzeugen (Piper)
         if: steps.voices.outputs.cache-hit != 'true'
         run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
           pip install --quiet piper-tts==1.2.0
           python scripts/build_voices.py voices-build
           du -sh voices-build; cat voices-build/index.json

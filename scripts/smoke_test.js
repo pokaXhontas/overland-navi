@@ -23,6 +23,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await sleep(4000);
   const shot = async (name) => { await sleep(2500); await page.screenshot({ path: `shots/${name}.png` }); console.log('Foto:', name); };
 
+  // Stimmen
+  console.log('Stimmen:', await page.evaluate(async () => { await Pack.load(); const v = Nav.packVoice(); let ok = 'nicht gespielt'; try { await Pack.play(v, ['d300', 'right'], 1); ok = 'abgespielt'; } catch (e) { ok = 'Fehler ' + e.message; } return Pack.index.voices.map((x) => x.name).join(', ') + ' | Standard: ' + v + ' | Probe: ' + ok + ' | Auswahl: ' + document.querySelectorAll('#voice-select option').length + ' Einträge'; }));
+
   // Fahrzeug als Positionssymbol
   await page.evaluate(() => {
     settings.vehicle = 'defender110'; settings.vehicleColor = '#4a5f45';

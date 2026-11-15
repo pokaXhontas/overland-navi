@@ -5,6 +5,57 @@
 const VALHALLA = 'https://valhalla1.openstreetmap.de/route';
 const OSRM = 'https://routing.openstreetmap.de/routed-car/route/v1/driving/';
 
+/* Mitgelieferte Stimmen: kurze Bausteine („In 300 Metern“ + „rechts abbiegen“), offline nutzbar */
+const Pack = {
+  index: null, ctx: null, buf: new Map(), playing: [],
+  async load() {
+    if (this.index) return this.index;
+    try { const r = await fetch('voices/index.json'); this.index = r.ok ? await r.json() : null; } catch (e) { this.index = null; }
+    if (!this.index || !this.index.voices) this.index = { voices: [], keys: [] };
+    return this.index;
+  },
+  ac() {
+    if (!this.ctx) {
+      const C = window.AudioContext || window.webkitAudioContext;
+      if (!C) return null;
+      this.ctx = new C();
+    }
+    if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+    return this.ctx;
+  },
+  get(voice, key) {
+    const k = voice + '/' + key;
+    if (this.buf.has(k)) return this.buf.get(k);
+    const p = fetch(`voices/${voice}/${key}.mp3`)
+      .then((r) => { if (!r.ok) throw new Error('fehlt'); return r.arrayBuffer(); })
+      .then((ab) => new Promise((res, rej) => this.ac().decodeAudioData(ab, res, rej)));
+    this.buf.set(k, p);
+    p.catch(() => this.buf.delete(k));
+    return p;
+  },
+  stop() { for (const s of this.playing) { try { s.stop(); } catch (e) { /* schon fertig */ } } this.playing = []; },
+  async play(voice, keys, rate) {
+    const ctx = this.ac();
+    if (!ctx) throw new Error('kein Audio');
+    // Navigationsansagen: andere Musik kurz leiser, auch bei Stummschalter hörbar
+    try { if (navigator.audioSession) navigator.audioSession.type = 'transient'; } catch (e) { /* älteres iOS */ }
+    const bufs = await Promise.all(keys.map((k) => this.get(voice, k)));
+    this.stop();
+    let t = ctx.currentTime + 0.05;
+    for (const b of bufs) {
+      const s = ctx.createBufferSource();
+      s.buffer = b;
+      s.playbackRate.value = rate;
+      s.connect(ctx.destination);
+      s.start(t);
+      t += b.duration / rate + 0.05;
+      this.playing.push(s);
+    }
+  },
+  preload(voice) { for (const k of (this.index && this.index.keys) || []) this.get(voice, k).catch(() => {}); }
+};
+document.addEventListener('pointerdown', () => { if (Pack.ctx || Pack.index) Pack.ac(); }, { passive: true });
+
 const Nav = {
   active: null,
   profile: store.get('navProfile2', 'road'),
@@ -268,7 +319,7 @@ const Nav = {
         clearTimeout(this.followTimer);
         this.followTimer = setTimeout(() => { if (this.active === a) this.follow(); }, 4000);
       }
-      this.say(this.active.mode === 'route' ? 'Route gestartet.' : 'Luftlinie zum Ziel.');
+      this.say(this.active.mode === 'route' ? 'Route gestartet.' : 'Luftlinie zum Ziel.', false, [this.active.mode === 'route' ? 'start' : 'line']);
     }
   },
 
@@ -300,7 +351,7 @@ const Nav = {
       if (this.active !== a) return;
       this.active = this.prepare(a.target, res[0], 'route', { stops: a.stops, vias: rest, joined: true, startPt: a.startPt });
       this.save();
-      this.say('Route neu berechnet.');
+      this.say('Route neu berechnet.', false, ['reroute']);
       this.update(pos);
     } catch (e) { /* weiter mit alter Route */ } finally { this.busy = false; }
   },
@@ -385,20 +436,40 @@ const Nav = {
     return a.maneuvers.find((m) => m.at > a.along + 5 && m.type !== 1 && m.type !== 2 && m.type !== 3) || null;
   },
 
+  distKey(d) {
+    const steps = [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 900, 1000, 1500, 2000, 3000, 5000];
+    let best = steps[0];
+    for (const s of steps) if (Math.abs(s - d) < Math.abs(best - d)) best = s;
+    return 'd' + best;
+  },
+  actKey(m) {
+    const t = m.type;
+    if ([4, 5, 6].includes(t)) return this.active && m.at < this.active.total - 50 ? 'via' : 'dest';
+    if (t === 26) return m.exit >= 1 && m.exit <= 6 ? 'rb' + m.exit : 'rb';
+    return { 9: 'slight_right', 10: 'right', 11: 'sharp_right', 12: 'uturn', 13: 'uturn', 14: 'sharp_left', 15: 'left', 16: 'slight_left',
+      17: 'ramp', 18: 'ramp', 19: 'ramp', 20: 'exit_right', 21: 'exit_left', 22: 'straight', 23: 'keep_right', 24: 'keep_left',
+      25: 'merge', 28: 'ferry' }[t] || 'straight';
+  },
+
   announce() {
     const a = this.active, m = this.next();
-    if (!m) return;
+    if (!m || m.type === 27) return;
     const d = m.at - a.along;
     const key = m.idx + ':' + m.at;
     const fast = (gps.speed || 0) > 18;
     const far = fast ? 1500 : 500;
     const st = a.spoken[key] || 0;
-    if (st < 1 && d <= far && d > 150) { a.spoken[key] = 1; this.say('In ' + this.speakDist(d) + ' ' + m.alert); }
-    else if (st < 2 && d <= (fast ? 120 : 60)) { a.spoken[key] = 2; this.say(m.verbal); }
+    const act = this.actKey(m);
+    if (st < 1 && d <= far && d > 150) { a.spoken[key] = 1; this.say('In ' + this.speakDist(d) + ' ' + m.alert, false, [this.distKey(d), act]); }
+    else if (st < 2 && d <= (fast ? 120 : 60)) {
+      a.spoken[key] = 2;
+      if (act === 'dest') return;
+      this.say(m.verbal, false, act === 'via' ? ['via_reached'] : ['now', act]);
+    }
   },
 
   arrive() {
-    this.say('Du hast dein Ziel erreicht.');
+    this.say('Du hast dein Ziel erreicht.', false, ['arrived']);
     toast('Ziel erreicht: ' + (this.active.target.name || ''), 4000);
     this.stop(true);
   },
@@ -551,8 +622,25 @@ const Nav = {
     return list.find((v) => v.voiceURI === want) || list[0] || null;
   },
 
-  say(text, force) {
-    if ((!this.voice && !force) || !text || !('speechSynthesis' in window)) return;
+  packVoice() {
+    const sel = store.get('navVoiceURI', '');
+    const vs = (Pack.index && Pack.index.voices) || [];
+    if (sel.startsWith('pack:')) return vs.find((v) => 'pack:' + v.id === sel) ? sel.slice(5) : (vs[0] && vs[0].id) || null;
+    return !sel && vs.length ? vs[0].id : null;
+  },
+
+  say(text, force, keys) {
+    if ((!this.voice && !force) || !text) return;
+    const pv = this.packVoice();
+    if (pv && keys && keys.length) {
+      Pack.play(pv, keys, store.get('navRate', 1)).catch(() => this.sayTTS(text));
+      return;
+    }
+    this.sayTTS(text);
+  },
+
+  sayTTS(text) {
+    if (!('speechSynthesis' in window)) return;
     try {
       speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
@@ -570,26 +658,49 @@ const Nav = {
     if (!sel) return;
     const fill = () => {
       const list = this.voices();
-      const cur = this.pickVoice();
+      const pv = this.packVoice();
+      const cur = pv ? null : this.pickVoice();
       sel.innerHTML = '';
-      if (!list.length) { const o = document.createElement('option'); o.textContent = 'Standardstimme'; sel.appendChild(o); return; }
+      const packs = (Pack.index && Pack.index.voices) || [];
+      if (packs.length) {
+        const g = document.createElement('optgroup');
+        g.label = 'Mitgelieferte Stimmen (auch offline)';
+        for (const v of packs) {
+          const o = document.createElement('option');
+          o.value = 'pack:' + v.id;
+          o.textContent = `${v.name} – ${v.desc}`;
+          if (pv === v.id) o.selected = true;
+          g.appendChild(o);
+        }
+        sel.appendChild(g);
+      }
+      const g2 = document.createElement('optgroup');
+      g2.label = 'Stimmen vom Gerät';
+      sel.appendChild(g2);
+      if (!list.length) { const o = document.createElement('option'); o.value = 'system'; o.textContent = 'Standardstimme'; g2.appendChild(o); return; }
       for (const v of list) {
         const o = document.createElement('option');
         o.value = v.voiceURI;
         const q = /premium/i.test(v.name + v.voiceURI) ? ' · Premium' : /enhanced|erweitert/i.test(v.name + v.voiceURI) ? ' · Erweitert' : '';
         o.textContent = v.name.replace(/\s*\((Premium|Enhanced|Erweitert)\)/i, '') + q + (/AT|CH/.test(v.lang) ? ' (' + v.lang.slice(-2) + ')' : '');
         if (cur && v.voiceURI === cur.voiceURI) o.selected = true;
-        sel.appendChild(o);
+        g2.appendChild(o);
       }
     };
     fill();
+    Pack.load().then(() => { fill(); const pv = this.packVoice(); if (pv) Pack.preload(pv); });
     if ('speechSynthesis' in window) speechSynthesis.addEventListener('voiceschanged', fill);
-    sel.onchange = () => { store.set('navVoiceURI', sel.value); this.say('In 300 Metern rechts abbiegen.', true); };
+    sel.onchange = () => {
+      store.set('navVoiceURI', sel.value);
+      const pv = this.packVoice();
+      if (pv) Pack.preload(pv);
+      this.say('Hallo! So klinge ich als deine Navigationsstimme.', true, ['hello']);
+    };
     rate.value = store.get('navRate', 1);
     $('#voice-rate-val').textContent = Math.round(rate.value * 100) + ' %';
     rate.oninput = () => { $('#voice-rate-val').textContent = Math.round(rate.value * 100) + ' %'; };
-    rate.onchange = () => { store.set('navRate', +rate.value); this.say('In 300 Metern rechts abbiegen.', true); };
-    $('#voice-test').onclick = () => this.say('In 300 Metern rechts abbiegen. Danach haben Sie Ihr Ziel erreicht.', true);
+    rate.onchange = () => { store.set('navRate', +rate.value); this.say('In 300 Metern rechts abbiegen.', true, ['d300', 'right']); };
+    $('#voice-test').onclick = () => this.say('In 300 Metern rechts abbiegen.', true, ['d300', 'right']);
     const on = $('#voice-on');
     on.checked = this.voice;
     on.onchange = () => { this.voice = on.checked; store.set('navVoice', this.voice); $('#nb-voice').classList.toggle('off', !this.voice); };
@@ -604,7 +715,7 @@ const Nav = {
       $('#nb-voice').classList.toggle('off', !this.voice);
       if ($('#voice-on')) $('#voice-on').checked = this.voice;
       toast(this.voice ? 'Sprachansagen an' : 'Sprachansagen aus');
-      if (this.voice) this.say('Sprachansagen an.');
+      if (this.voice) this.say('Sprachansagen an.', false, ['voice_on']);
     };
     this.restore();
   },
