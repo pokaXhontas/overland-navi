@@ -599,7 +599,7 @@ const Nav = {
     const left = a.total ? a.time * (a.remaining / a.total) : 0;
     const eta = new Date(Date.now() + left * 1000);
     $('#nf-rem').textContent = fmtDist(a.remaining);
-    $('#nf-eta').textContent = `${this.fmtTime(left)} · Ankunft ${eta.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
+    $('#nf-eta').innerHTML = `${this.fmtTime(left)} · <span class="eta-word">Ankunft </span>${eta.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
   },
 
   geojson(pos) {
@@ -652,15 +652,31 @@ const Nav = {
     const m = this.next();
     const d = m ? m.at - a.along : Infinity;
     if (d < Math.max(200, (speed || 0) * 14)) z = Math.max(z, v > 70 ? 16.8 : 17.8);
-    const h = map.getContainer().clientHeight;
     const center = a.off < 25 && a.proj ? a.proj : [cur.lon, cur.lat];
     const brg = this.routeBearing();
     return {
       center, zoom: z, pitch: store.get('navPitch', true) ? 55 : 0,
       bearing: brg === null ? map.getBearing() : brg,
-      padding: { top: Math.round(h * 0.42), bottom: 0, left: 0, right: 0 },
+      padding: this.camPadding(),
       duration: 1000, easing: (t) => t, essential: true
     };
+  },
+
+  /* freien Kartenbereich zwischen den Navi-Leisten bestimmen und das Fahrzeug dort ins untere Drittel setzen */
+  camPadding() {
+    const box = map.getContainer();
+    const W = box.clientWidth, H = box.clientHeight;
+    const b = $('#nav-banner').getBoundingClientRect(), f = $('#nav-foot').getBoundingClientRect();
+    const side = window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches;
+    if (side && b.width) {
+      // iPhone quer: Leisten links, Karte rechts daneben
+      const left = Math.round(Math.max(b.right, f.right) + 8);
+      return { left: Math.min(left, W * 0.6), top: Math.round(H * 0.32), bottom: 0, right: 0 };
+    }
+    const top = b.height ? b.bottom : 0;
+    const bottom = f.height ? f.top : H;
+    const y = top + 0.72 * (bottom - top);
+    return { top: Math.round(Math.max(0, 2 * y - bottom)), bottom: Math.round(H - bottom), left: 0, right: 0 };
   },
 
   /* Richtung der Route ein Stück voraus: ruhiger als der GPS-Kurs, auch bei Schritttempo */

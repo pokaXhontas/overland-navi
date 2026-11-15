@@ -560,3 +560,75 @@ body.drawing .fab, body.drawing .hud { display: none; }
 .nb-lanes .lane.ok { background: #2F80ED; }
 .nb-lanes .lane.ok svg { stroke: #fff; opacity: 1; }
 .nav-banner.mini .nb-lanes { display: none; }
+
+/* ---------- iPhone: Navigation übersichtlich, hochkant und quer ---------- */
+.nf-btn svg { width: 20px; height: 20px; display: none; }
+@media (max-width: 600px), (max-height: 500px) and (orientation: landscape) {
+  body.navigating .controls > :not(#btn-locate), body.navigating .topright, body.navigating .fab { display: none; }
+  body.navigating .controls { top: auto; right: calc(var(--safe-r) + var(--gap)); bottom: calc(var(--safe-b) + var(--gap) + var(--foot-h, 64px) + 12px); }
+  body.navigating #btn-locate { width: 48px; height: 48px; border-radius: 16px; }
+  body.navigating #btn-locate.active { display: none; }
+  /* Tacho als kleine Blase */
+  body.navigating .hud { width: auto; min-width: 0; padding: 6px 12px; gap: 0; top: auto; border-radius: 18px;
+    bottom: calc(var(--safe-b) + var(--gap) + var(--foot-h, 64px) + 12px); }
+  body.navigating .hud .hud-grid { display: none; }
+  body.navigating .hud .speed span { font-size: clamp(26px, 8vw, 34px); }
+  body.navigating .hud .speed small { font-size: 11px; }
+  /* Hinweis oben */
+  .nav-banner { padding: 10px; gap: 10px; min-height: 0; }
+  .nb-icon { width: clamp(46px, 13vw, 58px); height: clamp(46px, 13vw, 58px); border-radius: 14px; }
+  .nb-icon svg { width: 66%; height: 66%; }
+  .nb-main b { font-size: clamp(22px, 7.2vw, 30px); }
+  .nb-main span { font-size: clamp(13.5px, 3.9vw, 16px); }
+  .nb-lanes .lane { width: clamp(28px, 8vw, 34px); height: clamp(30px, 8.6vw, 38px); }
+  #nb-voice { width: 40px; height: 40px; }
+  /* Restweg unten: Symbolknöpfe */
+  .nav-foot { padding: 8px 8px 8px 14px; gap: 6px; min-width: 0; height: 64px; box-sizing: border-box; }
+  .nav-foot .nf-info { min-width: 0; }
+  .nav-foot b { font-size: clamp(16px, 5vw, 20px); white-space: nowrap; }
+  .nav-foot small { font-size: clamp(11px, 3.3vw, 13px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nf-btn { width: 46px; height: 46px; padding: 0; border-radius: 14px; display: grid; place-items: center; flex-shrink: 0; }
+  .nf-btn span { display: none; }
+  .nf-btn svg { display: block; }
+  .nav-foot #nf-overview { display: grid; }
+  .eta-word { display: none; }
+}
+/* iPhone hochkant */
+@media (max-width: 600px) {
+  .nav-banner { left: calc(var(--safe-l) + 8px); right: calc(var(--safe-r) + 8px); width: auto; top: calc(var(--safe-t) + 8px); }
+  .nav-foot { left: calc(var(--safe-l) + 8px); right: calc(var(--safe-r) + 8px); bottom: calc(var(--safe-b) + 8px); }
+  body.navigating .hud { left: calc(var(--safe-l) + 8px); bottom: calc(var(--safe-b) + 8px + 64px + 10px); }
+  body.navigating .controls { right: calc(var(--safe-r) + 8px); bottom: calc(var(--safe-b) + 8px + 64px + 10px); }
+}
+/* iPhone quer: alles in eine Spalte links, Karte rechts frei */
+@media (max-height: 500px) and (orientation: landscape) {
+  :root { --gap: 10px; --ctl: 44px; --np: clamp(250px, 36vw, 330px); }
+  .ctl svg { width: 22px; height: 22px; }
+  .ctl { border-radius: 14px; }
+  .controls { top: calc(var(--safe-t) + var(--gap) + 50px); gap: 8px; flex-wrap: wrap-reverse; align-content: flex-start;
+    max-height: calc(100vh - var(--safe-t) - var(--safe-b) - 2 * var(--gap) - 50px - 80px); }
+  .zoom { margin-top: 0; border-radius: 14px; }
+  .chip { height: 38px; font-size: 13px; }
+  .hud { width: 150px; padding: 8px 12px 10px; gap: 4px; top: auto; bottom: calc(var(--safe-b) + var(--gap)); }
+  .speed span { font-size: 40px; }
+  .hud-grid { grid-template-columns: 1fr; gap: 2px; padding-top: 4px; }
+  .hud-grid div { flex-direction: row; justify-content: space-between; align-items: baseline; }
+  .hud-grid b { font-size: 12.5px; }
+  .fab { height: 60px; padding: 0 16px 0 12px; border-radius: 20px; }
+  .fab svg { width: 24px; height: 24px; }
+  .fab-txt b { font-size: 16px; }
+  .fab-txt small { display: none; }
+  .nav-banner, .draw-bar { left: calc(var(--safe-l) + var(--gap)); width: var(--np); top: calc(var(--safe-t) + var(--gap)); }
+  .nav-foot { left: calc(var(--safe-l) + var(--gap)); width: var(--np); right: auto; bottom: calc(var(--safe-b) + var(--gap)); }
+  body.navigating .hud { left: calc(var(--safe-l) + var(--gap)); bottom: calc(var(--safe-b) + var(--gap) + 64px + 8px); }
+  body.navigating .controls { right: calc(var(--safe-r) + var(--gap)); bottom: calc(var(--safe-b) + var(--gap) + 24px); max-height: none; }
+  .nb-main span { -webkit-line-clamp: 2; }
+  .nav-choose { left: auto; right: calc(var(--safe-r) + var(--gap)); transform: none; bottom: calc(var(--safe-b) + var(--gap)); width: min(380px, 50vw); max-height: calc(100vh - 2 * var(--gap)); overflow-y: auto; }
+  .planner { max-height: calc(100vh - var(--safe-t) - var(--safe-b) - 2 * var(--gap)); }
+  .sheet { width: min(420px, 62vw); }
+}
+@media (max-width: 600px) {
+  .topright { right: calc(var(--safe-r) + 2 * var(--gap) + var(--ctl)); }
+  .chip { max-width: 100%; overflow: hidden; }
+  .chip > span:last-child, .chip #chip-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+}
