@@ -137,7 +137,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   console.log('Punkte-Ebene:', await page.evaluate(() => !!map.getLayer('hike-pts')));
   // Suche in der Nähe: Geldautomaten in Bischkek (echte Abfrage bei OpenStreetMap)
   await page.evaluate(async () => { map.jumpTo({ center: [74.59, 42.875], zoom: 14 }); openSearch(); await Poi.run(POI.atm); });
-  console.log('In der Nähe:', await page.evaluate(() => Poi.results.length + ' Geldautomaten, erster: ' + (Poi.results[0] ? Poi.label(Poi.results[0]) : '-')));
+  console.log('In der Nähe:', await page.evaluate(() => Poi.results.length + ' Geldautomaten, erster: ' + (Poi.results[0] ? Poi.label(Poi.results[0]) : '-') + ' | Serverfehler: ' + (Poi.errors.join('; ') || 'keine')));
   await shot('4f-in-der-naehe');
   await page.evaluate(() => { closeSearch(); if (Poi.results[0]) Poi.focus(Poi.results[0]); });
   await shot('4g-geldautomat');

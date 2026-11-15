@@ -41,7 +41,7 @@ const POI_CATS = [
     words: ['camping', 'campingplatz', 'hotel', 'hostel', 'gästehaus', 'unterkunft', 'übernachten', 'pension'], d: 'M3 20h18M5 20V10l7-6 7 6v10M10 20v-5h4v5' }
 ];
 const POI = Object.fromEntries(POI_CATS.map((c) => [c.id, c]));
-const POI_OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
+const POI_OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
 const POI_KIND = {
   supermarket: 'Supermarkt', wholesale: 'Großmarkt', convenience: 'Laden', general: 'Gemischtwaren', kiosk: 'Kiosk', greengrocer: 'Obst und Gemüse',
   bakery: 'Bäckerei', butcher: 'Metzger', marketplace: 'Markt', restaurant: 'Restaurant', fast_food: 'Imbiss', food_court: 'Essensstände', cafe: 'Café',
@@ -143,22 +143,24 @@ const Poi = {
     return { lat: c.lat, lon: c.lng, r: Math.max(1500, Math.min(12000, r)), name: 'im Kartenausschnitt' };
   },
 
+  errors: [],
   async overpass(cat, at) {
+    this.errors = [];
     const body = '[out:json][timeout:25];(' + cat.q.map((q) => `${q}(around:${Math.round(at.r)},${at.lat.toFixed(5)},${at.lon.toFixed(5)});`).join('') + ');out center tags 200;';
     for (const u of POI_OVERPASS) {
       try {
         const ctl = new AbortController();
-        const timer = setTimeout(() => ctl.abort(), 30000);
+        const timer = setTimeout(() => ctl.abort(), 20000);
         const r = await originalFetch(u, { method: 'POST', body: 'data=' + encodeURIComponent(body), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ctl.signal });
         clearTimeout(timer);
-        if (!r.ok) continue;
+        if (!r.ok) { this.errors.push(u.split('/')[2] + ': HTTP ' + r.status); continue; }
         const j = await r.json();
         return (j.elements || []).map((e) => {
           const lat = e.lat !== undefined ? e.lat : e.center && e.center.lat;
           const lon = e.lon !== undefined ? e.lon : e.center && e.center.lon;
           return lat === undefined ? null : { lat, lon, tags: e.tags || {}, osm: e.type + '/' + e.id };
         }).filter(Boolean);
-      } catch (e) { /* nächster Server */ }
+      } catch (e) { this.errors.push(u.split('/')[2] + ': ' + (e.name === 'AbortError' ? 'Zeitüberschreitung' : e.message)); }
     }
     return null;
   },
