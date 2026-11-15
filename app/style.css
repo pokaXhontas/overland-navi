@@ -549,3 +549,6 @@ body.drawing .fab, body.drawing .hud { display: none; }
 .hud.tucked::after { content: "›"; position: absolute; right: 2px; top: 50%; transform: translateY(-50%); font-size: 22px; font-weight: 700; color: var(--muted); }
 .nav-choose, .nav-banner, .nav-foot, .draw-bar, .hud, .toast, .grab, .sheet-head, .pl-head, .search-bar > svg {
   -webkit-user-select: none; user-select: none; -webkit-user-drag: none; -webkit-touch-callout: none; }
+.field select { border-radius: 14px; border: 1px solid var(--line); background: var(--faint); color: var(--text); padding: 13px 14px; font-size: 16px; -webkit-appearance: none; appearance: none; }
+.field input[type="range"] { padding: 0; border: 0; background: transparent; accent-color: var(--accent); height: 32px; }
+.field > span em { font-style: normal; color: var(--text); margin-left: 6px; letter-spacing: 0; text-transform: none; }

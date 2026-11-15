@@ -527,24 +527,82 @@ const Nav = {
     $('#nb-voice').classList.toggle('off', !this.voice);
   },
 
-  say(text) {
-    if (!this.voice || !text || !('speechSynthesis' in window)) return;
+  /* Stimmen: Spaß- und Roboterstimmen von iOS aussortieren, beste deutsche Stimme zuerst */
+  NOVELTY: /^(Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Good News|Jester|Organ|Superstar|Trinoids|Whisper|Wobble|Zarvox|Eddy|Flo|Grandma|Grandpa|Oma|Opa|Reed|Rocko|Sandy|Shelley|Fred|Junior|Kathy|Ralph)\b/i,
+  voiceScore(v) {
+    const n = v.name + ' ' + v.voiceURI;
+    let s = 0;
+    if (/premium/i.test(n)) s += 50;
+    if (/enhanced|erweitert|natural|neural/i.test(n)) s += 30;
+    if (/^de-DE/i.test(v.lang.replace('_', '-'))) s += 10;
+    if (/^(Anna|Helena|Petra|Markus|Yannick|Viktor|Martin|Katja|Conrad|Amala)/i.test(v.name)) s += 8;
+    if (v.localService) s += 2;
+    return s;
+  },
+  voices() {
+    if (!('speechSynthesis' in window)) return [];
+    return speechSynthesis.getVoices()
+      .filter((v) => /^de/i.test(v.lang) && !this.NOVELTY.test(v.name))
+      .sort((a, b) => this.voiceScore(b) - this.voiceScore(a) || a.name.localeCompare(b.name));
+  },
+  pickVoice() {
+    const list = this.voices();
+    const want = store.get('navVoiceURI', '');
+    return list.find((v) => v.voiceURI === want) || list[0] || null;
+  },
+
+  say(text, force) {
+    if ((!this.voice && !force) || !text || !('speechSynthesis' in window)) return;
     try {
       speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
       u.lang = 'de-DE';
-      const v = speechSynthesis.getVoices().find((x) => /^de/i.test(x.lang));
-      if (v) u.voice = v;
+      const v = this.pickVoice();
+      if (v) { u.voice = v; u.lang = v.lang; }
+      u.rate = store.get('navRate', 1);
+      u.pitch = 1;
       speechSynthesis.speak(u);
     } catch (e) { /* keine Sprachausgabe */ }
   },
 
+  setupVoiceUI() {
+    const sel = $('#voice-select'), rate = $('#voice-rate');
+    if (!sel) return;
+    const fill = () => {
+      const list = this.voices();
+      const cur = this.pickVoice();
+      sel.innerHTML = '';
+      if (!list.length) { const o = document.createElement('option'); o.textContent = 'Standardstimme'; sel.appendChild(o); return; }
+      for (const v of list) {
+        const o = document.createElement('option');
+        o.value = v.voiceURI;
+        const q = /premium/i.test(v.name + v.voiceURI) ? ' · Premium' : /enhanced|erweitert/i.test(v.name + v.voiceURI) ? ' · Erweitert' : '';
+        o.textContent = v.name.replace(/\s*\((Premium|Enhanced|Erweitert)\)/i, '') + q + (/AT|CH/.test(v.lang) ? ' (' + v.lang.slice(-2) + ')' : '');
+        if (cur && v.voiceURI === cur.voiceURI) o.selected = true;
+        sel.appendChild(o);
+      }
+    };
+    fill();
+    if ('speechSynthesis' in window) speechSynthesis.addEventListener('voiceschanged', fill);
+    sel.onchange = () => { store.set('navVoiceURI', sel.value); this.say('In 300 Metern rechts abbiegen.', true); };
+    rate.value = store.get('navRate', 1);
+    $('#voice-rate-val').textContent = Math.round(rate.value * 100) + ' %';
+    rate.oninput = () => { $('#voice-rate-val').textContent = Math.round(rate.value * 100) + ' %'; };
+    rate.onchange = () => { store.set('navRate', +rate.value); this.say('In 300 Metern rechts abbiegen.', true); };
+    $('#voice-test').onclick = () => this.say('In 300 Metern rechts abbiegen. Danach haben Sie Ihr Ziel erreicht.', true);
+    const on = $('#voice-on');
+    on.checked = this.voice;
+    on.onchange = () => { this.voice = on.checked; store.set('navVoice', this.voice); $('#nb-voice').classList.toggle('off', !this.voice); };
+  },
+
   setup() {
+    this.setupVoiceUI();
     $('#nf-stop').onclick = () => this.stop();
     $('#nf-overview').onclick = () => this.overview();
     $('#nb-voice').onclick = () => {
       this.voice = !this.voice; store.set('navVoice', this.voice);
       $('#nb-voice').classList.toggle('off', !this.voice);
+      if ($('#voice-on')) $('#voice-on').checked = this.voice;
       toast(this.voice ? 'Sprachansagen an' : 'Sprachansagen aus');
       if (this.voice) this.say('Sprachansagen an.');
     };
