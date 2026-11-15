@@ -10,7 +10,7 @@ const Planner = {
   picking: -1,
 
   label(s) { return !s ? '' : s.gps ? 'Mein Standort' : (s.name || 'Punkt auf der Karte'); },
-  clean(s) { return !s ? null : s.gps ? { gps: true } : { name: s.name || '', lat: +(+s.lat).toFixed(6), lon: +(+s.lon).toFixed(6) }; },
+  clean(s) { return !s ? null : s.gps ? { gps: true } : { name: s.name || '', lat: +(+s.lat).toFixed(6), lon: +(+s.lon).toFixed(6), ...(s.ferry ? { ferry: true } : {}) }; },
 
   open(stops) {
     if (Nav.pending) { Nav.pending = null; $('#nav-alts').hidden = true; Nav.draw(); }
@@ -106,10 +106,20 @@ const Planner = {
     else if (!local.length) renderResultList(box, [], 'Nichts gefunden.', () => {});
   },
 
-  pick(r) {
+  async pick(r) {
     const i = this.active;
     if (i < 0) return;
     if (r.type === 'quick-map') { this.pickOnMap(i); return; }
+    if (r.type === 'ferry') {
+      const st = await Nav.ferryStop(r);
+      this.stops[i] = this.clean(st);
+      this.active = -1;
+      document.activeElement && document.activeElement.blur();
+      this.save(); this.render();
+      const next = this.stops.findIndex((s) => !s);
+      if (next >= 0) this.focus(next);
+      return;
+    }
     // lieber lesbare Namen: „Bischkek“ statt „Бишкек“, wenn es einen gibt
     const latin = (t) => /^[\p{Script=Latin}\d\s\p{P}\p{S}]+$/u.test(t);
     let name = r.name;

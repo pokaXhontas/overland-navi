@@ -231,6 +231,21 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await shot('12c-faehre-maut');
   await page.evaluate(() => { if (Nav.pending) $('#na-cancel').click(); });
 
+  // Bestimmte Fähre erzwingen: „Fähre Trelleborg“ suchen, Rostock–Trelleborg als Zwischenstopp
+  console.log('Fähren-Suche:', await page.evaluate(async () => {
+    const web = await Search.online('Fähre Trelleborg');
+    const r = web.find((x) => x.type === 'ferry' && /Rostock/.test(x.name)) || web.find((x) => x.type === 'ferry');
+    if (!r) return 'keine Fähre gefunden: ' + web.map((x) => x.name + '/' + x.type).join(', ');
+    const st = await Nav.ferryStop(r);
+    window._ferry = st;
+    return web.filter((x) => x.type === 'ferry').map((x) => x.name).join(', ') + ' → Stopp ' + st.name + ' ' + st.lat + ',' + st.lon;
+  }));
+  await page.evaluate(() => { Nav.plan([{ name: 'Berlin', lat: 52.52, lon: 13.405 }, window._ferry, { name: 'Arvidsjaur', lat: 65.5915, lon: 19.1752 }], 'route'); });
+  await page.waitForFunction(() => Nav.pending && Nav.pending.list[0].target.name === 'Arvidsjaur', { timeout: 120000 }).catch(() => {});
+  console.log('Mit Fähre Trelleborg:', await page.evaluate(() => Nav.pending ? Nav.pending.list.map((r) => Math.round(r.time / 3600 * 10) / 10 + ' h/' + Math.round(r.total / 1000) + ' km · Fähre ' + (r.ferries.map((f) => (f.name || '?') + ' ' + Math.round(f.time / 60) + ' min').join('+') || 'keine') + ' (' + r.source + ')').join(' | ') : 'keine Route'));
+  await shot('12d-faehre-trelleborg');
+  await page.evaluate(() => { if (Nav.pending) $('#na-cancel').click(); });
+
   // Route zeichnen: echte Taps auf die Karte
   await page.evaluate(() => { map.jumpTo({ center: [74.60, 42.87], zoom: 13, bearing: 0 }); Draw.start(); });
   await sleep(1500);

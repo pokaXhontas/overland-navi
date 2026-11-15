@@ -145,7 +145,8 @@ const Nav = {
       road: { use_tracks: 0, use_highways: 1, use_ferry: 0.5, ...town }
     }[this.profile] || {};
     if (variant) Object.assign(opts, variant);
-    const locs = pts.map((p) => ({ lat: p.lat, lon: p.lon, type: 'break' }));
+    // Fähren-Stopp: Punkt auf See, die Route fährt nur hindurch (kein Halt, kein Wenden)
+    const locs = pts.map((p) => ({ lat: p.lat, lon: p.lon, type: p.ferry ? 'through' : 'break' }));
     if (pts[0].gps && gps.heading !== null && gps.speed > 2) { locs[0].heading = Math.round(gps.heading); locs[0].heading_tolerance = 60; }
     const q = {
       locations: locs,
@@ -157,6 +158,38 @@ const Nav = {
     const j = await r.json();
     if (!r.ok || !j.trip) throw new Error((j && (j.error || j.status_message)) || 'Keine Route gefunden');
     return [j.trip, ...(j.alternates || []).map((a) => a.trip)].filter(Boolean).map((t) => this.parseTrip(t));
+  },
+
+  /* Fährverbindung als Zwischenstopp: ein Punkt auf halber Strecke der Fährlinie */
+  async ferryStop(r) {
+    let pt = { lat: r.lat, lon: r.lon };
+    let name = r.name;
+    try {
+      let ref = r.osmRef;
+      if (r.terminal) {
+        // Anleger „Rostock - Trelleborg“: die zugehörige Fährlinie suchen
+        const j = await (await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(r.name)}&limit=5&osm_tag=route:ferry&osm_tag=railway:ferry`)).json();
+        const f = (j.features || [])[0];
+        if (f) { ref = (f.properties.osm_type || 'W') + f.properties.osm_id; pt = { lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0] }; }
+      }
+      if (ref && /^W/.test(ref)) {
+        const x = (await (await fetch(`https://nominatim.openstreetmap.org/lookup?osm_ids=${ref}&polygon_geojson=1&format=jsonv2`)).json())[0];
+        const g = x && x.geojson;
+        const lines = g ? (g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : []) : [];
+        const line = lines.sort((a, b) => b.length - a.length)[0];
+        if (line && line.length > 1) {
+          // Punkt in der Mitte der Linie (nach Länge)
+          const L = trackLength(line);
+          let acc = 0;
+          for (let i = 1; i < line.length; i++) {
+            const d = distance({ lon: line[i - 1][0], lat: line[i - 1][1] }, { lon: line[i][0], lat: line[i][1] });
+            if (acc + d >= L / 2) { const t = (L / 2 - acc) / d; pt = { lon: line[i - 1][0] + t * (line[i][0] - line[i - 1][0]), lat: line[i - 1][1] + t * (line[i][1] - line[i - 1][1]) }; break; }
+            acc += d;
+          }
+        }
+      }
+    } catch (e) { /* mit dem Punkt aus der Suche */ }
+    return { name: /fähre/i.test(name) ? name : 'Fähre ' + name, lat: +pt.lat.toFixed(6), lon: +pt.lon.toFixed(6), ferry: true };
   },
 
   parseTrip(trip) {

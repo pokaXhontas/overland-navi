@@ -1618,7 +1618,11 @@ const Search = {
   async online(q) {
     if (!navigator.onLine || q.trim().length < 3) return [];
     const c = map.getCenter();
-    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lang=de&limit=12&lat=${c.lat.toFixed(3)}&lon=${c.lng.toFixed(3)}`;
+    // „Fähre Trelleborg“: nur Fährverbindungen suchen
+    const fm = q.match(/\b(fähre|faehre|fähren|ferry|färja|ferje|fährverbindung)\b/i);
+    const qq = fm ? q.replace(fm[0], ' ').trim() : q;
+    const filter = fm ? '&osm_tag=route:ferry&osm_tag=railway:ferry&osm_tag=amenity:ferry_terminal' : '';
+    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(qq || q)}&lang=de&limit=12&lat=${c.lat.toFixed(3)}&lon=${c.lng.toFixed(3)}${filter}`;
     try {
       const r = await originalFetch(url);
       if (!r.ok) return [];
@@ -1628,6 +1632,11 @@ const Search = {
         const p = f.properties || {};
         const [lon, lat] = f.geometry.coordinates;
         const where = [p.street && (p.street + (p.housenumber ? ' ' + p.housenumber : '')), p.postcode, p.city || p.county, p.country].filter(Boolean).join(', ');
+        if (p.name && (p.osm_value === 'ferry' || p.osm_value === 'ferry_terminal')) {
+          // Fährverbindung: im Routenplaner als Zwischenstopp nutzbar, die Route muss dann diese Fähre nehmen
+          return { name: p.name, type: 'ferry', lat, lon, sub: (p.osm_value === 'ferry' ? 'Fährverbindung' : 'Fähranleger') + ' · als Zwischenstopp zwingt sie die Route auf die Fähre',
+            dist: distance(ref, { lat, lon }), color: '#1C6DD0', icon: FERRY_ICON, osmRef: (p.osm_type || 'W') + p.osm_id, terminal: p.osm_value === 'ferry_terminal' };
+        }
         const cat = p.name ? poiCatFor(p.osm_key, p.osm_value) : null;
         if (cat) {
           // Einrichtung (Restaurant, Laden, Bank …): eigenes Symbol, Infos beim Antippen
@@ -1654,6 +1663,10 @@ const Search = {
         ...(r.type === 'poi' ? { poiCat: r.poiCat, kind: r.kind, osmKey: r.osmKey, osmValue: r.osmValue, osmRef: r.osmRef, color: r.color, icon: r.icon } : {}) });
     }
     if (r.type === 'poi') { if (this.searchMarker) { this.searchMarker.remove(); this.searchMarker = null; } Poi.open(r); return; }
+    if (r.type === 'ferry') {
+      Nav.ferryStop(r).then((st) => { Planner.open([{ gps: true }, st, null]); toast('Fähre als Zwischenstopp eingetragen. Jetzt das Ziel wählen.', 3500); });
+      return;
+    }
     if (r.placeId && !r.place) r.place = places.find((p) => p.id === r.placeId);
     if (r.place) { openEditor(r.place); return; }
     gps.follow = false;
@@ -1734,6 +1747,7 @@ async function runSearch() {
   else if (!local.length) renderSearchResults([], 'Nichts gefunden.');
 }
 
+const FERRY_ICON = 'M3 17l2 4h14l2-4ZM6 17V11h12v6M9 11V7h6v4M12 3v4';
 const RECENT_ICON = 'M12 7v5l3 2M12 21a9 9 0 1 0-9-9';
 function renderRecent() {
   const box = $('#search-results');
