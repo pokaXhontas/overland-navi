@@ -222,6 +222,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.evaluate(() => Planner.close());
   console.log('Zuletzt geplant:', await page.evaluate(() => store.get('planRecent', []).length));
 
+  // Lange Strecke über die Ostsee: Fähre und Maut sollen als Vorschläge auftauchen
+  await page.evaluate(() => { Nav.plan([{ name: 'Berlin', lat: 52.52, lon: 13.405 }, { name: 'Arvidsjaur', lat: 65.5915, lon: 19.1752 }], 'route'); });
+  await page.waitForFunction(() => Nav.pending && Nav.pending.list[0].target.name === 'Arvidsjaur', { timeout: 120000 }).catch(() => {});
+  console.log('Berlin → Arvidsjaur:', await page.evaluate(() => Nav.pending ? Nav.pending.list.map((r) => Math.round(r.time / 3600 * 10) / 10 + ' h/' + Math.round(r.total / 1000) + ' km' +
+    (r.ferries.length ? ' · Fähre ' + r.ferries.map((f) => (f.name || '?') + ' ' + Math.round(f.time / 60) + ' min').join('+') : '') +
+    (r.tolls.length ? ' · Maut ' + r.tolls.map((t) => t.names.join('/') || '?').join(', ') : ' · ohne Maut') + ' (' + r.source + ')').join(' | ') : 'keine Route'));
+  await shot('12c-faehre-maut');
+  await page.evaluate(() => { if (Nav.pending) $('#na-cancel').click(); });
+
   // Route zeichnen: echte Taps auf die Karte
   await page.evaluate(() => { map.jumpTo({ center: [74.60, 42.87], zoom: 13, bearing: 0 }); Draw.start(); });
   await sleep(1500);

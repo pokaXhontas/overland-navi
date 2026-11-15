@@ -750,3 +750,11 @@ body.drawing .fab, body.drawing .hud { display: none; }
 .edit-pin svg { width: 48px; height: 48px; filter: drop-shadow(0 3px 5px rgba(0,0,0,.35)); }
 .edit-pin path { fill: var(--accent); stroke: #0B0F12; stroke-width: 1; }
 .edit-pin circle { fill: var(--accent-ink); }
+.na-row { flex-direction: column; align-items: stretch; gap: 6px; }
+.na-main { display: flex; align-items: baseline; gap: 10px; }
+.na-info { display: flex; flex-wrap: wrap; gap: 6px; }
+.na-tag { font-size: 12.5px; font-weight: 650; padding: 3px 9px; border-radius: 10px; }
+.na-tag.ferry { background: rgba(28,109,208,.14); color: #1C6DD0; }
+.na-tag.toll { background: rgba(245,159,0,.18); color: #A15C00; }
+.na-tag.free { background: rgba(47,158,68,.14); color: #2B8A3E; }
+html.dark .na-tag.ferry { color: #74C0FC; } html.dark .na-tag.toll { color: #FFC078; } html.dark .na-tag.free { color: #8CE99A; }

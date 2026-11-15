@@ -136,7 +136,7 @@ const Nav = {
     return out;
   },
 
-  async valhalla(pts) {
+  async valhalla(pts, variant) {
     // Spielstraßen und „Anlieger frei“ nicht künstlich meiden, sonst entstehen in Wohngebieten große Umwege
     const town = { use_living_streets: 0.6, destination_only_penalty: 120, service_penalty: 10 };
     const opts = {
@@ -144,6 +144,7 @@ const Nav = {
       short: { shortest: true, use_tracks: 0, use_ferry: 0.5, ...town, use_living_streets: 1 },
       road: { use_tracks: 0, use_highways: 1, use_ferry: 0.5, ...town }
     }[this.profile] || {};
+    if (variant) Object.assign(opts, variant);
     const locs = pts.map((p) => ({ lat: p.lat, lon: p.lon, type: 'break' }));
     if (pts[0].gps && gps.heading !== null && gps.speed > 2) { locs[0].heading = Math.round(gps.heading); locs[0].heading_tolerance = 60; }
     const q = {
@@ -151,7 +152,7 @@ const Nav = {
       costing: 'auto', costing_options: { auto: opts },
       directions_options: { units: 'kilometers', language: 'de-DE' }
     };
-    if (pts.length === 2) q.alternates = 2;
+    if (pts.length === 2 && !variant) q.alternates = 2;
     const r = await fetch(VALHALLA + '?json=' + encodeURIComponent(JSON.stringify(q)));
     const j = await r.json();
     if (!r.ok || !j.trip) throw new Error((j && (j.error || j.status_message)) || 'Keine Route gefunden');
@@ -159,18 +160,35 @@ const Nav = {
   },
 
   parseTrip(trip) {
-    const coords = [], man = [];
+    const coords = [], man = [], ferries = [], tolls = [];
     for (const leg of trip.legs) {
       const off = coords.length ? coords.length - 1 : 0;
       const pts = this.decode6(leg.shape);
       coords.push(...(coords.length ? pts.slice(1) : pts));
       for (const m of leg.maneuvers) {
+        const name = (m.street_names || [])[0] || '';
+        if (m.travel_type === 'ferry' || m.type === 28) {
+          if (m.travel_type === 'ferry' || !ferries.some((f) => f.idx === off + m.begin_shape_index))
+            ferries.push({ idx: off + m.begin_shape_index, name, km: m.length || 0, time: m.time || 0 });
+        }
+        if (m.toll) tolls.push({ idx: off + m.begin_shape_index, name, km: m.length || 0 });
         man.push({ idx: off + m.begin_shape_index, type: m.type, text: m.instruction,
           alert: m.verbal_transition_alert_instruction || m.verbal_pre_transition_instruction || m.instruction, exit: m.roundabout_exit_count || 0,
           verbal: m.verbal_pre_transition_instruction || m.instruction, street: (m.street_names || [])[0] || '' });
       }
     }
-    return { coords, maneuvers: man, time: trip.summary.time, source: 'Valhalla' };
+    return { coords, maneuvers: man, time: trip.summary.time, source: 'Valhalla', ferries: this.mergeFerries(ferries), tolls };
+  },
+
+  /* aufeinanderfolgende Fähr-Abschnitte zu einer Überfahrt zusammenfassen */
+  mergeFerries(list) {
+    const out = [];
+    for (const f of list) {
+      const last = out[out.length - 1];
+      if (last && f.idx - last.endIdx <= 2) { last.km += f.km; last.time += f.time; last.endIdx = f.idx; if (!last.name) last.name = f.name; }
+      else out.push({ ...f, endIdx: f.idx });
+    }
+    return out.filter((f) => f.km > 0.3 || f.time > 120);
   },
 
   osrmText(s) {
@@ -193,7 +211,7 @@ const Nav = {
   },
 
   parseOsrm(route) {
-    const coords = route.geometry.coordinates, man = [];
+    const coords = route.geometry.coordinates, man = [], ferries = [], tolls = [];
     let idx = 0;
     const typeOf = (s) => {
       const t = s.maneuver.type, m = s.maneuver.modifier || '';
@@ -211,14 +229,17 @@ const Nav = {
           if (d < 1e-7) break;
         }
         idx = best;
-        const text = this.osrmText(s);
+        const ferry = s.mode === 'ferry';
+        if (ferry) ferries.push({ idx, name: s.name || '', km: s.distance / 1000, time: s.duration });
+        if ((s.intersections || []).some((x) => (x.classes || []).includes('toll'))) tolls.push({ idx, name: s.name || s.ref || '', km: s.distance / 1000 });
+        const text = ferry ? 'Fähre nehmen' + (s.name ? ': ' + s.name : '') : this.osrmText(s);
         // Fahrspuren vor der Kreuzung (aus OpenStreetMap, wenn eingetragen)
         const ix = s.intersections && s.intersections[0];
         const lanes = ix && ix.lanes && ix.lanes.length > 1 ? ix.lanes.map((l) => ({ ind: l.indications || ['none'], ok: !!l.valid })) : null;
-        man.push({ idx, type: typeOf(s), text, alert: text, verbal: text, street: s.name || '', exit: s.maneuver.exit || 0, lanes });
+        man.push({ idx, type: ferry ? 28 : typeOf(s), text, alert: text, verbal: text, street: s.name || '', exit: s.maneuver.exit || 0, lanes });
       }
     }
-    return { coords, maneuvers: man, time: route.duration, source: 'OSRM' };
+    return { coords, maneuvers: man, time: route.duration, source: 'OSRM', ferries: this.mergeFerries(ferries), tolls };
   },
 
   prepare(target, res, mode, extra = {}) {
@@ -237,7 +258,17 @@ const Nav = {
       from = best;
       return { ...v, idx: best, at: cum[best] || 0 };
     });
-    return { target, mode, coords, cum, total: cum[cum.length - 1] || 0, maneuvers, time: res ? res.time : 0, source: res ? res.source : '',
+    const at = (i) => cum[Math.min(i, cum.length - 1)] || 0;
+    const ferries = res && res.ferries ? res.ferries.map((f) => ({ ...f, at: at(f.idx) })) : [];
+    // Maut-Abschnitte zusammenfassen (nah beieinander = ein Abschnitt)
+    const tolls = [];
+    for (const t of (res && res.tolls) || []) {
+      const last = tolls[tolls.length - 1];
+      const a0 = at(t.idx);
+      if (last && a0 - last.end < 3000) { last.end = a0 + t.km * 1000; if (t.name && !last.names.includes(t.name)) last.names.push(t.name); }
+      else tolls.push({ at: a0, end: a0 + t.km * 1000, names: t.name ? [t.name] : [] });
+    }
+    return { target, mode, coords, cum, total: cum[cum.length - 1] || 0, maneuvers, time: res ? res.time : 0, source: res ? res.source : '', ferries, tolls,
       vias, stops: extra.stops || null, joined: extra.joined !== false, startPt: extra.startPt || null,
       along: 0, seg: 0, off: 0, offCount: 0, lastReroute: Date.now(), spoken: {}, created: Date.now() };
   },
@@ -247,6 +278,12 @@ const Nav = {
   async calc(pts) {
     const jobs = [this.valhalla(pts)];
     if (this.profile !== 'tracks') jobs.push(this.osrm(pts));
+    // lange Strecken: auch eine Fähren-Variante und eine ohne Maut rechnen lassen (wie bei Google Maps)
+    const far = distance(pts[0], pts[pts.length - 1]) > 80000;
+    if (far && this.profile !== 'tracks') {
+      jobs.push(this.valhalla(pts, { use_ferry: 1 }));
+      jobs.push(this.valhalla(pts, { use_tolls: 0 }));
+    }
     const results = await Promise.allSettled(jobs);
     let list = [];
     for (const r of results) if (r.status === 'fulfilled') list.push(...r.value);
@@ -262,7 +299,18 @@ const Nav = {
       if (!uniq.some((u) => Math.abs(u.len - r.len) < Math.max(80, u.len * 0.02) && Math.abs(u.time - r.time) < 90)) uniq.push(r);
     }
     uniq.sort(this.profile === 'short' ? (a, b) => a.len - b.len : (a, b) => a.time - b.time);
-    return uniq.slice(0, 4);
+    const top = uniq.slice(0, 4);
+    // eine Route mit Fähre und eine ohne Maut sollen dabei sein, wenn es sie gibt (und sie nicht absurd länger dauern)
+    const keep = (want) => {
+      if (top.some(want)) return;
+      const x = uniq.find((r) => want(r) && r.time < top[0].time * 1.8 + 3600);
+      if (x) top.splice(Math.min(top.length, 3), 1, x);
+    };
+    if (far) {
+      keep((r) => r.ferries && r.ferries.length);
+      if (top.some((r) => r.tolls && r.tolls.length)) keep((r) => !(r.tolls && r.tolls.length));
+    }
+    return top;
   },
 
   async position() {
@@ -334,7 +382,13 @@ const Nav = {
         else tags.push('+' + Math.round((r.time - fastest) / 60) + ' min');
         if (r.total <= shortest + 50) tags.push('kürzeste');
         const extra = ' · ' + tags.join(' · ');
-        b.innerHTML = `<b>${this.fmtTime(r.time)}</b><span>${fmtDist(r.total)}${extra}</span>`;
+        const info = [];
+        for (const f of r.ferries || []) info.push(`<span class="na-tag ferry">⛴ Fähre${f.name ? ' ' + this.esc(f.name) : ''}${f.time ? ' · ' + this.fmtTime(f.time) : ''}</span>`);
+        if (r.tolls && r.tolls.length) {
+          const names = [...new Set(r.tolls.flatMap((t) => t.names))].slice(0, 2).join(', ');
+          info.push(`<span class="na-tag toll">€ Maut${names ? ': ' + this.esc(names) : ''}</span>`);
+        } else if (list.some((x) => x.tolls && x.tolls.length)) info.push('<span class="na-tag free">ohne Maut</span>');
+        b.innerHTML = `<span class="na-main"><b>${this.fmtTime(r.time)}</b><span>${fmtDist(r.total)}${extra}</span></span>${info.length ? `<span class="na-info">${info.join('')}</span>` : ''}`;
         b.onclick = () => { this.pending.sel = i; render(); this.draw(); };
         rows.appendChild(b);
       });
@@ -512,7 +566,25 @@ const Nav = {
       25: 'merge', 28: 'ferry' }[t] || 'straight';
   },
 
+  esc(s) { return String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c])); },
+
+  /* Hinweis vor Maut-Abschnitten (Brücken, Tunnel, Autobahnen) */
+  tollAlert() {
+    const a = this.active;
+    for (const t of a.tolls || []) {
+      const d = t.at - a.along;
+      const key = 'toll:' + Math.round(t.at);
+      if (d > 0 && d < ((gps.speed || 0) > 18 ? 3000 : 1000) && !a.spoken[key]) {
+        a.spoken[key] = 1;
+        const what = t.names.length ? ': ' + t.names.slice(0, 2).join(', ') : '';
+        toast('€ Mautpflichtiger Abschnitt in ' + fmtDist(d) + what, 6000);
+        this.say('In ' + this.speakDist(d) + ' beginnt ein mautpflichtiger Abschnitt.', false, [this.distKey(d), 'toll']);
+      }
+    }
+  },
+
   announce() {
+    this.tollAlert();
     const a = this.active, m = this.next();
     if (!m || m.type === 27) return;
     const d = m.at - a.along;

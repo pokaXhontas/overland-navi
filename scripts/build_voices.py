@@ -41,7 +41,7 @@ PHRASES = {
     "uturn": "wenden.", "straight": "geradeaus weiterfahren.",
     "keep_right": "rechts halten.", "keep_left": "links halten.",
     "exit_right": "die Ausfahrt rechts nehmen.", "exit_left": "die Ausfahrt links nehmen.",
-    "ramp": "auf die Auffahrt fahren.", "merge": "einfädeln.", "ferry": "auf die Fähre fahren.",
+    "ramp": "auf die Auffahrt fahren.", "merge": "einfädeln.", "ferry": "auf die Fähre fahren.", "toll": "beginnt ein mautpflichtiger Abschnitt.",
     "rb": "in den Kreisverkehr fahren.",
     "rb1": "im Kreisverkehr die erste Ausfahrt nehmen.", "rb2": "im Kreisverkehr die zweite Ausfahrt nehmen.",
     "rb3": "im Kreisverkehr die dritte Ausfahrt nehmen.", "rb4": "im Kreisverkehr die vierte Ausfahrt nehmen.",
