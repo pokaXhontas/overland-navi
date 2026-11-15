@@ -1,0 +1,54 @@
+[
+  {
+    "id": "ala-kul", "name": "Ala-Kul & Altyn-Arashan", "color": "#C2255C", "expect_km": 50,
+    "relation": "Ala-Kul.*Altyn",
+    "points": [
+      {"label": "Parktor Karakol", "icon": "start", "near": [78.418, 42.455], "filter": "[\"name\"~\"Каракол|Karakol\"][\"tourism\"~\"information|camp_site\"]", "radius": 4000},
+      {"label": "Sirota", "icon": "camp", "near": [78.48, 42.33], "filter": "[\"name\"~\"Сирота|Sirota\"]", "radius": 12000},
+      {"label": "Ala-Kul-See", "icon": "lake", "near": [78.53, 42.30], "filter": "[\"natural\"=\"water\"][\"name\"~\"Ала-Куль|Ала-Көл|Ala-?Kul|Ala-?Köl\"]", "radius": 12000},
+      {"label": "Ala-Kul-Pass 3.920 m", "icon": "pass", "near": [78.56, 42.32], "filter": "[\"mountain_pass\"=\"yes\"][\"name\"~\"Ала-Куль|Ала-Көл|Ala-?Kul\"]", "radius": 12000},
+      {"label": "Altyn-Arashan", "icon": "spring", "near": [78.62, 42.375], "filter": "[\"place\"][\"name\"~\"Алтын-Арашан|Altyn.?Arashan\"]", "radius": 10000},
+      {"label": "Ak-Suu", "icon": "end", "near": [78.53, 42.505], "filter": "[\"place\"][\"name\"~\"Ак-Суу|Ak-?Suu|Теплоключенка\"]", "radius": 10000}
+    ]
+  },
+  {
+    "id": "ala-archa", "name": "Ala-Archa: Ak-Sai-Wasserfall & Ratsek-Hütte", "color": "#2F9E44", "expect_km": 6.4,
+    "points": [
+      {"label": "Alplager", "icon": "start", "near": [74.483, 42.565], "filter": "[\"name\"~\"Альплагерь|Alplager|Alpine camp\"]", "radius": 4000},
+      {"label": "Ak-Sai-Wasserfall", "icon": "waterfall", "near": [74.505, 42.538], "filter": "[\"waterway\"=\"waterfall\"]", "radius": 4000},
+      {"label": "Ratsek-Hütte 3.300 m", "icon": "hut", "near": [74.517, 42.523], "filter": "[\"name\"~\"Рацек|Ratsek\"]", "radius": 6000}
+    ]
+  },
+  {
+    "id": "song-kol", "name": "Kyzart – Song-Köl", "color": "#E8590C", "expect_km": 33,
+    "points": [
+      {"label": "Kyzart-Pass (Start)", "icon": "start", "near": [74.97, 42.07], "filter": "[\"mountain_pass\"=\"yes\"][\"name\"~\"Кызарт|Kyzart\"]", "radius": 15000},
+      {"label": "Kilemche", "icon": "camp", "near": [74.95, 41.98], "filter": "[\"name\"~\"Килемче|Kilemche\"]", "radius": 25000},
+      {"label": "Jalgyz-Karagai-Pass", "icon": "pass", "near": [75.0, 41.95], "filter": "[\"name\"~\"Жалгыз|Jalgyz|Djalgyz\"]", "radius": 25000},
+      {"label": "Song-Köl Nordufer", "icon": "end", "near": [75.05, 41.90]}
+    ]
+  },
+  {
+    "id": "lenin", "name": "Pik-Lenin-Basislager & Traveller's Pass", "color": "#7048E8", "expect_km": 8,
+    "points": [
+      {"label": "Tulpar-Köl", "icon": "start", "near": [72.86, 39.42], "filter": "[\"natural\"=\"water\"][\"name\"~\"Тулпар|Tulpar\"]", "radius": 8000},
+      {"label": "Basislager Achik-Tash", "icon": "camp", "near": [72.87, 39.40], "filter": "[\"name\"~\"Ачик-Таш|Ачик Таш|Achik.?Tash\"]", "radius": 10000},
+      {"label": "Traveller's Pass 4.150 m", "icon": "pass", "near": [72.88, 39.37], "filter": "[\"name\"~\"Путешественник|Traveller\"]", "radius": 12000}
+    ]
+  },
+  {
+    "id": "skazka", "name": "Skazka-Canyon (Märchenschlucht)", "color": "#F59F00", "expect_km": 4, "info": "canyons",
+    "ways": {"near": [77.346, 42.1658], "radius": 1300},
+    "points": [
+      {"label": "Skazka Parkplatz", "icon": "start", "near": [77.346, 42.1658]}
+    ]
+  },
+  {
+    "id": "konorchek", "name": "Konorchek-Canyons", "color": "#B5482A", "expect_km": 10, "info": "canyons",
+    "ways": {"near": [75.83, 42.58], "radius": 15000, "name": "каньон|Каньон|панорам|Панорам|Кок-Мойнок|Көк-Мойнок"},
+    "points": [
+      {"label": "Parkplatz Krasnyj Most", "icon": "start", "near": [75.83, 42.58], "filter": "[\"amenity\"=\"parking\"]", "radius": 8000},
+      {"label": "Panorama-Aussicht 1.890 m", "icon": "view", "near": [75.85, 42.57], "filter": "[\"tourism\"=\"viewpoint\"]", "radius": 10000}
+    ]
+  }
+]

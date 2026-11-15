@@ -1,0 +1,35 @@
+name: Empfohlene Touren bauen
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['tours/*-def.json', 'scripts/build_tours.py']
+permissions:
+  contents: write
+  actions: write
+concurrency:
+  group: tours
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Touren aus OpenStreetMap berechnen
+        run: |
+          mkdir -p app/tours
+          for def in tours/*-def.json; do
+            name=$(basename "$def" -def.json)
+            python3 scripts/build_tours.py "$def" "app/tours/$name.geojson"
+            ls -l "app/tours/$name.geojson"
+          done
+      - name: Ergebnis speichern und App neu bauen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "pokaXhontas"
+          git config user.email "pokaXhontas@users.noreply.github.com"
+          git add app/tours
+          if git diff --cached --quiet; then echo "keine Änderung"; exit 0; fi
+          git commit -m "Empfohlene Touren aktualisiert"
+          git push
+          gh workflow run deploy.yml -R ${{ github.repository }}
