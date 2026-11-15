@@ -49,7 +49,7 @@ PHRASES = {
     "dest": "erreichst du dein Ziel.", "via": "erreichst du deinen Zwischenstopp.",
     # ganze Sätze
     "arrived": "Du hast dein Ziel erreicht.", "via_reached": "Zwischenstopp erreicht.",
-    "start": "Route gestartet. Gute Fahrt!", "reroute": "Route wird neu berechnet.",
+    "start": "Route gestartet. Gute Fahrt!", "start_walk": "Route gestartet. Guten Weg!", "start_transit": "Route gestartet. Gute Reise!", "reroute": "Route wird neu berechnet.",
     "line": "Luftlinie zum Ziel.", "voice_on": "Sprachansagen an.", "off_route": "Du hast die Route verlassen.",
     "hello": "Hallo! So klinge ich als deine Navigationsstimme.",
 }

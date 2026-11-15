@@ -405,7 +405,7 @@ function buildStyle() {
       places: { type: 'geojson', data: placesGeoJSON() },
       ...(typeof Tours !== 'undefined' ? { tours: Tours.source() } : {}),
       ...(typeof Poi !== 'undefined' ? { poi: Poi.source() } : {}),
-      ...(hk.lines.length ? { hike: Hike.source() } : {}),
+      ...(hk.lines.length || hk.top.length ? { hike: Hike.source() } : {}),
       draw: { type: 'geojson', data: typeof Draw !== 'undefined' ? Draw.geojson() : { type: 'FeatureCollection', features: [] } },
       route: { type: 'geojson', data: typeof Nav !== 'undefined' ? Nav.geojson() : { type: 'FeatureCollection', features: [] } },
       sat: {
@@ -1416,6 +1416,8 @@ function setupUI() {
   Hike.setup();
   Tours.setup();
   Poi.setup();
+  $('#t-oev').checked = store.get('oevOn', false);
+  $('#t-oev').onchange = () => { store.set('oevOn', $('#t-oev').checked); refreshStyle(); };
   document.querySelectorAll('[data-maptype]').forEach((b) => {
     b.setAttribute('aria-checked', String(b.dataset.maptype === settings.mapType));
     b.onclick = () => {

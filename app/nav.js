@@ -3,6 +3,7 @@
 'use strict';
 
 const VALHALLA = 'https://valhalla1.openstreetmap.de/route';
+const TRANSIT = 'https://api.transitous.org';
 const OSRM = 'https://routing.openstreetmap.de/routed-car/route/v1/driving/';
 
 /* Mitgelieferte Stimmen: kurze Bausteine („In 300 Metern“ + „rechts abbiegen“), offline nutzbar.
@@ -116,6 +117,7 @@ for (const ev of ['touchend', 'click', 'keydown']) document.addEventListener(ev,
 const Nav = {
   active: null,
   profile: store.get('navProfile2', 'road'),
+  travel: store.get('navTravel', 'car'),     // car | foot | transit
   pending: null,
   voice: store.get('navVoice', true),
   busy: false,
@@ -160,6 +162,78 @@ const Nav = {
     if (!j.trip && j.error_code === 154 && pts.length > 2) return [await this.valhallaSplit(pts, variant)];
     if (!r.ok || !j.trip) throw new Error((j && (j.error || j.status_message)) || 'Keine Route gefunden');
     return [j.trip, ...(j.alternates || []).map((a) => a.trip)].filter(Boolean).map((t) => this.parseTrip(t));
+  },
+
+  /* Zu Fuß / Wandern: Valhalla als Fußgänger, Wanderwege bis zur eingestellten SAC-Stufe */
+  async foot(pts) {
+    const locs = pts.map((p) => ({ lat: p.lat, lon: p.lon, type: 'break' }));
+    const max = typeof Hike !== 'undefined' ? Hike.max() : 3;
+    const q = { locations: locs, costing: 'pedestrian',
+      costing_options: { pedestrian: { max_hiking_difficulty: max, use_tracks: 1, walking_speed: 4.5, use_hills: 0.5 } },
+      directions_options: { units: 'kilometers', language: 'de-DE' } };
+    if (pts.length === 2) q.alternates = 2;
+    const r = await fetch(VALHALLA + '?json=' + encodeURIComponent(JSON.stringify(q)));
+    const j = await r.json();
+    if (!r.ok || !j.trip) throw new Error((j && (j.error || j.status_message)) || 'Kein Weg gefunden');
+    const list = [j.trip, ...(j.alternates || []).map((a) => a.trip)].filter(Boolean).map((t) => ({ ...this.parseTrip(t), travel: 'foot' }));
+    for (const x of list) x.len = trackLength(x.coords);
+    return list.sort((a, b) => a.time - b.time);
+  },
+
+  /* Bus & Bahn: Verbindungen von Transitous (freie Fahrplandaten, MOTIS) */
+  async transit(pts) {
+    if (pts.length > 2) toast('Bei Bus & Bahn zählen nur Start und Ziel, Zwischenstopps werden übergangen.', 4000);
+    const a = pts[0], b = pts[pts.length - 1];
+    const url = `${TRANSIT}/api/v5/plan?fromPlace=${a.lat.toFixed(6)},${a.lon.toFixed(6)}&toPlace=${b.lat.toFixed(6)},${b.lon.toFixed(6)}&numItineraries=5&language=de`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('Fahrplanauskunft nicht erreichbar (' + r.status + ')');
+    const j = await r.json();
+    const its = (j.itineraries || []).filter((it) => it.legs.some((l) => l.mode !== 'WALK'));
+    if (j.direct && j.direct.length && !its.length) throw new Error('keine Verbindung mit Bus oder Bahn, besser zu Fuß');
+    if (!its.length) throw new Error('keine Verbindung gefunden');
+    return its.slice(0, 5).map((it) => this.parseItinerary(it));
+  },
+
+  parseItinerary(it) {
+    const coords = [], man = [];
+    const clock = (t) => new Date(t).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    const modeName = { BUS: 'Bus', COACH: 'Fernbus', TRAM: 'Straßenbahn', SUBWAY: 'U-Bahn', SUBURBAN: 'S-Bahn', RAIL: 'Zug', REGIONAL_RAIL: 'Regionalzug', REGIONAL_FAST_RAIL: 'Regionalexpress',
+      HIGHSPEED_RAIL: 'Fernzug', LONG_DISTANCE: 'Fernzug', NIGHT_RAIL: 'Nachtzug', FERRY: 'Fähre', AERIAL_LIFT: 'Seilbahn', FUNICULAR: 'Standseilbahn', METRO: 'S-Bahn', ODM: 'Rufbus' };
+    const dirType = { LEFT: 15, RIGHT: 10, SLIGHTLY_LEFT: 16, SLIGHTLY_RIGHT: 9, HARD_LEFT: 14, HARD_RIGHT: 11, UTURN_LEFT: 13, UTURN_RIGHT: 13, CIRCLE_CLOCKWISE: 26, CIRCLE_COUNTERCLOCKWISE: 26 };
+    const dirText = { 15: 'Links abbiegen', 10: 'Rechts abbiegen', 16: 'Halb links', 9: 'Halb rechts', 14: 'Scharf links', 11: 'Scharf rechts', 13: 'Umdrehen', 26: 'In den Kreisverkehr' };
+    const legs = [];
+    for (const leg of it.legs) {
+      const pts = leg.legGeometry ? this.decode6(leg.legGeometry.points) : [[leg.from.lon, leg.from.lat], [leg.to.lon, leg.to.lat]];
+      const off = coords.length ? coords.length - 1 : 0;
+      coords.push(...(coords.length ? pts.slice(1) : pts));
+      if (leg.mode === 'WALK') {
+        const to = leg.to.name === 'END' ? 'zum Ziel' : 'zu ' + leg.to.name;
+        man.push({ idx: off, type: 8, text: 'Zu Fuß ' + to, alert: 'Zu Fuß ' + to, verbal: 'Zu Fuß ' + to, street: '', tts: true });
+        let from = off;
+        for (const st of leg.steps || []) {
+          const t = dirType[st.relativeDirection];
+          const p0 = st.polyline ? this.decode6(st.polyline.points)[0] : null;
+          if (!t || !p0) continue;
+          let best = from, bd = Infinity;
+          for (let i = from; i < coords.length; i++) { const d = Math.abs(coords[i][0] - p0[0]) + Math.abs(coords[i][1] - p0[1]); if (d < bd) { bd = d; best = i; } }
+          from = best;
+          const text = dirText[t] + (st.streetName ? ' auf ' + st.streetName : '');
+          man.push({ idx: best, type: t, text, alert: text, verbal: text, street: st.streetName || '' });
+        }
+      } else {
+        const line = leg.routeShortName || leg.displayName || '';
+        const what = (modeName[leg.mode] || 'Linie') + (line ? ' ' + line : '');
+        const color = leg.routeColor ? '#' + leg.routeColor : null;
+        legs.push({ mode: leg.mode, what, line, color, headsign: leg.headsign || '', from: leg.from.name, to: leg.to.name, dep: clock(leg.startTime), arr: clock(leg.endTime) });
+        const board = `Einsteigen: ${what}${leg.headsign ? ' Richtung ' + leg.headsign : ''}, ab ${clock(leg.startTime)} an ${leg.from.name}`;
+        man.push({ idx: off, type: 40, text: board, alert: board, verbal: `Steig hier in ${what}${leg.headsign ? ' Richtung ' + leg.headsign : ''} ein.`, street: '', tts: true });
+        const end = off + pts.length - 1;
+        man.push({ idx: end, type: 41, text: `Aussteigen: ${leg.to.name} (an ${clock(leg.endTime)})`, alert: `an ${leg.to.name} aussteigen`, verbal: `Hier aussteigen: ${leg.to.name}.`, street: '', tts: true });
+      }
+    }
+    man.push({ idx: coords.length - 1, type: 4, text: 'Ziel erreicht', alert: 'erreichst du dein Ziel', verbal: 'Du hast dein Ziel erreicht.', street: '' });
+    return { coords, maneuvers: man, time: it.duration, source: 'Transitous', travel: 'transit', len: trackLength(coords),
+      transit: { dep: clock(it.startTime), arr: clock(it.endTime), transfers: it.transfers || 0, legs } };
   },
 
   /* Route in Abschnitten (je zwei Punkte) rechnen und zusammensetzen */
@@ -337,6 +411,7 @@ const Nav = {
       else tolls.push({ at: a0, end: a0 + t.km * 1000, names: t.name ? [t.name] : [] });
     }
     return { target, mode, coords, cum, total: cum[cum.length - 1] || 0, maneuvers, time: res ? res.time : 0, source: res ? res.source : '', ferries, tolls,
+      travel: (res && res.travel) || (mode === 'route' && res && res.source !== 'Track' ? this.travel : 'car'), transit: res ? res.transit || null : null,
       vias, stops: extra.stops || null, joined: extra.joined !== false, startPt: extra.startPt || null,
       along: 0, seg: 0, off: 0, offCount: 0, lastReroute: Date.now(), spoken: {}, created: Date.now() };
   },
@@ -344,6 +419,8 @@ const Nav = {
   /* Zwei unabhängige Routenrechner fragen und die Vorschläge zusammenlegen.
      Für Straßen kommen so mehr echte Alternativen zusammen; auf Pisten zählt nur Valhalla. */
   async calc(pts) {
+    if (this.travel === 'foot') return this.foot(pts);
+    if (this.travel === 'transit') return this.transit(pts);
     const jobs = [this.valhalla(pts)];
     // mit gewählter Fähre nur Valhalla: OSRM fängt den Punkt auf See nicht zuverlässig auf der Fähre ein
     const ferryVia = pts.some((p) => p.ferry);
@@ -459,6 +536,11 @@ const Nav = {
           info.push(`<span class="na-tag toll">€ Maut${names ? ': ' + this.esc(names) : ''}</span>`);
         } else if (r.source === 'Valhalla' && list.some((x) => x.tolls && x.tolls.length)) info.push('<span class="na-tag free">ohne Maut</span>');
         // OSRM erkennt Maut auf langen Brücken nicht zuverlässig: dann lieber nichts behaupten
+        if (r.transit) {
+          const t = r.transit;
+          const chips = t.legs.map((l) => `<span class="na-line" style="${l.color ? `background:${l.color};color:#fff` : ''}">${this.esc(l.line || l.what)}</span>`).join('<span class="na-arrow">›</span>');
+          b.innerHTML = `<span class="na-main"><b>${t.dep} – ${t.arr}</b><span>${this.fmtTime(r.time)} · ${t.transfers ? t.transfers + '× umsteigen' : 'ohne Umsteigen'}</span></span><span class="na-info">${chips}</span><span class="na-legs">${t.legs.map((l) => `${l.dep} ${this.esc(l.what)} ab ${this.esc(l.from)} → ${this.esc(l.to)}`).join('<br>')}</span>`;
+        } else
         b.innerHTML = `<span class="na-main"><b>${this.fmtTime(r.time)}</b><span>${fmtDist(r.total)}${extra}</span></span>${info.length ? `<span class="na-info">${info.join('')}</span>` : ''}`;
         b.onclick = () => { this.pending.sel = i; render(); this.draw(); };
         rows.appendChild(b);
@@ -479,8 +561,9 @@ const Nav = {
     $('#na-cancel').onclick = () => { this.pending = null; box.hidden = true; this.draw(); };
     $('#na-edit').onclick = () => { const st = list[0].stops; this.pending = null; box.hidden = true; this.draw(); Planner.open(st); };
     $('#na-save').onclick = () => this.saveAsTrack(this.pending.list[this.pending.sel]);
-    $('#na-go').textContent = list[0].joined ? 'Losfahren' : 'Navigation starten';
-    $('#na-title').textContent = list.length > 1 ? 'Route auswählen' : 'Deine Route';
+    $('#na-go').textContent = !list[0].joined ? 'Navigation starten' : list[0].travel === 'foot' ? 'Loslaufen' : list[0].travel === 'transit' ? 'Los geht’s' : 'Losfahren';
+    $('#na-title').textContent = list[0].travel === 'transit' ? 'Verbindung auswählen' : list.length > 1 ? 'Route auswählen' : 'Deine Route';
+    $('#na-credit').hidden = list[0].travel !== 'transit';
     $('#na-sub').textContent = list.length > 1 ? 'Antippen zeigt sie auf der Karte' : ((list[0].vias.length ? list[0].vias.length + (list[0].vias.length === 1 ? ' Zwischenstopp' : ' Zwischenstopps') : 'Direkt') + ' · ' + (list[0].startPt && !list[0].startPt.gps ? 'ab ' + list[0].startPt.name : 'ab deinem Standort'));
     box.hidden = false;
     this.draw();
@@ -504,7 +587,10 @@ const Nav = {
         clearTimeout(this.followTimer);
         this.followTimer = setTimeout(() => { if (this.active === a) this.follow(); }, 4000);
       }
-      this.say(this.active.mode === 'route' ? 'Route gestartet.' : 'Luftlinie zum Ziel.', false, [this.active.mode === 'route' ? 'start' : 'line']);
+      const tv = this.active.travel;
+      const startKey = tv === 'foot' ? 'start_walk' : tv === 'transit' ? 'start_transit' : 'start';
+      const startText = tv === 'foot' ? 'Route gestartet. Guten Weg!' : tv === 'transit' ? 'Route gestartet. Gute Reise!' : 'Route gestartet. Gute Fahrt!';
+      this.say(this.active.mode === 'route' ? startText : 'Luftlinie zum Ziel.', false, [this.active.mode === 'route' ? startKey : 'line']);
     }
   },
 
@@ -527,7 +613,7 @@ const Nav = {
 
   async reroute(pos) {
     const a = this.active;
-    if (!a || a.mode !== 'route' || a.track || this.busy || !navigator.onLine) return;
+    if (!a || a.mode !== 'route' || a.track || a.travel === 'transit' || this.busy || !navigator.onLine) return;
     this.busy = true;
     a.lastReroute = Date.now();
     try {
@@ -664,6 +750,11 @@ const Nav = {
     const far = fast ? 1500 : 500;
     const st = a.spoken[key] || 0;
     const act = this.actKey(m);
+    if (m.tts) {
+      // Ein- und Aussteigen, Fußwege bei Bus & Bahn: als ganzer Satz
+      if (st < 1 && d <= (m.type === 41 ? 600 : 80)) { a.spoken[key] = 2; this.say(m.type === 41 ? 'Gleich ' + m.alert + '.' : m.verbal); }
+      return;
+    }
     if (st < 1 && d <= far && d > 150) { a.spoken[key] = 1; this.say('In ' + this.speakDist(d) + ' ' + m.alert, false, [this.distKey(d), act]); }
     else if (st < 2 && d <= (fast ? 120 : 60)) {
       a.spoken[key] = 2;

@@ -63,6 +63,12 @@ const Planner = {
       };
       box.appendChild(row);
     });
+    document.querySelectorAll('#planner [data-travel]').forEach((b) => {
+      b.setAttribute('aria-checked', String(b.dataset.travel === Nav.travel));
+      b.onclick = () => { Nav.travel = b.dataset.travel; store.set('navTravel', Nav.travel); this.render(); };
+    });
+    $('#planner .pl-seg').hidden = Nav.travel !== 'car';
+    $('#pl-go').textContent = Nav.travel === 'transit' ? 'Verbindung suchen' : Nav.travel === 'foot' ? 'Weg berechnen' : 'Route berechnen';
     document.querySelectorAll('#planner [data-profile]').forEach((b) => {
       b.setAttribute('aria-checked', String(b.dataset.profile === Nav.profile));
       b.onclick = () => { Nav.profile = b.dataset.profile; store.set('navProfile2', Nav.profile); this.render(); };

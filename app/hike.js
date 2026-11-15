@@ -157,8 +157,38 @@ const Hike = {
   },
 
   /* Kartenebenen; werden in buildStyle eingefügt */
+  oev() { return store.get('oevOn', false); },
+
+  /* Bus und Bahn (aus denselben Länderdateien, Ebenen „oev“ und „halt“) */
+  oevLayers(dark, sat) {
+    if (!this.oev() || (!this.keys().length && !this.local.size)) return { lines: [], top: [] };
+    const col = ['case', ['has', 'c'], ['to-color', ['get', 'c'], '#7048E8'],
+      ['match', ['get', 'm'], 'bahn', '#495057', 'ubahn', '#1C6DD0', 'sbahn', '#2F9E44', 'tram', '#C92A2A', '#7048E8']];
+    const w = ['match', ['get', 'm'], 'bahn', 3, 'ubahn', 3, 'sbahn', 3, 'tram', 2.4, 1.8];
+    const halo = dark || sat ? '#0B0F12' : '#FFFFFF';
+    return {
+      lines: [
+        { id: 'oev-casing', type: 'line', source: 'hike', 'source-layer': 'oev', layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': halo, 'line-opacity': 0.8, 'line-width': ['interpolate', ['linear'], ['zoom'], 10, ['+', w, 1.5], 16, ['+', ['*', w, 2], 3]] } },
+        { id: 'oev-line', type: 'line', source: 'hike', 'source-layer': 'oev', layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': col, 'line-opacity': 0.85, 'line-width': ['interpolate', ['linear'], ['zoom'], 10, w, 16, ['*', w, 2]] } },
+        { id: 'oev-label', type: 'symbol', source: 'hike', 'source-layer': 'oev', minzoom: 14, filter: ['has', 'r'],
+          layout: { 'symbol-placement': 'line', 'text-field': ['get', 'r'], 'text-font': ['Noto Sans Medium'], 'text-size': 10.5, 'symbol-spacing': 320 },
+          paint: { 'text-color': col, 'text-halo-color': halo, 'text-halo-width': 1.6 } }
+      ],
+      top: [
+        { id: 'oev-halt', type: 'symbol', source: 'hike', 'source-layer': 'halt',
+          layout: { 'icon-image': ['concat', 'halt-', ['get', 'k']], 'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.7, 16, 1], 'icon-allow-overlap': ['step', ['zoom'], false, 15, true],
+            'symbol-sort-key': ['match', ['get', 'k'], 'bahn', 0, 'ubahn', 1, 'sbahn', 1, 'tram', 2, 3],
+            'text-field': ['step', ['zoom'], '', 15, ['coalesce', ['get', 'n'], '']], 'text-font': ['Noto Sans Medium'], 'text-size': 11, 'text-offset': [0, 1.2], 'text-anchor': 'top', 'text-optional': true, 'text-max-width': 9 },
+          paint: { 'text-color': dark || sat ? '#E9EEF1' : '#343A40', 'text-halo-color': halo, 'text-halo-width': 1.5 } }
+      ]
+    };
+  },
+
   layers(dark, sat) {
-    if (!this.on() || (!this.keys().length && !this.local.size)) return { lines: [], labels: [], top: [] };
+    const ov = this.oevLayers(dark, sat);
+    if (!this.on() || (!this.keys().length && !this.local.size)) return { lines: ov.lines, labels: [], top: ov.top };
     const max = this.max();
     const isTrack = ['all', ['==', ['get', 'h'], 't'], ['==', ['get', 's'], 0], ['!', ['has', 'net']]];
     const sacOk = ['any', ['==', ['get', 's'], 0], ['<=', ['get', 's'], max]];
@@ -178,7 +208,8 @@ const Hike = {
           paint: { 'line-color': dark || sat ? 'rgba(11,15,18,0.65)' : 'rgba(255,255,255,0.85)', 'line-width': w(2.6, 5.4) } },
         { id: 'hike-line', type: 'line', source: 'hike', 'source-layer': 'wege', filter: f, layout: { 'line-join': 'round' },
           paint: { 'line-color': sacColor, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1, 11, 1.4, 16, 3.2], 'line-dasharray': [2, 1.3] } },
-        { id: 'hike-hit', type: 'line', source: 'hike', 'source-layer': 'wege', filter: any, minzoom: 11, paint: { 'line-color': '#000', 'line-opacity': 0, 'line-width': 18 } }
+        { id: 'hike-hit', type: 'line', source: 'hike', 'source-layer': 'wege', filter: any, minzoom: 11, paint: { 'line-color': '#000', 'line-opacity': 0, 'line-width': 18 } },
+        ...ov.lines
       ],
       labels: [
         { id: 'hike-label', type: 'symbol', source: 'hike', 'source-layer': 'wege', filter: f, minzoom: 13,
@@ -189,6 +220,7 @@ const Hike = {
           paint: { 'text-color': sacColor, 'text-halo-color': dark || sat ? '#0B0F12' : '#FFFFFF', 'text-halo-width': 1.6 } },
       ],
       top: [
+        ...ov.top,
         ...(this.pts().length ? [{ id: 'hike-pts', type: 'symbol', source: 'hike', 'source-layer': 'punkte', filter: ['in', ['get', 'k'], ['literal', this.pts()]],
           layout: { 'icon-image': ['concat', 'hkpt-', ['get', 'k']], 'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.7, 14, 1],
             'icon-allow-overlap': ['step', ['zoom'], false, 13, true], 'symbol-sort-key': ['match', ['get', 'k'], 'biwak', 0, 'huette', 1, 'ruine', 2, 'burg', 2, 'wasser', 3, 4],
@@ -338,6 +370,36 @@ const Hike = {
       b.onclick = () => { store.set('hikeMax', +b.dataset.hkmax); this.renderSheet(); refreshStyle(); };
     });
     map.on('styleimagemissing', (e) => {
+      if (!e.id || !e.id.startsWith('halt-') || map.hasImage(e.id)) return;
+      const k = e.id.slice(5);
+      const ratio = 2, size = 26;
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = size * ratio;
+      const g = cv.getContext('2d');
+      g.scale(ratio, ratio);
+      const color = { bahn: '#495057', ubahn: '#1C6DD0', sbahn: '#2F9E44', tram: '#C92A2A', bus: '#7048E8' }[k] || '#7048E8';
+      g.beginPath();
+      if (k === 'bus' || k === 'tram') g.arc(size / 2, size / 2, 10, 0, Math.PI * 2);
+      else { const r = 4; g.moveTo(3 + r, 3); g.arcTo(size - 3, 3, size - 3, size - 3, r); g.arcTo(size - 3, size - 3, 3, size - 3, r); g.arcTo(3, size - 3, 3, 3, r); g.arcTo(3, 3, size - 3, 3, r); }
+      g.fillStyle = color; g.fill(); g.lineWidth = 2; g.strokeStyle = '#FFFFFF'; g.stroke();
+      g.fillStyle = '#FFFFFF'; g.font = '700 12px -apple-system, Helvetica, Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText({ bus: 'H', tram: 'T', ubahn: 'U', sbahn: 'S', bahn: 'B' }[k] || 'H', size / 2, size / 2 + 0.5);
+      map.addImage(e.id, g.getImageData(0, 0, size * ratio, size * ratio), { pixelRatio: ratio });
+    });
+    map.on('click', 'oev-halt', (e) => {
+      const f = e.features && e.features[0];
+      if (!f || (typeof Draw !== 'undefined' && Draw.active) || editor.open) return;
+      this._ptTap = e.originalEvent;
+      const p = f.properties;
+      const kind = { bus: 'Bushaltestelle', tram: 'Straßenbahn', ubahn: 'U-Bahn', sbahn: 'S-Bahn / Stadtbahn', bahn: 'Bahnhof' }[p.k] || 'Haltestelle';
+      const ll = f.geometry.coordinates;
+      if (this.popup) this.popup.remove();
+      const esc = (t) => String(t).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+      this.popup = new maplibregl.Popup({ closeButton: true, maxWidth: '280px', className: 'hk-popup' }).setLngLat(ll)
+        .setHTML(`<div class="hk-pop"><div class="hk-head"><b>${esc(p.n || kind)}</b></div><p>${kind}</p><div class="hk-actions"><button type="button" class="btn primary small-btn" data-a="nav">Route hierher</button></div></div>`).addTo(map);
+      this.popup.getElement().querySelector('[data-a="nav"]').onclick = () => { this.popup.remove(); Nav.choose({ lon: ll[0], lat: ll[1], name: p.n || kind }); };
+    });
+    map.on('styleimagemissing', (e) => {
       if (!e.id || !e.id.startsWith('hkpt-') || map.hasImage(e.id) || !HK_PTS[e.id.slice(5)]) return;
       const { image, ratio } = hikePointImage(e.id.slice(5));
       map.addImage(e.id, image, { pixelRatio: ratio });
@@ -352,6 +414,7 @@ const Hike = {
     map.on('mouseleave', 'hike-pts', () => { map.getCanvas().style.cursor = ''; });
     map.on('click', 'hike-hit', (e) => {
       if (this._ptTap === e.originalEvent) return;
+      if (map.getLayer('oev-halt') && map.queryRenderedFeatures(e.point, { layers: ['oev-halt'] }).length) return;
       if ((typeof Draw !== 'undefined' && Draw.active) || editor.open || editor.moving) return;
       if (map.queryRenderedFeatures(e.point, { layers: ['places-icon', 'tracks-hit', 'tours-hit', 'tours-pt', 'hike-pts', 'poi-icon'].filter((l) => map.getLayer(l)) }).length) return;
       const f = e.features && e.features[0];
