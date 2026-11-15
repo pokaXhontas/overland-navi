@@ -110,7 +110,11 @@ const Planner = {
     const i = this.active;
     if (i < 0) return;
     if (r.type === 'quick-map') { this.pickOnMap(i); return; }
-    this.stops[i] = r.type === 'quick-gps' ? { gps: true } : this.clean({ name: r.type === 'coord' ? r.name : r.name, lat: r.lat, lon: r.lon });
+    // lieber lesbare Namen: „Bischkek“ statt „Бишкек“, wenn es einen gibt
+    const latin = (t) => /^[\p{Script=Latin}\d\s\p{P}\p{S}]+$/u.test(t);
+    let name = r.name;
+    if (name && !latin(name) && r.alts) { const alt = String(r.alts).split('|').find(latin); if (alt) name = alt; }
+    this.stops[i] = r.type === 'quick-gps' ? { gps: true } : this.clean({ name, lat: r.lat, lon: r.lon });
     this.active = -1;
     document.activeElement && document.activeElement.blur();
     this.save();
