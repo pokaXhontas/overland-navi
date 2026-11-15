@@ -27,4 +27,8 @@ for attempt in range(3):
         time.sleep(10)
 if allc is None:
     allc = json.load(open(CACHE))
+# Länder für die eigenen Reisen zuerst bauen, der Rest danach
+FIRST = ["germany", "sweden", "norway", "finland", "denmark", "poland", "kyrgyzstan", "kazakhstan", "uzbekistan", "tajikistan",
+         "switzerland", "austria", "liechtenstein", "georgia", "turkey", "mongolia"]
+allc.sort(key=lambda c: (FIRST.index(c["id"]) if c["id"] in FIRST else len(FIRST), c["id"]))
 print(json.dumps([c for c in allc if not only or c["id"] in only]))
