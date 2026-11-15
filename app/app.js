@@ -1552,7 +1552,7 @@ const Search = {
   async online(q) {
     if (!navigator.onLine || q.trim().length < 3) return [];
     const c = map.getCenter();
-    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lang=de&limit=8&lat=${c.lat.toFixed(3)}&lon=${c.lng.toFixed(3)}`;
+    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lang=de&limit=12&lat=${c.lat.toFixed(3)}&lon=${c.lng.toFixed(3)}`;
     try {
       const r = await originalFetch(url);
       if (!r.ok) return [];
@@ -1562,6 +1562,13 @@ const Search = {
         const p = f.properties || {};
         const [lon, lat] = f.geometry.coordinates;
         const where = [p.street && (p.street + (p.housenumber ? ' ' + p.housenumber : '')), p.postcode, p.city || p.county, p.country].filter(Boolean).join(', ');
+        const cat = p.name ? poiCatFor(p.osm_key, p.osm_value) : null;
+        if (cat) {
+          // Einrichtung (Restaurant, Laden, Bank …): eigenes Symbol, Infos beim Antippen
+          const kind = poiKindName(p.osm_value);
+          return { name: p.name, type: 'poi', lat, lon, sub: kind + (where ? ' · ' + where : ''), dist: distance(ref, { lat, lon }), color: cat.color, icon: cat.d,
+            poiCat: cat.id, kind, osmKey: p.osm_key, osmValue: p.osm_value, osmRef: (p.osm_type || 'N') + p.osm_id };
+        }
         return { name: p.name || where || 'Adresse', type: 'web', lat, lon, sub: 'Online · ' + where, dist: distance(ref, { lat, lon }), zoom: p.osm_key === 'place' ? 13 : 16 };
       });
     } catch (e) { return []; }
@@ -1577,8 +1584,10 @@ const Search = {
   show(r) {
     closeSearch();
     if (r.type !== 'quick-gps' && r.type !== 'quick-map') {
-      this.remember({ kind: 'place', name: r.name, sub: (r.sub || '').replace(/^Online · /, ''), lat: r.lat, lon: r.lon, type: r.type, zoom: r.zoom, placeId: r.place ? r.place.id : undefined });
+      this.remember({ kind: 'place', name: r.name, sub: (r.sub || '').replace(/^Online · /, ''), lat: r.lat, lon: r.lon, type: r.type, zoom: r.zoom, placeId: r.place ? r.place.id : undefined,
+        ...(r.type === 'poi' ? { poiCat: r.poiCat, kind: r.kind, osmKey: r.osmKey, osmValue: r.osmValue, osmRef: r.osmRef, color: r.color, icon: r.icon } : {}) });
     }
+    if (r.type === 'poi') { if (this.searchMarker) { this.searchMarker.remove(); this.searchMarker = null; } Poi.open(r); return; }
     if (r.placeId && !r.place) r.place = places.find((p) => p.id === r.placeId);
     if (r.place) { openEditor(r.place); return; }
     gps.follow = false;
@@ -1670,7 +1679,7 @@ function renderRecent() {
   const rec = Search.recent();
   const list = rec.map((x) => x.kind === 'cat' && POI[x.cat]
     ? { name: x.name, sub: 'Zuletzt gesucht', color: POI[x.cat].color, icon: POI[x.cat].d, rec: x }
-    : { ...x, sub: x.sub || 'Zuletzt gesucht', icon: (TYPE_ICON[x.type] || RECENT_ICON), rec: x });
+    : { ...x, sub: x.sub || 'Zuletzt gesucht', icon: x.icon || TYPE_ICON[x.type] || RECENT_ICON, rec: x });
   renderResultList(box, list, rec.length ? '' : 'Suche nach Orten, Gipfeln, Pässen, Seen, deinen eigenen Orten oder Koordinaten (z. B. 39.02, 73.48). Oder tippe oben eine Kategorie an.', (r) => {
     if (r.rec.kind === 'cat') Poi.run(POI[r.rec.cat], r.rec.place);
     else Search.show({ ...r.rec });

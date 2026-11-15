@@ -142,6 +142,20 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.evaluate(() => { closeSearch(); if (Poi.results[0]) Poi.focus(Poi.results[0]); });
   await shot('4g-geldautomat');
   await page.evaluate(() => Poi.clear());
+  // Bestimmtes Restaurant suchen: als Einrichtung erkannt, Infofenster mit Details
+  const rest = await page.evaluate(async () => {
+    map.jumpTo({ center: [74.59, 42.875], zoom: 13 });
+    const web = await Search.online('Navat');
+    const r = web.find((x) => x.type === 'poi');
+    if (!r) return 'kein Restaurant erkannt: ' + web.map((x) => x.name + '/' + x.type).join(', ');
+    Search.show(r);
+    await new Promise((res) => setTimeout(res, 3000));
+    const pop = document.querySelector('.hk-popup');
+    return r.name + ' | ' + r.sub + ' | Infofenster: ' + (pop ? pop.innerText.replace(/\s+/g, ' ').slice(0, 160) : 'fehlt');
+  });
+  console.log('Restaurant-Suche:', rest);
+  await shot('4h-restaurant');
+  await page.evaluate(() => { if (Poi.popup) Poi.popup.remove(); });
 
   // Luftbild und Hybrid
   for (const t of ['sat', 'hybrid']) {

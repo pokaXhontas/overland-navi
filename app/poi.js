@@ -41,6 +41,25 @@ const POI_CATS = [
     words: ['camping', 'campingplatz', 'hotel', 'hostel', 'gästehaus', 'unterkunft', 'übernachten', 'pension'], d: 'M3 20h18M5 20V10l7-6 7 6v10M10 20v-5h4v5' }
 ];
 const POI = Object.fromEntries(POI_CATS.map((c) => [c.id, c]));
+const POI_GENERIC = { id: 'poi', label: 'Orte', one: 'Ort', color: '#7048E8', d: 'M12 21s6-5.4 6-10.5a6 6 0 0 0-12 0C6 15.6 12 21 12 21ZM12 10.5h.01' };
+// OSM-Schlüssel, die eine Einrichtung beschreiben (kein Ort, Berg oder See)
+const POI_KEYS = ['amenity', 'shop', 'tourism', 'leisure', 'craft', 'office', 'healthcare', 'club'];
+const POI_EXTRA_KIND = { museum: 'Museum', attraction: 'Sehenswürdigkeit', viewpoint: 'Aussichtspunkt', bar: 'Bar', pub: 'Kneipe', ice_cream: 'Eisdiele',
+  clothes: 'Bekleidung', mall: 'Einkaufszentrum', department_store: 'Kaufhaus', electronics: 'Elektronik', car: 'Autohaus', bicycle: 'Fahrradladen',
+  sports: 'Sportgeschäft', books: 'Buchhandlung', police: 'Polizei', embassy: 'Botschaft', place_of_worship: 'Gotteshaus', parking: 'Parkplatz',
+  bus_station: 'Busbahnhof', car_wash: 'Autowäsche', car_rental: 'Autovermietung', veterinary: 'Tierarzt', gym: 'Fitnessstudio', fitness_centre: 'Fitnessstudio',
+  theatre: 'Theater', cinema: 'Kino', library: 'Bibliothek', school: 'Schule', university: 'Universität', townhall: 'Rathaus', park: 'Park', bakery: 'Bäckerei',
+  information: 'Touristeninfo', zoo: 'Zoo', spa: 'Wellness', swimming_pool: 'Schwimmbad', sauna: 'Sauna', beauty: 'Kosmetik', hairdresser: 'Friseur' };
+
+/* Kategorie zu einem OSM-Merkmal (z. B. amenity=restaurant) */
+function poiCatFor(key, value) {
+  if (!POI_KEYS.includes(key)) return null;
+  const c = POI_CATS.find((x) => x.types.includes(value));
+  return c || POI_GENERIC;
+}
+function poiKindName(value) {
+  return POI_KIND[value] || POI_EXTRA_KIND[value] || String(value || '').replace(/_/g, ' ').replace(/^./, (ch) => ch.toUpperCase());
+}
 const POI_OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
 const POI_KIND = {
   supermarket: 'Supermarkt', wholesale: 'Großmarkt', convenience: 'Laden', general: 'Gemischtwaren', kiosk: 'Kiosk', greengrocer: 'Obst und Gemüse',
@@ -248,7 +267,7 @@ const Poi = {
 
   label(p) {
     const t = p.tags;
-    return t.name || t.brand || t.operator || POI_KIND[t.shop || t.amenity || t.tourism] || this.cat.one;
+    return t.name || t.brand || t.operator || POI_KIND[t.shop || t.amenity || t.tourism] || (p.cat || this.cat || POI_GENERIC).one;
   },
 
   sub(p) {
@@ -327,7 +346,8 @@ const Poi = {
   show(p) {
     const t = p.tags;
     const esc = (s) => String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
-    const kind = POI_KIND[t.shop || t.amenity || t.tourism] || this.cat.one;
+    const cat = p.cat || this.cat || POI_GENERIC;
+    const kind = POI_KIND[t.shop || t.amenity || t.tourism] || p.kind || cat.one;
     const addr = [[t['addr:street'], t['addr:housenumber']].filter(Boolean).join(' '), [t['addr:postcode'], t['addr:city']].filter(Boolean).join(' ')].filter(Boolean).join(', ');
     const phone = t.phone || t['contact:phone'];
     const web = t.website || t['contact:website'] || t.url;
@@ -358,7 +378,7 @@ const Poi = {
       web && /^https?:\/\//.test(web) ? `<a class="btn small-btn" href="${esc(web)}" target="_blank" rel="noopener">Website</a>` : ''
     ].filter(Boolean).join('');
     const html = `<div class="hk-pop">
-      <div class="hk-head"><span class="hk-badge" style="background:${this.cat.color}"><svg viewBox="0 0 24 24" aria-hidden="true" class="poi-ico"><path d="${this.cat.d}"/></svg></span><b>${esc(this.label(p))}</b></div>
+      <div class="hk-head"><span class="hk-badge" style="background:${cat.color}"><svg viewBox="0 0 24 24" aria-hidden="true" class="poi-ico"><path d="${cat.d}"/></svg></span><b>${esc(this.label(p))}</b></div>
       ${status}
       ${rows.map((r) => `<div class="hk-row"><span>${r[0]}</span><b>${esc(r[1]).replace(/\n/g, '<br>')}</b></div>`).join('')}
       ${p.offline ? '<p class="small">Offline nur Name und Art. Mit Internet gibt es Öffnungszeiten, Telefon und mehr.</p>' : '<p class="small">Angaben aus OpenStreetMap, vor Ort können sie abweichen.</p>'}
@@ -380,6 +400,30 @@ const Poi = {
       $('#spot-name').value = editor.draft.name;
       $('#spot-note').value = editor.draft.note;
     };
+  },
+
+  /* Einzelne Einrichtung aus der Suche: Details nachladen und Infofenster zeigen */
+  async open(r) {
+    gps.follow = false; $('#btn-locate').classList.remove('active');
+    map.flyTo({ center: [r.lon, r.lat], zoom: Math.max(map.getZoom(), 16.5), duration: 700 });
+    const cat = r.poiCat ? POI[r.poiCat] || POI_GENERIC : POI_GENERIC;
+    let p = { lat: r.lat, lon: r.lon, tags: { name: r.name, [r.osmKey || 'amenity']: r.osmValue || '' }, cat, kind: r.kind, offline: !navigator.onLine };
+    if (navigator.onLine && r.osmRef) {
+      try {
+        const u = `https://nominatim.openstreetmap.org/lookup?osm_ids=${r.osmRef}&extratags=1&addressdetails=1&format=jsonv2&accept-language=de`;
+        const x = (await (await originalFetch(u)).json())[0];
+        if (x) {
+          const a = x.address || {};
+          const tags = { ...(x.extratags || {}), [x.category]: x.type, name: x.name || r.name };
+          if (a.road && !tags['addr:street']) tags['addr:street'] = a.road;
+          if (a.house_number && !tags['addr:housenumber']) tags['addr:housenumber'] = a.house_number;
+          if (!tags['addr:city']) tags['addr:city'] = a.city || a.town || a.village || '';
+          p = { lat: +x.lat, lon: +x.lon, tags, cat, kind: r.kind };
+        }
+      } catch (e) { /* mit dem zeigen, was die Suche lieferte */ }
+    }
+    p.open = poiOpenNow(p.tags.opening_hours);
+    this.show(p);
   },
 
   /* Kategorien-Leiste in der Suche */
