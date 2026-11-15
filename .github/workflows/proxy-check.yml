@@ -21,6 +21,17 @@ jobs:
           for d in $(seq 0 14); do D=$(date -u -d "-$d day" +%Y%m%d); if curl -sfI "https://build.protomaps.com/$D.pmtiles" > /dev/null; then break; fi; done
           echo "== Karte $D"; curl -s -D - -o /dev/null -H "Range: bytes=0-99" -H "Origin: https://pokaxhontas.github.io" "$P/$D.pmtiles" | grep -iE "^HTTP|access-control-allow-origin|content-range"
           echo "== Wanderwege (Testdatei)"; curl -sL -D /tmp/h -H "Origin: https://pokaxhontas.github.io" "$P/wander/test.json"; echo; grep -iE "^HTTP|access-control-allow-origin" /tmp/h
+      - name: Bus und Bahn in der Kirgistan-Datei
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          pip install --quiet pmtiles mapbox-vector-tile
+          gh release download wanderwege -p "kyrgyzstan.pmtiles" -R ${{ github.repository }}
+          ls -l kyrgyzstan.pmtiles
+          python3 scripts/inspect_tile.py kyrgyzstan.pmtiles 42.8746 74.6122 14
+          python3 scripts/inspect_tile.py kyrgyzstan.pmtiles 42.8746 74.6122 12
+          exit 0
       - name: Transitous (Bus und Bahn)
         run: python3 scripts/check_transit.py || true
       - name: Grundkarte an Beispielorten untersuchen
