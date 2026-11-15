@@ -379,6 +379,17 @@
   <svg viewBox="0 0 24 24"><path d="M12 22.5s7.5-6.4 7.5-12.5a7.5 7.5 0 0 0-15 0c0 6.1 7.5 12.5 7.5 12.5Z"/><circle cx="12" cy="10" r="2.8"/></svg>
 </div>
 <div class="move-hint panel" id="move-hint" hidden>Karte verschieben, bis die Nadel genau auf dem Ort sitzt</div>
+<div class="pick-bar panel" id="pick-bar" hidden>
+  <div class="grab" aria-hidden="true"></div>
+  <b id="pick-title">Wo soll der Ort hin?</b>
+  <small>Karte verschieben, bis die Nadel genau sitzt</small>
+  <small class="pick-coords" id="pick-coords"></small>
+  <div class="pick-btns">
+    <button class="btn" id="pick-cancel">Abbrechen</button>
+    <button class="btn" id="pick-gps">Mein Standort</button>
+    <button class="btn primary" id="pick-ok">Hier setzen</button>
+  </div>
+</div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="fatal" id="fatal" hidden></div>

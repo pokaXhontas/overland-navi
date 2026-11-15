@@ -734,3 +734,19 @@ body.drawing .fab, body.drawing .hud { display: none; }
 .poi-open { background: rgba(47,158,68,.15); color: #2B8A3E; }
 .poi-closed { background: rgba(224,49,49,.13); color: #C92A2A; }
 .hk-actions a.btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+
+/* Ort setzen: Fenster eingeklappt, Leiste unten */
+.pick-bar { position: fixed; z-index: 12; left: 50%; transform: translateX(-50%); bottom: calc(var(--safe-b) + 12px);
+  width: min(520px, calc(100vw - 24px)); padding: 10px 16px 14px; border-radius: 22px; display: flex; flex-direction: column; gap: 3px; background: var(--panel-solid); }
+.pick-bar[hidden] { display: none; }
+.pick-bar b { font-size: 17px; }
+.pick-bar small { color: var(--muted); font-size: 13px; }
+.pick-bar .pick-coords { font-variant-numeric: tabular-nums; }
+.pick-btns { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 8px; margin-top: 10px; }
+.pick-btns .btn { height: 50px; font-size: 15px; padding: 0 8px; }
+.pick-btns .btn[hidden] { display: none; }
+.pick-bar:has(#pick-gps[hidden]) .pick-btns { grid-template-columns: 1fr 1.6fr; }
+#spot.picking { display: none; }
+.edit-pin svg { width: 48px; height: 48px; filter: drop-shadow(0 3px 5px rgba(0,0,0,.35)); }
+.edit-pin path { fill: var(--accent); stroke: #0B0F12; stroke-width: 1; }
+.edit-pin circle { fill: var(--accent-ink); }

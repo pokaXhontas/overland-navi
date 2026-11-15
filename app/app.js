@@ -731,7 +731,7 @@ function updateEditorCoords() {
 function setMoving(on) {
   editor.moving = on;
   $('#crosshair').hidden = !on;
-  $('#move-hint').hidden = !on;
+  $('#move-hint').hidden = !on || !!editor.picking;
   $('#spot-move').textContent = on ? 'Position wird verschoben …' : 'Position verschieben';
   $('#spot-move').disabled = on;
   if (map.getLayer('places-icon')) {
@@ -813,7 +813,7 @@ async function renderPhotos() {
   }
 }
 
-function openEditor(place, at) {
+function openEditor(place, at, opts = {}) {
   closeTrackInfo();
   closeSheet();
   gps.follow = false;
@@ -844,14 +844,76 @@ function openEditor(place, at) {
   sheet.hidden = false;
   sheet.querySelector('.sheet-body').scrollTop = 0;
   requestAnimationFrame(() => {
+    if (isNew && opts.pick) { startPick(); return; }
+    setMoving(false);
+    showEditorPin();
     const padding = setEditorPadding();
     map.easeTo({ center: [editor.draft.lon, editor.draft.lat], zoom: Math.max(map.getZoom(), 15), padding, duration: 500 });
-    setMoving(isNew);
+    if (isNew && !editor.draft.ele) fillEditorEle();
   });
+}
+
+/* Punkt wählen: Karte unter der Nadel verschieben, Fenster solange eingeklappt */
+function startPick() {
+  editor.picking = true;
+  editor.pickFrom = { lat: editor.draft.lat, lon: editor.draft.lon };
+  $('#spot').classList.add('picking');
+  if (editor.pin) editor.pin.remove();
+  setMoving(true);
+  $('#pick-bar').hidden = false;
+  $('#pick-title').textContent = editor.id ? 'Neue Position wählen' : 'Wo soll der Ort hin?';
+  $('#pick-gps').hidden = !gps.pos;
+  const padding = setEditorPadding();
+  map.easeTo({ center: [editor.draft.lon, editor.draft.lat], zoom: Math.max(map.getZoom(), 14), padding, duration: 400 });
+}
+
+function endPick(take) {
+  if (!editor.picking) return;
+  editor.picking = false;
+  $('#pick-bar').hidden = true;
+  if (take) {
+    const c = map.getCenter();
+    editor.draft.lat = c.lat; editor.draft.lon = c.lng;
+    if (gps.pos && gps.alt !== null && distance(gps.pos, editor.draft) < 60) editor.draft.ele = Math.round(gps.alt);
+    else editor.draft.ele = null;
+  } else if (!editor.id) { closeEditor(); return; }
+  else { editor.draft.lat = editor.pickFrom.lat; editor.draft.lon = editor.pickFrom.lon; }
+  $('#spot').classList.remove('picking');
+  setMoving(false);
+  showEditorPin();
+  requestAnimationFrame(() => {
+    const padding = setEditorPadding();
+    map.easeTo({ center: [editor.draft.lon, editor.draft.lat], padding, duration: 400 });
+  });
+  if (take && !editor.draft.ele) fillEditorEle();
+}
+
+/* Nadel an der gewählten Stelle, solange das Fenster offen ist */
+function showEditorPin() {
+  if (editor.pin) editor.pin.remove();
+  editor.pin = null;
+  if (!editor.open || editor.id) return;   // gespeicherte Orte haben ihr eigenes Symbol
+  const el = document.createElement('div');
+  el.className = 'edit-pin';
+  el.innerHTML = $('#crosshair').innerHTML;
+  editor.pin = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([editor.draft.lon, editor.draft.lat]).addTo(map);
+}
+
+/* Höhe aus dem Höhenmodell, wenn der Ort nicht am eigenen Standort liegt */
+async function fillEditorEle() {
+  const d = editor.draft;
+  try {
+    const e = await demElevation(d.lon, d.lat);
+    if (editor.draft === d && typeof e === 'number' && isFinite(e)) { d.ele = Math.round(e); updateEditorCoords(); }
+  } catch (err) { /* ohne Höhe */ }
 }
 
 function closeEditor() {
   editor.open = false;
+  editor.picking = false;
+  $('#pick-bar').hidden = true;
+  $('#spot').classList.remove('picking');
+  if (editor.pin) { editor.pin.remove(); editor.pin = null; }
   $('#spot').hidden = true;
   $('#crosshair').hidden = true;
   $('#move-hint').hidden = true;
@@ -908,9 +970,9 @@ async function deleteEditorPlace() {
 }
 
 function newPlaceHere() {
-  const at = gps.pos ? { lat: gps.pos.lat, lon: gps.pos.lon } : (() => { const c = map.getCenter(); return { lat: c.lat, lon: c.lng }; })();
-  if (!gps.pos) toast('Kein GPS – der Ort startet in der Kartenmitte');
-  openEditor(null, at);
+  // dort, wo man gerade auf die Karte schaut (zum Vorausplanen); den eigenen Standort gibt es per Knopf
+  const c = map.getCenter();
+  openEditor(null, { lat: c.lat, lon: c.lng }, { pick: true });
 }
 
 function renderPlaceList() { renderDataCats(); refreshCatPage(); }
@@ -947,10 +1009,10 @@ function setupEditorUI() {
     closeEditor();
     Nav.choose({ lat: p.lat, lon: p.lon, name: p.name });
   };
-  $('#spot-move').onclick = () => {
-    map.easeTo({ center: [editor.draft.lon, editor.draft.lat], duration: 300 });
-    setMoving(true);
-  };
+  $('#spot-move').onclick = () => startPick();
+  $('#pick-ok').onclick = () => endPick(true);
+  $('#pick-cancel').onclick = () => endPick(false);
+  $('#pick-gps').onclick = () => { if (gps.pos) map.easeTo({ center: [gps.pos.lon, gps.pos.lat], zoom: Math.max(map.getZoom(), 16), duration: 500 }); };
   $('#spot-file').onchange = async (e) => {
     const files = [...e.target.files];
     e.target.value = '';
@@ -2366,7 +2428,7 @@ async function main() {
   map.on('mouseleave', 'tracks-hit', () => { map.getCanvas().style.cursor = ''; });
   map.on('mouseenter', 'places-icon', () => { map.getCanvas().style.cursor = 'pointer'; });
   map.on('mouseleave', 'places-icon', () => { map.getCanvas().style.cursor = ''; });
-  map.on('move', () => { if (editor.open && editor.moving) updateEditorCoords(); });
+  map.on('move', () => { if (editor.open && editor.moving) { updateEditorCoords(); if (editor.picking) $('#pick-coords').textContent = $('#spot-coords').textContent.replace(/ · .*m$/, ''); } });
   setupLongPress();
   loadTracks();
   map.on('error', (e) => { if (e && e.error) console.warn('Karte:', e.error.message || e.error); });
