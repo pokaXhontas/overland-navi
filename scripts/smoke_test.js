@@ -79,6 +79,33 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   }
   await page.evaluate(() => { settings.mapType = 'topo'; refreshStyle(); });
 
+  // Routenplaner: Start, Zwischenstopp, Ziel über die Eingabefelder
+  await page.evaluate(() => { Nav.stop(true); Planner.open([null, null]); });
+  await sleep(500);
+  const typePick = async (i, text) => {
+    await page.evaluate((i) => { document.querySelectorAll('#pl-stops input')[i].focus(); }, i);
+    await page.keyboard.type(text, { delay: 30 });
+    await page.waitForFunction(() => document.querySelectorAll('#pl-results .place-item').length > 0, { timeout: 30000 });
+    await sleep(1500);
+    await page.evaluate(() => document.querySelector('#pl-results .place-item').click());
+    await sleep(300);
+  };
+  await typePick(0, 'Bischkek');
+  await typePick(1, 'Karakol');
+  await page.evaluate(() => $('#pl-add').click());
+  await typePick(1, 'Tscholpon-Ata');
+  console.log('Planer:', await page.evaluate(() => Planner.stops.map((s) => Planner.label(s)).join(' → ')));
+  await shot('11-planer');
+  await page.evaluate(() => $('#pl-go').click());
+  await page.waitForFunction(() => Nav.pending, { timeout: 60000 });
+  console.log('Geplante Route:', await page.evaluate(() => Nav.pending.list.map((r) => Math.round(r.time / 60) + ' min/' + Math.round(r.total / 1000) + ' km/' + r.vias.length + ' Stopp').join(', ') + ' · ' + $('#na-sub').textContent));
+  await shot('12-geplante-route');
+  await page.evaluate(() => $('#na-edit').click());
+  await sleep(500);
+  console.log('Nach „Route ändern“:', await page.evaluate(() => !$('#planner').hidden && Planner.stops.map((s) => Planner.label(s)).join(' → ')));
+  await page.evaluate(() => Planner.close());
+  console.log('Zuletzt geplant:', await page.evaluate(() => store.get('planRecent', []).length));
+
   // Route zeichnen: echte Taps auf die Karte
   await page.evaluate(() => { map.jumpTo({ center: [74.60, 42.87], zoom: 13, bearing: 0 }); Draw.start(); });
   await sleep(1500);

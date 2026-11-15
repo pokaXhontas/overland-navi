@@ -349,8 +349,10 @@ function buildStyle() {
       paint: { 'line-color': '#8C98A2', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 4, 15, 9] } },
     { id: 'route-air', type: 'line', source: 'route', filter: ['==', ['get', 'kind'], 'line'], layout: { 'line-cap': 'round' },
       paint: { 'line-color': navBlue, 'line-width': 4, 'line-dasharray': [0.1, 2] } },
-    { id: 'route-target', type: 'circle', source: 'route', filter: ['==', ['get', 'kind'], 'target'],
-      paint: { 'circle-radius': 9, 'circle-color': navBlue, 'circle-stroke-color': '#FFFFFF', 'circle-stroke-width': 3 } }
+    { id: 'route-target', type: 'circle', source: 'route', filter: ['match', ['get', 'kind'], ['target', 'via', 'start'], true, false],
+      paint: { 'circle-radius': ['match', ['get', 'kind'], 'via', 7, 9],
+        'circle-color': ['match', ['get', 'kind'], 'start', '#2F9E44', 'via', '#FFFFFF', '#C2255C'],
+        'circle-stroke-color': ['match', ['get', 'kind'], 'via', navBlue, '#FFFFFF'], 'circle-stroke-width': 3 } }
   );
   layers.push(
     {
@@ -1309,6 +1311,7 @@ function setupUI() {
   $('#btn-gpx').onclick = exportGPX;
   setupVehiclePicker();
   Nav.setup();
+  Planner.setup();
   Draw.setup();
   document.querySelectorAll('[data-maptype]').forEach((b) => {
     b.setAttribute('aria-checked', String(b.dataset.maptype === settings.mapType));
@@ -1562,22 +1565,25 @@ function fmtDist(d) {
   return d >= 10000 ? Math.round(d / 1000) + ' km' : d >= 1000 ? (d / 1000).toFixed(1).replace('.', ',') + ' km' : Math.round(d) + ' m';
 }
 
-function renderSearchResults(list, note) {
-  const box = $('#search-results');
+function renderSearchResults(list, note) { renderResultList($('#search-results'), list, note, (r) => Search.show(r)); }
+
+const QUICK_ICON = { 'quick-gps': 'M12 2v3M12 19v3M2 12h3M19 12h3M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z', 'quick-map': 'M12 21s6-5.4 6-10.5a6 6 0 0 0-12 0C6 15.6 12 21 12 21ZM12 10.5h.01' };
+function renderResultList(box, list, note, onPick) {
   box.innerHTML = '';
   if (note) { const p = document.createElement('p'); p.className = 'muted small sr-note'; p.textContent = note; box.appendChild(p); }
   for (const r of list) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'place-item';
-    const color = r.type === 'own' ? (CAT[r.place.cat] || CAT.other).color : r.type === 'web' ? '#5B6670' : 'var(--faint)';
-    const ink = r.type === 'own' ? (CAT[r.place.cat] || CAT.other).ink : r.type === 'web' ? '#fff' : 'var(--text)';
-    const d = r.type === 'own' ? (CAT[r.place.cat] || CAT.other).d : (TYPE_ICON[r.type] || TYPE_ICON.default);
+    const quick = QUICK_ICON[r.type];
+    const color = quick ? '#2F80ED' : r.type === 'own' ? (CAT[r.place.cat] || CAT.other).color : r.type === 'web' ? '#5B6670' : 'var(--faint)';
+    const ink = quick ? '#fff' : r.type === 'own' ? (CAT[r.place.cat] || CAT.other).ink : r.type === 'web' ? '#fff' : 'var(--text)';
+    const d = quick || (r.type === 'own' ? (CAT[r.place.cat] || CAT.other).d : (TYPE_ICON[r.type] || TYPE_ICON.default));
     b.innerHTML = `<span class="pi-icon" style="background:${color};color:${ink}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg></span><span class="pi-txt"><b></b><small></small></span><span class="pi-dist"></span>`;
     b.querySelector('b').textContent = r.name;
     b.querySelector('small').textContent = r.sub || '';
     b.querySelector('.pi-dist').textContent = fmtDist(r.dist);
-    b.onclick = () => Search.show(r);
+    b.onclick = () => onPick(r);
     box.appendChild(b);
   }
 }

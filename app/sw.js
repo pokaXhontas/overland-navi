@@ -15,6 +15,7 @@ const SHELL = [
   'extract.js',
   'vehicles.js',
   'nav.js',
+  'planner.js',
   'draw.js',
   'manifest.webmanifest',
   'icons/icon-192.png',
