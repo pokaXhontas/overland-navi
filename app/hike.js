@@ -15,59 +15,100 @@ const VIS_TEXT = [null, 'sehr gut sichtbar', 'gut sichtbar', 'stellenweise undeu
 const ROUTE_COLORS = { red: '#D62828', blue: '#1C6DD0', yellow: '#E3A700', green: '#2F9E44', orange: '#E8590C', purple: '#7048E8', black: '#343A40', white: '#ADB5BD', brown: '#8B5A2B' };
 
 const Hike = {
-  archives: new Map(),
-  local: new Set(),
+  index: store.get('hikeIndex', {}),   // Kennung → { size, date, bbox, name, iso }
+  local: new Map(),                     // Gebiet → Set der offline gespeicherten Kennungen
+  arch: new Map(),
 
   on() { return store.get('hikeOn', true); },
   max() { return store.get('hikeMax', 6); },
-  regions() { return Tiles.regions.filter((r) => r.hike); },
-  url(r) { return Tiles.sources.hike ? Tiles.sources.hike.replace('{id}', r.id) : null; },
+  keys() { return Object.keys(this.index); },
+  url(key) { return Tiles.sources.hike ? Tiles.sources.hike.replace('{id}', key) : null; },
+
+  async loadIndex() {
+    if (!Tiles.sources.hike || !navigator.onLine) return;
+    try {
+      const r = await originalFetch(this.url('index').replace('.pmtiles', '.json'), { cache: 'no-cache' });
+      if (r.ok) { this.index = await r.json(); store.set('hikeIndex', this.index); }
+    } catch (e) { /* alte Liste behalten */ }
+  },
+
+  /* Länderdateien, die ein Gebiet berühren */
+  keysFor(boxes) {
+    return this.keys().filter((k) => {
+      const b = this.index[k].bbox;
+      return b && boxes.some((x) => x[0] <= b[2] && x[2] >= b[0] && x[1] <= b[3] && x[3] >= b[1]);
+    });
+  },
+  regionDone(r) {
+    const ks = this.keysFor(r.boxes), have = this.local.get(r.id);
+    return ks.length > 0 && !!have && ks.every((k) => have.has(k));
+  },
 
   async scan() {
     this.local.clear();
+    this.arch.clear();
     const root = await Tiles.opfs();
-    if (!root) return;
-    for (const r of Tiles.regions) if (await Tiles.exists(root, `${r.id}-hike.ok`)) this.local.add(r.id);
-    this.archives.clear();
+    if (!root || !root.keys) return;
+    const old = [];
+    for await (const name of root.keys()) {
+      const m = name.match(/^(.+)-hk-([a-z0-9-]+)\.idx\.ok$/);
+      if (m) { if (!this.local.has(m[1])) this.local.set(m[1], new Set()); this.local.get(m[1]).add(m[2]); }
+      if (/-hike\.(pmtiles|ok|pmtiles\.state)$/.test(name)) old.push(name);
+    }
+    for (const n of old) { try { await root.removeEntry(n); } catch (e) { /* egal */ } }
   },
 
-  async archive(r) {
-    const key = r.id + (this.local.has(r.id) ? '/lokal' : '/online');
-    if (this.archives.has(key)) return this.archives.get(key);
+  async localArchive(rid, key) {
+    const k = rid + '/' + key;
+    if (this.arch.has(k)) return this.arch.get(k);
     let a = null;
     try {
-      if (this.local.has(r.id)) {
-        const root = await Tiles.opfs();
-        const file = await (await root.getFileHandle(`${r.id}-hike.pmtiles`)).getFile();
-        a = new pmtiles.PMTiles(new FileSource(file, key));
-      } else if (navigator.onLine && this.url(r)) {
-        a = new pmtiles.PMTiles(this.url(r));
-      }
+      const root = await Tiles.opfs();
+      const idx = await (await (await root.getFileHandle(`${rid}-hk-${key}.idx`)).getFile()).arrayBuffer();
+      const data = await (await root.getFileHandle(`${rid}-hk-${key}.dat`)).getFile();
+      a = new OvlExtract.LocalArchive(idx, async (o, l) => new Uint8Array(await data.slice(o, o + l).arrayBuffer()));
     } catch (e) { a = null; }
-    this.archives.set(key, a);
+    this.arch.set(k, a);
     return a;
+  },
+  remoteArchive(key) {
+    const k = 'online/' + key;
+    if (!this.arch.has(k)) this.arch.set(k, this.url(key) ? new pmtiles.PMTiles(this.url(key)) : null);
+    return this.arch.get(k);
   },
 
   async tile(z, x, y) {
     const n = Math.pow(2, z);
     const lon = (x + 0.5) / n * 360 - 180;
     const lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * (y + 0.5) / n))) * 180 / Math.PI;
-    const hits = this.regions().filter((r) => r.boxes.some((b) => lon >= b[0] - 0.5 && lon <= b[2] + 0.5 && lat >= b[1] - 0.5 && lat <= b[3] + 0.5));
-    hits.sort((a, b) => this.local.has(b.id) - this.local.has(a.id));
-    for (const r of hits) {
-      const a = await this.archive(r);
-      if (!a) continue;
+    // zuerst offline gespeicherte Gebiete
+    for (const r of Tiles.regions) {
+      const have = this.local.get(r.id);
+      if (!have || !r.boxes.some((b) => lon >= b[0] && lon <= b[2] && lat >= b[1] && lat <= b[3])) continue;
+      for (const key of have) {
+        try {
+          const a = await this.localArchive(r.id, key);
+          const t = a && await a.getZxy(z, x, y);
+          if (t && t.data && t.data.byteLength) return t.data;
+        } catch (e) { /* nächste */ }
+      }
+    }
+    if (!navigator.onLine) return null;
+    // online: die Länderdatei, deren Ausdehnung passt (kleinste zuerst)
+    const hits = this.keys().filter((k) => { const b = this.index[k].bbox; return b && lon >= b[0] && lon <= b[2] && lat >= b[1] && lat <= b[3]; });
+    hits.sort((a, b) => (this.index[a].size || 0) - (this.index[b].size || 0));
+    for (const key of hits) {
       try {
-        const t = await a.getZxy(z, x, y);
-        if (t && t.data) return t.data;
-      } catch (e) { /* nächste Datei */ }
+        const t = await this.remoteArchive(key).getZxy(z, x, y);
+        if (t && t.data && t.data.byteLength) return t.data;
+      } catch (e) { /* nächste */ }
     }
     return null;
   },
 
   /* Kartenebenen; werden in buildStyle eingefügt */
   layers(dark, sat) {
-    if (!this.on() || !this.regions().length) return { lines: [], labels: [] };
+    if (!this.on() || (!this.keys().length && !this.local.size)) return { lines: [], labels: [] };
     const max = this.max();
     const isTrack = ['all', ['==', ['get', 'h'], 't'], ['==', ['get', 's'], 0], ['!', ['has', 'net']]];
     const sacOk = ['any', ['==', ['get', 's'], 0], ['<=', ['get', 's'], max]];
@@ -142,11 +183,11 @@ const Hike = {
       row.innerHTML = `<span class="hk-dash" style="--c:${s.color}"></span><span class="hk-badge" style="background:${s.color}">${s.t}</span><span><b>${s.name}</b><small>${s.text}</small></span>`;
       legend.appendChild(row);
     }
-    const have = this.regions();
-    const off = have.filter((r) => this.local.has(r.id)).map((r) => r.name);
-    const need = have.filter((r) => Tiles.local.has(r.id) && !this.local.has(r.id)).map((r) => r.name);
-    let txt = have.length ? `Wanderwege gibt es für: ${have.map((r) => r.name).join(', ')}.` : 'Die Wanderwege werden gerade erstellt. Schau später nochmal rein.';
-    if (off.length) txt += ` Offline gespeichert: ${off.join(', ')}.`;
+    const n = this.keys().length;
+    const off = Tiles.regions.filter((r) => this.regionDone(r)).map((r) => r.name);
+    const need = Tiles.regions.filter((r) => Tiles.local.has(r.id) && this.keysFor(r.boxes).length && !this.regionDone(r)).map((r) => r.name);
+    let txt = n ? `Online gibt es Wanderwege für ${n} Länder.` : 'Die Wanderwege werden gerade erstellt. Schau später nochmal rein.';
+    if (off.length) txt += ` Offline gespeichert für: ${off.join(', ')}.`;
     if (need.length) txt += ` Für ${need.join(', ')} unter Menü → Offline-Karten „Wanderwege laden“ tippen.`;
     $('#hk-status').textContent = txt;
   },
@@ -160,7 +201,8 @@ const Hike = {
   },
 
   setup() {
-    this.scan().then(() => { if (this.on() && this.regions().length) refreshStyle(); });
+    const before = this.keys().length;
+    Promise.all([this.scan(), this.loadIndex()]).then(() => { if (this.on() && (this.keys().length !== before || this.local.size)) refreshStyle(); });
     $('#btn-hike').onclick = () => ($('#hike-sheet').hidden ? this.open() : this.close());
     $('#hk-close').onclick = () => this.close();
     $('#hk-on').onchange = () => { store.set('hikeOn', $('#hk-on').checked); refreshStyle(); };

@@ -175,7 +175,7 @@ async function downloadFile(root, name, url, size, post) {
 }
 
 self.onmessage = async (e) => {
-  const { id, boxes, maxzoom, demMaxzoom, sources, searchUrl, buildSearchIndex, mode, hikeUrl, hikeSize } = e.data;
+  const { id, boxes, maxzoom, demMaxzoom, sources, searchUrl, buildSearchIndex, mode, hikeLayers } = e.data;
   const post = (m) => self.postMessage(m);
   try {
     if (mode === 'estimate') {
@@ -193,6 +193,8 @@ self.onmessage = async (e) => {
     const saveState = (layer, st) => writeWhole(root, `${id}-${layer}.state`, enc.encode(JSON.stringify(st)));
 
     const layers = [['base', sources.base, maxzoom], ['dem', sources.dem, demMaxzoom]];
+    // Wanderwege: aus jeder berührten Länderdatei genau das Gebiet ausschneiden
+    for (const h of hikeLayers || []) layers.push(['hk-' + h.key, h.url, 14]);
     const jobs = [];
     let doneBytes = 0;
     for (const [layer, url, mz] of layers) {
@@ -234,12 +236,6 @@ self.onmessage = async (e) => {
     }
 
     post({ type: 'tiles-done' });
-    if (hikeUrl && hikeSize) {
-      try {
-        await downloadFile(root, `${id}-hike.pmtiles`, hikeUrl, hikeSize, post);
-        post({ type: 'hike-done' });
-      } catch (err) { post({ type: 'hike-error', message: String(err && err.message || err) }); }
-    }
     if (searchUrl) {
       try {
         const r = await fetch(searchUrl);

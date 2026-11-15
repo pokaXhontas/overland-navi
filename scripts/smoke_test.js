@@ -98,13 +98,24 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.evaluate(() => { map.jumpTo({ center: [74.49, 42.57], zoom: 13.2, bearing: 0, pitch: 0 }); });
   await sleep(6000);
   console.log('Wanderwege:', await page.evaluate(() => {
-    const regs = Hike.regions().map((r) => r.id).join(',');
+    const regs = Hike.keys().length + ' Länderdateien';
     const f = map.getLayer('hike-line') ? map.queryRenderedFeatures({ layers: ['hike-line'] }) : [];
     const sac = {};
     for (const x of f) sac['T' + x.properties.s] = (sac['T' + x.properties.s] || 0) + 1;
     sac.Feldwege = map.getLayer('hike-track') ? map.queryRenderedFeatures({ layers: ['hike-track'] }).length : 0;
     return 'Länder: ' + regs + ' · sichtbare Wegstücke: ' + f.length + ' ' + JSON.stringify(sac);
   }));
+  // Schweiz: 5-Seen-Wanderung am Pizol
+  await page.evaluate(() => { map.jumpTo({ center: [9.40, 46.975], zoom: 13.4 }); });
+  await sleep(6000);
+  console.log('Pizol:', await page.evaluate(() => {
+    const f = map.getLayer('hike-line') ? map.queryRenderedFeatures({ layers: ['hike-line', 'hike-route'] }) : [];
+    const routes = [...new Set(f.map((x) => x.properties.r).filter(Boolean))];
+    return f.length + ' Wegstücke · Routen: ' + (routes.join(' | ').slice(0, 300) || 'keine');
+  }));
+  await shot('4a-pizol');
+  await page.evaluate(() => { map.jumpTo({ center: [74.49, 42.57], zoom: 13.2 }); });
+  await sleep(5000);
   await page.evaluate(() => { const f = map.queryRenderedFeatures({ layers: ['hike-line'] }).find((x) => x.properties.s >= 2) || map.queryRenderedFeatures({ layers: ['hike-line'] })[0]; if (f) Hike.showInfo(f, map.getCenter()); });
   await shot('4b-wanderwege');
   await page.evaluate(() => { if (Hike.popup) Hike.popup.remove(); Hike.open(); });
