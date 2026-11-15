@@ -1,6 +1,11 @@
 name: Empfohlene Touren bauen
 on:
   workflow_dispatch:
+    inputs:
+      explore:
+        description: 'Nur benannte Objekte rund um die Touren auflisten'
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths: ['tours/*-def.json', 'scripts/build_tours.py']
@@ -29,10 +34,12 @@ jobs:
             done
             [ $ok = 1 ] || exit 1
             ls -lh land.osm.pbf
+            if [ "${{ github.event.inputs.explore }}" = "true" ]; then python3 scripts/build_tours.py --explore "$def" land.osm.pbf; exit 0; fi
             python3 scripts/build_tours.py "$def" land.osm.pbf "app/tours/$name.geojson"
             ls -l "app/tours/$name.geojson"
           done
       - name: Ergebnis speichern und App neu bauen
+        if: github.event.inputs.explore != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

@@ -190,7 +190,67 @@ def length(c):
     return sum(dist(c[i - 1], c[i]) for i in range(1, len(c)))
 
 
+INTEREST = ("natural", "mountain_pass", "tourism", "place", "waterway", "route", "amenity", "historic")
+
+
+class Explore(osmium.SimpleHandler):
+    """Hilfsmodus: benannte Objekte rund um jede Tour auflisten, um Wegpunkte festzulegen."""
+
+    def __init__(self, tours):
+        super().__init__()
+        self.boxes = []
+        for t in tours:
+            xs = [p["near"][0] for p in t["points"]]
+            ys = [p["near"][1] for p in t["points"]]
+            self.boxes.append((t["id"], min(xs) - 0.12, min(ys) - 0.1, max(xs) + 0.12, max(ys) + 0.1))
+        self.hits = {b[0]: [] for b in self.boxes}
+
+    def add(self, kind, o, c):
+        tags = tagdict(o)
+        name = tags.get("name") or tags.get("name:en")
+        if not name or not any(k in tags for k in INTEREST):
+            return
+        if kind == "w" and "route" not in tags and not any(k in tags for k in ("natural", "tourism", "place", "amenity")):
+            return
+        for tid, x0, y0, x1, y1 in self.boxes:
+            if c and x0 <= c[0] <= x1 and y0 <= c[1] <= y1:
+                info = ",".join(f"{k}={tags[k]}" for k in INTEREST + ("ele", "name:en") if k in tags)
+                self.hits[tid].append(f"{kind} {name} | {info} | {c[0]:.5f},{c[1]:.5f}")
+
+    def node(self, n):
+        if n.tags:
+            self.add("n", n, [n.location.lon, n.location.lat])
+
+    def way(self, w):
+        if not w.tags:
+            return
+        try:
+            c = [w.nodes[len(w.nodes) // 2].lon, w.nodes[len(w.nodes) // 2].lat]
+        except Exception:
+            return
+        self.add("w", w, c)
+
+
+def explore(defs, pbf):
+    tours = json.load(open(defs, encoding="utf-8"))["tours"]
+    ex = Explore(tours)
+    ex.apply_file(pbf, locations=True, idx="flex_mem")
+    for tid, lst in ex.hits.items():
+        print(f"\n#### {tid}: {len(lst)} Objekte")
+        for h in sorted(lst)[:400]:
+            print("  ", h)
+    class R(osmium.SimpleHandler):
+        def relation(self, r):
+            tags = tagdict(r)
+            if tags.get("type") == "route" or tags.get("route"):
+                print("REL", r.id, tags.get("route"), tags.get("name"), "|", tags.get("name:en", ""))
+    print("\n#### Routen-Relationen im Land")
+    R().apply_file(pbf)
+
+
 def main():
+    if sys.argv[1] == "--explore":
+        return explore(sys.argv[2], sys.argv[3])
     defs, pbf, out = sys.argv[1:4]
     tours = json.load(open(defs, encoding="utf-8"))["tours"]
     for t in tours:
