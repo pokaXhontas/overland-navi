@@ -147,6 +147,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // Menü: Fahrzeugauswahl und Länderliste
   await page.evaluate(() => $('#btn-layers').click());
+  await page.evaluate(() => $('#voice-test').scrollIntoView());
+  await sleep(300);
+  await page.click('#voice-test');
+  await sleep(1500);
+  console.log('Probe hören (Web-Audio):', await page.evaluate(() => Pack.how + ' · ' + (Pack.ctx && Pack.ctx.state)));
+  await page.evaluate(() => { Pack._r = Pack.running; Pack.running = async () => false; Pack.how = ''; });
+  await page.click('#voice-test');
+  await sleep(1500);
+  console.log('Probe hören (Ersatzweg Audio-Player):', await page.evaluate(() => Pack.how + ' · läuft: ' + (Pack.el && !Pack.el.paused) + ' · Dauer ' + (Pack.el && Pack.el.duration ? Pack.el.duration.toFixed(2) : '?') + ' s'));
+  await page.evaluate(() => { Pack.running = Pack._r; });
   await page.evaluate(() => $('#veh-grid').scrollIntoView());
   await shot('6-menue-fahrzeuge');
   await drag('#sheet', 300, 0);

@@ -5,9 +5,12 @@
 const VALHALLA = 'https://valhalla1.openstreetmap.de/route';
 const OSRM = 'https://routing.openstreetmap.de/routed-car/route/v1/driving/';
 
-/* Mitgelieferte Stimmen: kurze Bausteine („In 300 Metern“ + „rechts abbiegen“), offline nutzbar */
+/* Mitgelieferte Stimmen: kurze Bausteine („In 300 Metern“ + „rechts abbiegen“), offline nutzbar.
+ * iOS gibt Ton erst nach einem echten Fingertipp frei. Deshalb wird bei jedem Tipp „entsperrt“,
+ * und wenn Web-Audio trotzdem stumm bleibt, spielt ein normaler Audio-Player die Ansage. */
+const SILENT_WAV = 'data:audio/wav;base64,UklGRiYAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YQIAAAAAAA==';
 const Pack = {
-  index: null, ctx: null, buf: new Map(), playing: [],
+  index: null, ctx: null, raw: new Map(), dec: new Map(), playing: [], el: null, elReady: false,
   async load() {
     if (this.index) return this.index;
     try { const r = await fetch('voices/index.json'); this.index = r.ok ? await r.json() : null; } catch (e) { this.index = null; }
@@ -18,43 +21,89 @@ const Pack = {
     if (!this.ctx) {
       const C = window.AudioContext || window.webkitAudioContext;
       if (!C) return null;
-      this.ctx = new C();
+      try { this.ctx = new C(); } catch (e) { return null; }
     }
-    if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
     return this.ctx;
   },
-  get(voice, key) {
-    const k = voice + '/' + key;
-    if (this.buf.has(k)) return this.buf.get(k);
-    const p = fetch(`voices/${voice}/${key}.mp3`)
-      .then((r) => { if (!r.ok) throw new Error('fehlt'); return r.arrayBuffer(); })
-      .then((ab) => new Promise((res, rej) => this.ac().decodeAudioData(ab, res, rej)));
-    this.buf.set(k, p);
-    p.catch(() => this.buf.delete(k));
-    return p;
-  },
-  stop() { for (const s of this.playing) { try { s.stop(); } catch (e) { /* schon fertig */ } } this.playing = []; },
-  async play(voice, keys, rate) {
-    const ctx = this.ac();
-    if (!ctx) throw new Error('kein Audio');
-    // Navigationsansagen: andere Musik kurz leiser, auch bei Stummschalter hörbar
+  /* im Fingertipp aufrufen */
+  unlock() {
     try { if (navigator.audioSession) navigator.audioSession.type = 'transient'; } catch (e) { /* älteres iOS */ }
-    const bufs = await Promise.all(keys.map((k) => this.get(voice, k)));
-    this.stop();
-    let t = ctx.currentTime + 0.05;
-    for (const b of bufs) {
-      const s = ctx.createBufferSource();
-      s.buffer = b;
-      s.playbackRate.value = rate;
-      s.connect(ctx.destination);
-      s.start(t);
-      t += b.duration / rate + 0.05;
-      this.playing.push(s);
+    const ctx = this.ac();
+    if (ctx && ctx.state !== 'running') {
+      ctx.resume().catch(() => {});
+      try { const s = ctx.createBufferSource(); s.buffer = ctx.createBuffer(1, 1, 22050); s.connect(ctx.destination); s.start(0); } catch (e) { /* egal */ }
+    }
+    if (!this.el) { this.el = new Audio(); this.el.setAttribute('playsinline', ''); this.el.preload = 'auto'; }
+    if (!this.elReady) {
+      this.el.src = SILENT_WAV;
+      const p = this.el.play();
+      if (p) p.then(() => { this.elReady = true; }).catch(() => {});
     }
   },
-  preload(voice) { for (const k of (this.index && this.index.keys) || []) this.get(voice, k).catch(() => {}); }
+  async running() {
+    const ctx = this.ac();
+    if (!ctx) return false;
+    if (ctx.state !== 'running') {
+      try { await Promise.race([ctx.resume(), new Promise((r) => setTimeout(r, 350))]); } catch (e) { /* bleibt stumm */ }
+    }
+    return ctx.state === 'running';
+  },
+  bytes(voice, key) {
+    const k = voice + '/' + key;
+    if (!this.raw.has(k)) {
+      const p = fetch(`voices/${voice}/${key}.mp3`).then((r) => { if (!r.ok) throw new Error('Ansage fehlt'); return r.arrayBuffer(); });
+      this.raw.set(k, p);
+      p.catch(() => this.raw.delete(k));
+    }
+    return this.raw.get(k);
+  },
+  decoded(voice, key) {
+    const k = voice + '/' + key;
+    if (!this.dec.has(k)) {
+      const p = this.bytes(voice, key).then((ab) => new Promise((res, rej) => this.ac().decodeAudioData(ab.slice(0), res, rej)));
+      this.dec.set(k, p);
+      p.catch(() => this.dec.delete(k));
+    }
+    return this.dec.get(k);
+  },
+  stop() {
+    for (const s of this.playing) { try { s.stop(); } catch (e) { /* schon fertig */ } }
+    this.playing = [];
+    if (this.el && !this.el.paused) { try { this.el.pause(); } catch (e) { /* egal */ } }
+  },
+  async play(voice, keys, rate) {
+    if (await this.running()) {
+      const bufs = await Promise.all(keys.map((k) => this.decoded(voice, k)));
+      this.stop();
+      const ctx = this.ctx;
+      let t = ctx.currentTime + 0.05;
+      for (const b of bufs) {
+        const s = ctx.createBufferSource();
+        s.buffer = b;
+        s.playbackRate.value = rate;
+        s.connect(ctx.destination);
+        s.start(t);
+        t += b.duration / rate + 0.05;
+        this.playing.push(s);
+      }
+      this.how = 'webaudio';
+      return;
+    }
+    // Ersatzweg: Bausteine hintereinander als eine MP3 über den normalen Audio-Player
+    const parts = await Promise.all(keys.map((k) => this.bytes(voice, k)));
+    if (!this.el) { this.el = new Audio(); this.el.setAttribute('playsinline', ''); }
+    this.stop();
+    if (this.el.dataset.url) URL.revokeObjectURL(this.el.dataset.url);
+    const url = URL.createObjectURL(new Blob(parts, { type: 'audio/mpeg' }));
+    this.el.dataset.url = url;
+    this.el.src = url;
+    this.el.playbackRate = rate;
+    await this.el.play();
+    this.how = 'audio';
+  },
+  preload(voice) { for (const k of (this.index && this.index.keys) || []) this.bytes(voice, k).catch(() => {}); }
 };
-document.addEventListener('pointerdown', () => { if (Pack.ctx || Pack.index) Pack.ac(); }, { passive: true });
+for (const ev of ['touchend', 'click', 'keydown']) document.addEventListener(ev, () => Pack.unlock(), { capture: true, passive: true });
 
 const Nav = {
   active: null,
@@ -630,27 +679,28 @@ const Nav = {
   },
 
   say(text, force, keys) {
-    if ((!this.voice && !force) || !text) return;
+    if ((!this.voice && !force) || !text) return Promise.resolve(false);
     const pv = this.packVoice();
     if (pv && keys && keys.length) {
-      Pack.play(pv, keys, store.get('navRate', 1)).catch(() => this.sayTTS(text));
-      return;
+      return Pack.play(pv, keys, store.get('navRate', 1)).then(() => true).catch(() => this.sayTTS(text));
     }
-    this.sayTTS(text);
+    return Promise.resolve(this.sayTTS(text));
   },
 
   sayTTS(text) {
-    if (!('speechSynthesis' in window)) return;
+    if (!('speechSynthesis' in window)) return false;
     try {
-      speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
       u.lang = 'de-DE';
       const v = this.pickVoice();
       if (v) { u.voice = v; u.lang = v.lang; }
       u.rate = store.get('navRate', 1);
       u.pitch = 1;
-      speechSynthesis.speak(u);
-    } catch (e) { /* keine Sprachausgabe */ }
+      // iOS verschluckt eine Ansage direkt nach cancel(), daher kurz warten
+      if (speechSynthesis.speaking || speechSynthesis.pending) { speechSynthesis.cancel(); setTimeout(() => speechSynthesis.speak(u), 120); }
+      else speechSynthesis.speak(u);
+      return true;
+    } catch (e) { return false; }
   },
 
   setupVoiceUI() {
@@ -700,7 +750,14 @@ const Nav = {
     $('#voice-rate-val').textContent = Math.round(rate.value * 100) + ' %';
     rate.oninput = () => { $('#voice-rate-val').textContent = Math.round(rate.value * 100) + ' %'; };
     rate.onchange = () => { store.set('navRate', +rate.value); this.say('In 300 Metern rechts abbiegen.', true, ['d300', 'right']); };
-    $('#voice-test').onclick = () => this.say('In 300 Metern rechts abbiegen.', true, ['d300', 'right']);
+    const test = $('#voice-test');
+    test.onclick = async () => {
+      Pack.unlock();
+      test.textContent = 'Spielt …';
+      const ok = await this.say('In 300 Metern rechts abbiegen.', true, ['d300', 'right']);
+      setTimeout(() => { test.textContent = 'Probe hören'; }, 1800);
+      if (!ok) toast('Kein Ton möglich. Ist das iPad stumm oder ganz leise gestellt?', 4500);
+    };
     const on = $('#voice-on');
     on.checked = this.voice;
     on.onchange = () => { this.voice = on.checked; store.set('navVoice', this.voice); $('#nb-voice').classList.toggle('off', !this.voice); };
