@@ -171,9 +171,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const typePick = async (i, text) => {
     await page.evaluate((i) => { document.querySelectorAll('#pl-stops input')[i].focus(); }, i);
     await page.keyboard.type(text, { delay: 30 });
-    await page.waitForFunction(() => document.querySelectorAll('#pl-results .place-item').length > 0, { timeout: 30000 });
-    await sleep(1500);
-    await page.evaluate(() => document.querySelector('#pl-results .place-item').click());
+    // Online-Suche kann kurz gedrosselt sein: bis zu dreimal versuchen
+    for (let tries = 0; tries < 3; tries++) {
+      await page.waitForFunction(() => document.querySelectorAll('#pl-results .place-item').length > 0, { timeout: 30000 }).catch(() => {});
+      await sleep(1500);
+      const ok = await page.evaluate(() => { const b = document.querySelector('#pl-results .place-item'); if (b) b.click(); return !!b; });
+      if (ok) break;
+      await sleep(3000);
+      await page.evaluate((i) => { const inp = document.querySelectorAll('#pl-stops input')[i]; inp.dispatchEvent(new Event('input', { bubbles: true })); }, i);
+    }
     await sleep(300);
   };
   await typePick(0, 'Bischkek');
