@@ -1116,7 +1116,7 @@ function startDownload(region) {
   worker.postMessage({
     id: region.id, boxes: region.boxes, maxzoom: region.maxzoom, demMaxzoom: region.demMaxzoom,
     sources: Tiles.sources, searchUrl: region.search ? BASE + region.search : null, buildSearchIndex: !region.search,
-    hikeLayers: Hike.keysFor(region.boxes).map((k) => ({ key: k, url: Hike.url(k) })).filter((l) => l.url)
+    hikeLayers: Hike.keysFor(region.boxes).map((k) => ({ key: k, url: Hike.dlUrl(k) })).filter((l) => l.url)
   });
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 }
@@ -1207,7 +1207,7 @@ function renderRegions() {
       if (Hike.keysFor(r.boxes).length && !Hike.regionDone(r)) {
         const hb = document.createElement('button');
         hb.className = 'btn small-btn';
-        hb.textContent = 'Wanderwege laden';
+        hb.textContent = Hike.regionStale(r) ? 'Wanderwege aktualisieren' : 'Wanderwege laden';
         hb.onclick = () => { if (!navigator.onLine) { toast('Dafür brauchst du Internet.'); return; } startDownload(r); };
         div.querySelector('.region-top').insertBefore(hb, btn);
       } else if (Hike.regionDone(r)) state.append(' · mit Wanderwegen');

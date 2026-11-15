@@ -62,6 +62,7 @@ function hikePointImage(k) {
 const Hike = {
   index: store.get('hikeIndex', {}),   // Kennung → { size, date, bbox, name, iso }
   local: new Map(),                     // Gebiet → Set der offline gespeicherten Kennungen
+  localDate: new Map(),                 // „Gebiet/Kennung“ → Zeitpunkt des Downloads
   arch: new Map(),
 
   on() { return store.get('hikeOn', true); },
@@ -91,8 +92,17 @@ const Hike = {
   },
   regionDone(r) {
     const ks = this.keysFor(r.boxes), have = this.local.get(r.id);
-    return ks.length > 0 && !!have && ks.every((k) => have.has(k));
+    return ks.length > 0 && !!have && ks.every((k) => have.has(k) && !this.stale(r.id, k));
   },
+  regionStale(r) { const have = this.local.get(r.id); return !!have && this.keysFor(r.boxes).some((k) => have.has(k) && this.stale(r.id, k)); },
+  /* gespeicherte Kopie älter als die aktuelle Datei? (neue Ebenen wie Bus & Bahn, Biwaks) */
+  stale(rid, key) {
+    const d = this.localDate.get(rid + '/' + key), m = this.index[key];
+    if (!d || !m || !m.date) return false;
+    return d < Date.parse(m.ts || m.date + 'T00:00:00Z');
+  },
+  /* Download-Adresse mit Datum, damit eine neuere Fassung wirklich neu geladen wird */
+  dlUrl(key) { const u = this.url(key); return u && this.index[key] && this.index[key].date ? u + '?v=' + this.index[key].date : u; },
 
   async scan() {
     this.local.clear();
@@ -102,7 +112,11 @@ const Hike = {
     const old = [];
     for await (const name of root.keys()) {
       const m = name.match(/^(.+)-hk-([a-z0-9-]+)\.idx\.ok$/);
-      if (m) { if (!this.local.has(m[1])) this.local.set(m[1], new Set()); this.local.get(m[1]).add(m[2]); }
+      if (m) {
+        if (!this.local.has(m[1])) this.local.set(m[1], new Set());
+        this.local.get(m[1]).add(m[2]);
+        try { this.localDate.set(m[1] + '/' + m[2], (await (await root.getFileHandle(`${m[1]}-hk-${m[2]}.dat`)).getFile()).lastModified); } catch (e) { /* ohne Datum */ }
+      }
       if (/-hike\.(pmtiles|ok|pmtiles\.state)$/.test(name)) old.push(name);
     }
     for (const n of old) { try { await root.removeEntry(n); } catch (e) { /* egal */ } }
@@ -136,6 +150,7 @@ const Hike = {
       const have = this.local.get(r.id);
       if (!have || !r.boxes.some((b) => lon >= b[0] && lon <= b[2] && lat >= b[1] && lat <= b[3])) continue;
       for (const key of have) {
+        if (navigator.onLine && this.stale(r.id, key)) continue;   // veraltete Kopie: lieber online die neue Fassung
         try {
           const a = await this.localArchive(r.id, key);
           const t = a && await a.getZxy(z, x, y);
