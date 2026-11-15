@@ -64,8 +64,10 @@ class Relations(osmium.SimpleHandler):
         if not ways:
             return
         for t in self.tours:
-            if t.get("relation") and tags.get("route") in ("hiking", "foot") and re.search(t["relation"], tags.get("name", "")):
-                self.found.append(("route", t["id"], None, tags.get("name", ""), ways))
+            name = tags.get("name:en") or tags.get("name", "")
+            if r.id == t.get("relation_id") or (t.get("relation") and tags.get("route") in ("hiking", "foot")
+                                                 and (re.search(t["relation"], tags.get("name", "")) or re.search(t["relation"], name))):
+                self.found.append(("route", t["id"], None, name, ways))
                 self.need.update(ways)
             for i, p in enumerate(t["points"]):
                 if p.get("flt") and matches(tags, p["flt"]):
@@ -293,7 +295,7 @@ def main():
             pts.append({"label": p["label"], "icon": p.get("icon", "dot"), "coord": [round(c[0], 6), round(c[1], 6)], "on_route": p.get("on_route", True)})
 
         lines = []
-        if t.get("relation"):
+        if t.get("relation") or t.get("relation_id"):
             routes = [x for x in rel.found if x[0] == "route" and x[1] == t["id"]]
             for _, _, _, name, ways in routes[:1]:
                 segs = [scan.geom[w] for w in ways if w in scan.geom]

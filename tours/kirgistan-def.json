@@ -6,67 +6,55 @@
    "name": "Ala-Kul & Altyn-Arashan",
    "color": "#C2255C",
    "expect_km": 50,
-   "relation": "Ala-Kul.*Altyn",
+   "relation_id": 12350207,
    "points": [
     {
-     "label": "Parktor Karakol",
+     "label": "Nationalpark-Eingang",
      "icon": "start",
      "near": [
-      78.418,
-      42.455
-     ],
-     "filter": "[\"name\"~\"Каракол|Karakol\"][\"tourism\"~\"information|camp_site\"]",
-     "radius": 4000
+      78.4156,
+      42.44216
+     ]
     },
     {
-     "label": "Sirota",
+     "label": "Sirota (Jurtencamp)",
      "icon": "camp",
      "near": [
-      78.48,
-      42.33
-     ],
-     "filter": "[\"name\"~\"Сирота|Sirota\"]",
-     "radius": 12000
+      78.47166,
+      42.31539
+     ]
     },
     {
-     "label": "Ala-Kul-See",
+     "label": "Ala-Kul-See, Zeltplätze",
      "icon": "lake",
      "near": [
-      78.53,
-      42.3
-     ],
-     "filter": "[\"natural\"=\"water\"][\"name\"~\"Ала-Куль|Ала-Көл|Ala-?Kul|Ala-?Köl\"]",
-     "radius": 12000
+      78.52758,
+      42.31974
+     ]
     },
     {
      "label": "Ala-Kul-Pass 3.920 m",
      "icon": "pass",
      "near": [
-      78.56,
-      42.32
-     ],
-     "filter": "[\"mountain_pass\"=\"yes\"][\"name\"~\"Ала-Куль|Ала-Көл|Ala-?Kul\"]",
-     "radius": 12000
+      78.54534,
+      42.32639
+     ]
     },
     {
      "label": "Altyn-Arashan",
      "icon": "spring",
      "near": [
-      78.62,
-      42.375
-     ],
-     "filter": "[\"place\"][\"name\"~\"Алтын-Арашан|Altyn.?Arashan\"]",
-     "radius": 10000
+      78.61173,
+      42.3728
+     ]
     },
     {
      "label": "Ak-Suu",
      "icon": "end",
      "near": [
-      78.53,
-      42.505
-     ],
-     "filter": "[\"place\"][\"name\"~\"Ак-Суу|Ak-?Suu|Теплоключенка\"]",
-     "radius": 10000
+      78.52239,
+      42.49968
+     ]
     }
    ]
   },
@@ -80,31 +68,25 @@
      "label": "Alplager",
      "icon": "start",
      "near": [
-      74.483,
-      42.565
-     ],
-     "filter": "[\"name\"~\"Альплагерь|Alplager|Alpine camp\"]",
-     "radius": 4000
+      74.48238,
+      42.56254
+     ]
     },
     {
      "label": "Ak-Sai-Wasserfall",
      "icon": "waterfall",
      "near": [
-      74.505,
-      42.538
-     ],
-     "filter": "[\"waterway\"=\"waterfall\"]",
-     "radius": 4000
+      74.51726,
+      42.54648
+     ]
     },
     {
      "label": "Ratsek-Hütte 3.300 m",
      "icon": "hut",
      "near": [
-      74.517,
-      42.523
-     ],
-     "filter": "[\"name\"~\"Рацек|Ratsek\"]",
-     "radius": 6000
+      74.52889,
+      42.53501
+     ]
     }
    ]
   },
@@ -115,42 +97,53 @@
    "expect_km": 33,
    "points": [
     {
-     "label": "Kyzart-Pass (Start)",
+     "label": "Start am Kyzart-Pass",
      "icon": "start",
      "near": [
-      74.97,
-      42.07
-     ],
-     "filter": "[\"mountain_pass\"=\"yes\"][\"name\"~\"Кызарт|Kyzart\"]",
-     "radius": 15000
+      75.14612,
+      42.09378
+     ]
     },
     {
-     "label": "Kilemche",
-     "icon": "camp",
-     "near": [
-      74.95,
-      41.98
-     ],
-     "filter": "[\"name\"~\"Килемче|Kilemche\"]",
-     "radius": 25000
-    },
-    {
-     "label": "Jalgyz-Karagai-Pass",
+     "label": "Chaar-Archa 3.043 m",
      "icon": "pass",
      "near": [
-      75.0,
-      41.95
-     ],
-     "filter": "[\"name\"~\"Жалгыз|Jalgyz|Djalgyz\"]",
-     "radius": 25000
+      75.1676,
+      42.06576
+     ]
     },
     {
-     "label": "Song-Köl Nordufer",
+     "label": "Kilemche (CBT-Jurten)",
+     "icon": "camp",
+     "near": [
+      75.15857,
+      41.98941
+     ]
+    },
+    {
+     "label": "Höchster Punkt des Wegs",
+     "icon": "pass",
+     "near": [
+      75.12286,
+      41.95797
+     ]
+    },
+    {
+     "label": "Song-Köl, Jurtencamps Nordufer",
      "icon": "end",
      "near": [
-      75.05,
-      41.9
+      75.13676,
+      41.91852
      ]
+    },
+    {
+     "label": "Tuz-Ashuu 3.233 m (Rückweg)",
+     "icon": "pass",
+     "near": [
+      75.11328,
+      41.96021
+     ],
+     "on_route": false
     }
    ]
   },
@@ -161,34 +154,28 @@
    "expect_km": 8,
    "points": [
     {
-     "label": "Tulpar-Köl",
+     "label": "Jurtencamps Tulpar-Köl",
      "icon": "start",
      "near": [
-      72.86,
-      39.42
-     ],
-     "filter": "[\"natural\"=\"water\"][\"name\"~\"Тулпар|Tulpar\"]",
-     "radius": 8000
+      72.92962,
+      39.49884
+     ]
     },
     {
      "label": "Basislager Achik-Tash",
      "icon": "camp",
      "near": [
-      72.87,
-      39.4
-     ],
-     "filter": "[\"name\"~\"Ачик-Таш|Ачик Таш|Achik.?Tash\"]",
-     "radius": 10000
+      72.91255,
+      39.48217
+     ]
     },
     {
-     "label": "Traveller's Pass 4.150 m",
+     "label": "Traveller's Pass 4.130 m",
      "icon": "pass",
      "near": [
-      72.88,
-      39.37
-     ],
-     "filter": "[\"name\"~\"Путешественник|Traveller\"]",
-     "radius": 12000
+      72.89935,
+      39.4372
+     ]
     }
    ]
   },
@@ -196,15 +183,8 @@
    "id": "skazka",
    "name": "Skazka-Canyon (Märchenschlucht)",
    "color": "#F59F00",
-   "expect_km": 4,
+   "expect_km": 3,
    "info": "canyons",
-   "ways": {
-    "near": [
-     77.346,
-     42.1658
-    ],
-    "radius": 1300
-   },
    "points": [
     {
      "label": "Skazka Parkplatz",
@@ -212,6 +192,46 @@
      "near": [
       77.346,
       42.1658
+     ]
+    },
+    {
+     "label": "Aussicht unten",
+     "icon": "view",
+     "near": [
+      77.35508,
+      42.15657
+     ]
+    },
+    {
+     "label": "Aussicht Schichtfelsen",
+     "icon": "view",
+     "near": [
+      77.35266,
+      42.15621
+     ]
+    },
+    {
+     "label": "Aufstieg Aussichtshügel",
+     "icon": "view",
+     "near": [
+      77.35194,
+      42.15475
+     ]
+    },
+    {
+     "label": "Steile Aussicht",
+     "icon": "view",
+     "near": [
+      77.35827,
+      42.15676
+     ]
+    },
+    {
+     "label": "Zurück zum Parkplatz",
+     "icon": "end",
+     "near": [
+      77.3461,
+      42.1657
      ]
     }
    ]
@@ -222,34 +242,39 @@
    "color": "#B5482A",
    "expect_km": 10,
    "info": "canyons",
-   "ways": {
-    "near": [
-     75.83,
-     42.58
-    ],
-    "radius": 15000,
-    "name": "каньон|Каньон|панорам|Панорам|Кок-Мойнок|Көк-Мойнок"
-   },
+   "relation_id": 19628981,
    "points": [
     {
-     "label": "Parkplatz Krasnyj Most",
+     "label": "Abzweig Krasnyj Most",
      "icon": "start",
      "near": [
-      75.83,
-      42.58
-     ],
-     "filter": "[\"amenity\"=\"parking\"]",
-     "radius": 8000
+      75.80447,
+      42.57914
+     ]
     },
     {
-     "label": "Panorama-Aussicht 1.890 m",
+     "label": "Konorchek-Canyons",
      "icon": "view",
      "near": [
-      75.85,
-      42.57
-     ],
-     "filter": "[\"tourism\"=\"viewpoint\"]",
-     "radius": 10000
+      75.78303,
+      42.60264
+     ]
+    },
+    {
+     "label": "Aussicht am Canyonende",
+     "icon": "view",
+     "near": [
+      75.75911,
+      42.591
+     ]
+    },
+    {
+     "label": "Aussicht Konorchek",
+     "icon": "view",
+     "near": [
+      75.72436,
+      42.60684
+     ]
     }
    ]
   }
