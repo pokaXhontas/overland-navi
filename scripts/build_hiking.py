@@ -46,11 +46,14 @@ class Ways(osmium.SimpleHandler):
         hw = t.get("highway")
         rs = member.get(w.id, [])
         sac = SAC.get(t.get("sac_scale", ""), 0)
-        if not rs and not sac and hw != "path":
+        walk = hw in ("path", "footway", "bridleway", "steps", "via_ferrata", "track")
+        if not rs and not sac and not walk:
             return
         if hw in ("motorway", "trunk", "primary", "secondary") and not rs:
             return
-        if t.get("footway") in ("sidewalk", "crossing") or t.get("area") == "yes":
+        if t.get("footway") in ("sidewalk", "crossing", "traffic_island") or t.get("area") == "yes":
+            return
+        if t.get("access") in ("private", "no") and not rs:
             return
         try:
             coords = [(round(n.lon, 6), round(n.lat, 6)) for n in w.nodes]
@@ -58,7 +61,7 @@ class Ways(osmium.SimpleHandler):
             return
         if len(coords) < 2:
             return
-        p = {"s": sac, "h": hw or ""}
+        p = {"s": sac, "h": {"path": "p", "footway": "f", "bridleway": "b", "steps": "s", "via_ferrata": "k", "track": "t"}.get(hw, "o")}
         name = t.get("name:de") or t.get("name")
         if name:
             p["n"] = name[:60]
@@ -73,7 +76,16 @@ class Ways(osmium.SimpleHandler):
             if rr[0]["col"]:
                 p["c"] = rr[0]["col"]
         # wichtige Routen früh zeigen, schwierige Pfade ab mittlerem Zoom, einfache Pfade erst nah dran
-        minz = (8 if p.get("net", 0) >= 3 else 9 if p.get("net") == 2 else 10) if rs else (11 if sac >= 2 else 12)
+        if rs:
+            minz = 8 if p.get("net", 0) >= 3 else 9 if p.get("net") == 2 else 10
+        elif sac:
+            minz = 10
+        elif hw in ("path", "bridleway", "via_ferrata"):
+            minz = 11
+        elif hw == "track":
+            minz = 12
+        else:
+            minz = 13
         f = {"type": "Feature", "properties": p, "tippecanoe": {"minzoom": minz},
              "geometry": {"type": "LineString", "coordinates": coords}}
         self.out.write(json.dumps(f, ensure_ascii=False, separators=(",", ":")) + "\n")

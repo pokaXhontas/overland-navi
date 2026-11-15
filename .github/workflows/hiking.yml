@@ -47,7 +47,7 @@ jobs:
 
       - name: Wanderwege herausfiltern
         run: |
-          osmium tags-filter land.osm.pbf w/sac_scale w/highway=path r/route=hiking,foot -o wege.osm.pbf --overwrite
+          osmium tags-filter land.osm.pbf w/sac_scale w/highway=path,footway,bridleway,steps,via_ferrata,track r/route=hiking,foot -o wege.osm.pbf --overwrite
           ls -lh wege.osm.pbf
           python3 scripts/build_hiking.py wege.osm.pbf wege.geojsonseq
 
