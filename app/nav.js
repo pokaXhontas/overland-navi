@@ -29,9 +29,13 @@ const Nav = {
   },
 
   async valhalla(from, to) {
-    const opts = this.profile === 'tracks'
-      ? { use_tracks: 0.8, use_highways: 0.6, exclude_unpaved: false, use_ferry: 0.5 }
-      : { use_tracks: 0, use_highways: 1, use_ferry: 0.5 };
+    // Spielstraßen und „Anlieger frei“ nicht künstlich meiden, sonst entstehen in Wohngebieten große Umwege
+    const town = { use_living_streets: 0.6, destination_only_penalty: 120, service_penalty: 10 };
+    const opts = {
+      tracks: { use_tracks: 0.8, use_highways: 0.6, exclude_unpaved: false, use_ferry: 0.5, ...town },
+      short: { shortest: true, use_tracks: 0, use_ferry: 0.5, ...town, use_living_streets: 1 },
+      road: { use_tracks: 0, use_highways: 1, use_ferry: 0.5, ...town }
+    }[this.profile] || {};
     const loc = { lat: from.lat, lon: from.lon };
     if (gps.heading !== null && gps.speed > 2) { loc.heading = Math.round(gps.heading); loc.heading_tolerance = 60; }
     const q = {
@@ -115,13 +119,27 @@ const Nav = {
       along: 0, seg: 0, off: 0, offCount: 0, lastReroute: Date.now(), spoken: {}, created: Date.now() };
   },
 
+  /* Zwei unabhängige Routenrechner fragen und die Vorschläge zusammenlegen.
+     Für Straßen kommen so mehr echte Alternativen zusammen; auf Pisten zählt nur Valhalla. */
   async calc(from, target) {
-    let res = null, err = null;
-    for (const fn of [this.valhalla, this.osrm]) {
-      try { res = await fn.call(this, from, target); if (res && res.length) break; } catch (e) { err = e; }
+    const jobs = [this.valhalla(from, target)];
+    if (this.profile !== 'tracks') jobs.push(this.osrm(from, target));
+    const results = await Promise.allSettled(jobs);
+    let list = [];
+    for (const r of results) if (r.status === 'fulfilled') list.push(...r.value);
+    if (!list.length && this.profile === 'tracks') { try { list = await this.osrm(from, target); } catch (e) { /* nichts */ } }
+    if (!list.length) {
+      const err = results.find((r) => r.status === 'rejected');
+      throw (err && err.reason) || new Error('Keine Route gefunden');
     }
-    if (!res || !res.length) throw err || new Error('Keine Route gefunden');
-    return res;
+    const lenOf = (r) => trackLength(r.coords);
+    const uniq = [];
+    for (const r of list) {
+      r.len = lenOf(r);
+      if (!uniq.some((u) => Math.abs(u.len - r.len) < Math.max(80, u.len * 0.02) && Math.abs(u.time - r.time) < 90)) uniq.push(r);
+    }
+    uniq.sort(this.profile === 'short' ? (a, b) => a.len - b.len : (a, b) => a.time - b.time);
+    return uniq.slice(0, 4);
   },
 
   async position() {
@@ -166,13 +184,18 @@ const Nav = {
     this.pending = { target, list, sel: 0 };
     const box = $('#nav-alts'), rows = $('#na-list');
     const fastest = Math.min(...list.map((r) => r.time));
+    const shortest = Math.min(...list.map((r) => r.total));
     const render = () => {
       rows.innerHTML = '';
       list.forEach((r, i) => {
         const b = document.createElement('button');
         b.className = 'na-row';
         b.setAttribute('aria-checked', String(i === this.pending.sel));
-        const extra = r.time > fastest ? ` · +${Math.round((r.time - fastest) / 60)} min` : ' · schnellste';
+        const tags = [];
+        if (r.time <= fastest + 30) tags.push('schnellste');
+        else tags.push('+' + Math.round((r.time - fastest) / 60) + ' min');
+        if (r.total <= shortest + 50) tags.push('kürzeste');
+        const extra = ' · ' + tags.join(' · ');
         b.innerHTML = `<b>${this.fmtTime(r.time)}</b><span>${fmtDist(r.total)}${extra}</span>`;
         b.onclick = () => { this.pending.sel = i; render(); this.draw(); };
         rows.appendChild(b);

@@ -41,6 +41,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.waitForFunction(() => Nav.active || Nav.pending, { timeout: 60000 });
   console.log('Vorschläge Berlin–Potsdam:', await page.evaluate(() => Nav.pending ? Nav.pending.list.map((r) => Math.round(r.time / 60) + ' min/' + Math.round(r.total / 1000) + ' km').join(', ') : 'nur eine Route'));
   await shot('2a-vorschlaege');
+  for (const prof of ['road', 'short']) {
+    await page.evaluate((p) => { if (Nav.pending) $('#na-cancel').click(); Nav.stop(true); Nav.profile = p; gps.pos = { lat: 52.4766, lon: 13.4295 }; return Nav.start({ lat: 52.4876, lon: 13.4106, name: 'Test' }, 'route'); }, prof);
+    await page.waitForFunction(() => Nav.active || Nav.pending, { timeout: 60000 });
+    console.log('Neukölln→Kreuzberg ' + prof + ':', await page.evaluate(() => (Nav.pending ? Nav.pending.list : [Nav.active]).map((r) => Math.round(r.time / 60) + ' min/' + (r.total / 1000).toFixed(1) + ' km/' + r.source).join(', ')));
+  }
+  await page.evaluate(() => { Nav.profile = 'road'; });
   await page.evaluate(() => { if (Nav.pending) $('#na-cancel').click(); Nav.stop(true); gps.pos = { lat: 42.8746, lon: 74.5698 }; });
   await page.evaluate(() => Nav.start({ lat: 42.4901, lon: 78.3936, name: 'Karakol' }, 'route'));
   await page.waitForFunction(() => Nav.active || Nav.pending, { timeout: 60000 });
