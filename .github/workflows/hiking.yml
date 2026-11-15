@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 90
     strategy:
       fail-fast: false
-      max-parallel: 5
+      max-parallel: 2
       matrix:
         include:
           - { id: berlin, osm: europe/germany/brandenburg }
