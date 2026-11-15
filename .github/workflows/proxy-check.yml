@@ -35,7 +35,9 @@ jobs:
           python3 scripts/inspect_tile.py kyrgyzstan.pmtiles 42.8746 74.6122 12
           exit 0
       - name: Transitous (Bus und Bahn)
-        run: python3 scripts/check_transit.py || true
+        run: |
+          python3 scripts/check_transit.py "https://api.transitous.org/api/v5/plan?fromPlace=52.5606,13.3733&toPlace=52.4572,13.3209&numItineraries=3&time=2026-11-16T08:00:00Z" || true
+          python3 scripts/check_transit.py "https://api.transitous.org/api/v5/plan?fromPlace=52.5606,13.3733&toPlace=52.4572,13.3209&numItineraries=3&time=2026-11-15T23:55:00Z" || true
       - name: Grundkarte an Beispielorten untersuchen
         run: |
           set +e

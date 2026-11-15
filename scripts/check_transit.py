@@ -3,7 +3,8 @@
 import json
 import urllib.request
 
-U = "https://api.transitous.org/api/v5/plan?fromPlace=52.5219,13.4132&toPlace=52.5076,13.3904&numItineraries=3"
+import sys
+U = sys.argv[1] if len(sys.argv) > 1 else "https://api.transitous.org/api/v5/plan?fromPlace=52.5219,13.4132&toPlace=52.5076,13.3904&numItineraries=3"
 req = urllib.request.Request(U, headers={"User-Agent": "overland-navi (https://github.com/pokaXhontas/overland-navi)", "Origin": "https://pokaxhontas.github.io"})
 r = urllib.request.urlopen(req, timeout=60)
 print("CORS:", r.headers.get("Access-Control-Allow-Origin"))
