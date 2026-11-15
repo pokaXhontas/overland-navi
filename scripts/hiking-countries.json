@@ -1,0 +1,1531 @@
+[
+{
+"id": "afghanistan",
+"url": "https://download.geofabrik.de/asia/afghanistan-latest.osm.pbf",
+"name": "Afghanistan",
+"iso": [
+"AF"
+]
+},
+{
+"id": "albania",
+"url": "https://download.geofabrik.de/europe/albania-latest.osm.pbf",
+"name": "Albania",
+"iso": [
+"AL"
+]
+},
+{
+"id": "algeria",
+"url": "https://download.geofabrik.de/africa/algeria-latest.osm.pbf",
+"name": "Algeria",
+"iso": [
+"DZ"
+]
+},
+{
+"id": "andorra",
+"url": "https://download.geofabrik.de/europe/andorra-latest.osm.pbf",
+"name": "Andorra",
+"iso": [
+"AD"
+]
+},
+{
+"id": "angola",
+"url": "https://download.geofabrik.de/africa/angola-latest.osm.pbf",
+"name": "Angola",
+"iso": [
+"AO"
+]
+},
+{
+"id": "antarctica",
+"url": "https://download.geofabrik.de/antarctica-latest.osm.pbf",
+"name": "Antarctica",
+"iso": [
+"AQ"
+]
+},
+{
+"id": "argentina",
+"url": "https://download.geofabrik.de/south-america/argentina-latest.osm.pbf",
+"name": "Argentina",
+"iso": [
+"AR"
+]
+},
+{
+"id": "armenia",
+"url": "https://download.geofabrik.de/asia/armenia-latest.osm.pbf",
+"name": "Armenia",
+"iso": [
+"AM"
+]
+},
+{
+"id": "australia",
+"url": "https://download.geofabrik.de/australia-oceania/australia-latest.osm.pbf",
+"name": "Australia",
+"iso": [
+"AU"
+]
+},
+{
+"id": "austria",
+"url": "https://download.geofabrik.de/europe/austria-latest.osm.pbf",
+"name": "Austria",
+"iso": [
+"AT"
+]
+},
+{
+"id": "azerbaijan",
+"url": "https://download.geofabrik.de/asia/azerbaijan-latest.osm.pbf",
+"name": "Azerbaijan",
+"iso": [
+"AZ"
+]
+},
+{
+"id": "bahamas",
+"url": "https://download.geofabrik.de/central-america/bahamas-latest.osm.pbf",
+"name": "Bahamas",
+"iso": [
+"BS"
+]
+},
+{
+"id": "bangladesh",
+"url": "https://download.geofabrik.de/asia/bangladesh-latest.osm.pbf",
+"name": "Bangladesh",
+"iso": [
+"BD"
+]
+},
+{
+"id": "belarus",
+"url": "https://download.geofabrik.de/europe/belarus-latest.osm.pbf",
+"name": "Belarus",
+"iso": [
+"BY"
+]
+},
+{
+"id": "belgium",
+"url": "https://download.geofabrik.de/europe/belgium-latest.osm.pbf",
+"name": "Belgium",
+"iso": [
+"BE"
+]
+},
+{
+"id": "belize",
+"url": "https://download.geofabrik.de/central-america/belize-latest.osm.pbf",
+"name": "Belize",
+"iso": [
+"BZ"
+]
+},
+{
+"id": "benin",
+"url": "https://download.geofabrik.de/africa/benin-latest.osm.pbf",
+"name": "Benin",
+"iso": [
+"BJ"
+]
+},
+{
+"id": "bhutan",
+"url": "https://download.geofabrik.de/asia/bhutan-latest.osm.pbf",
+"name": "Bhutan",
+"iso": [
+"BT"
+]
+},
+{
+"id": "bolivia",
+"url": "https://download.geofabrik.de/south-america/bolivia-latest.osm.pbf",
+"name": "Bolivia",
+"iso": [
+"BO"
+]
+},
+{
+"id": "bosnia-herzegovina",
+"url": "https://download.geofabrik.de/europe/bosnia-herzegovina-latest.osm.pbf",
+"name": "Bosnia-Herzegovina",
+"iso": [
+"BA"
+]
+},
+{
+"id": "botswana",
+"url": "https://download.geofabrik.de/africa/botswana-latest.osm.pbf",
+"name": "Botswana",
+"iso": [
+"BW"
+]
+},
+{
+"id": "brazil",
+"url": "https://download.geofabrik.de/south-america/brazil-latest.osm.pbf",
+"name": "Brazil",
+"iso": [
+"BR"
+]
+},
+{
+"id": "bulgaria",
+"url": "https://download.geofabrik.de/europe/bulgaria-latest.osm.pbf",
+"name": "Bulgaria",
+"iso": [
+"BG"
+]
+},
+{
+"id": "burkina-faso",
+"url": "https://download.geofabrik.de/africa/burkina-faso-latest.osm.pbf",
+"name": "Burkina Faso",
+"iso": [
+"BF"
+]
+},
+{
+"id": "burundi",
+"url": "https://download.geofabrik.de/africa/burundi-latest.osm.pbf",
+"name": "Burundi",
+"iso": [
+"BI"
+]
+},
+{
+"id": "cambodia",
+"url": "https://download.geofabrik.de/asia/cambodia-latest.osm.pbf",
+"name": "Cambodia",
+"iso": [
+"KH"
+]
+},
+{
+"id": "cameroon",
+"url": "https://download.geofabrik.de/africa/cameroon-latest.osm.pbf",
+"name": "Cameroon",
+"iso": [
+"CM"
+]
+},
+{
+"id": "canada",
+"url": "https://download.geofabrik.de/north-america/canada-latest.osm.pbf",
+"name": "Canada",
+"iso": [
+"CA"
+]
+},
+{
+"id": "cape-verde",
+"url": "https://download.geofabrik.de/africa/cape-verde-latest.osm.pbf",
+"name": "Cape Verde",
+"iso": [
+"CV"
+]
+},
+{
+"id": "central-african-republic",
+"url": "https://download.geofabrik.de/africa/central-african-republic-latest.osm.pbf",
+"name": "Central African Republic",
+"iso": [
+"CF"
+]
+},
+{
+"id": "chad",
+"url": "https://download.geofabrik.de/africa/chad-latest.osm.pbf",
+"name": "Chad",
+"iso": [
+"TD"
+]
+},
+{
+"id": "chile",
+"url": "https://download.geofabrik.de/south-america/chile-latest.osm.pbf",
+"name": "Chile",
+"iso": [
+"CL"
+]
+},
+{
+"id": "china",
+"url": "https://download.geofabrik.de/asia/china-latest.osm.pbf",
+"name": "China",
+"iso": [
+"CN"
+]
+},
+{
+"id": "colombia",
+"url": "https://download.geofabrik.de/south-america/colombia-latest.osm.pbf",
+"name": "Colombia",
+"iso": [
+"CO"
+]
+},
+{
+"id": "congo-brazzaville",
+"url": "https://download.geofabrik.de/africa/congo-brazzaville-latest.osm.pbf",
+"name": "Congo (Republic/Brazzaville)",
+"iso": [
+"CG"
+]
+},
+{
+"id": "congo-democratic-republic",
+"url": "https://download.geofabrik.de/africa/congo-democratic-republic-latest.osm.pbf",
+"name": "Congo (Democratic Republic/Kinshasa)",
+"iso": [
+"CD"
+]
+},
+{
+"id": "cook-islands",
+"url": "https://download.geofabrik.de/australia-oceania/cook-islands-latest.osm.pbf",
+"name": "Cook Islands",
+"iso": [
+"CK"
+]
+},
+{
+"id": "costa-rica",
+"url": "https://download.geofabrik.de/central-america/costa-rica-latest.osm.pbf",
+"name": "Costa Rica",
+"iso": [
+"CR"
+]
+},
+{
+"id": "croatia",
+"url": "https://download.geofabrik.de/europe/croatia-latest.osm.pbf",
+"name": "Croatia",
+"iso": [
+"HR"
+]
+},
+{
+"id": "cuba",
+"url": "https://download.geofabrik.de/central-america/cuba-latest.osm.pbf",
+"name": "Cuba",
+"iso": [
+"CU"
+]
+},
+{
+"id": "cyprus",
+"url": "https://download.geofabrik.de/europe/cyprus-latest.osm.pbf",
+"name": "Cyprus",
+"iso": [
+"CY"
+]
+},
+{
+"id": "czech-republic",
+"url": "https://download.geofabrik.de/europe/czech-republic-latest.osm.pbf",
+"name": "Czech Republic",
+"iso": [
+"CZ"
+]
+},
+{
+"id": "denmark",
+"url": "https://download.geofabrik.de/europe/denmark-latest.osm.pbf",
+"name": "Denmark",
+"iso": [
+"DK"
+]
+},
+{
+"id": "djibouti",
+"url": "https://download.geofabrik.de/africa/djibouti-latest.osm.pbf",
+"name": "Djibouti",
+"iso": [
+"DJ"
+]
+},
+{
+"id": "east-timor",
+"url": "https://download.geofabrik.de/asia/east-timor-latest.osm.pbf",
+"name": "East Timor",
+"iso": [
+"TL"
+]
+},
+{
+"id": "ecuador",
+"url": "https://download.geofabrik.de/south-america/ecuador-latest.osm.pbf",
+"name": "Ecuador",
+"iso": [
+"EC"
+]
+},
+{
+"id": "egypt",
+"url": "https://download.geofabrik.de/africa/egypt-latest.osm.pbf",
+"name": "Egypt",
+"iso": [
+"EG"
+]
+},
+{
+"id": "el-salvador",
+"url": "https://download.geofabrik.de/central-america/el-salvador-latest.osm.pbf",
+"name": "El Salvador",
+"iso": [
+"SV"
+]
+},
+{
+"id": "equatorial-guinea",
+"url": "https://download.geofabrik.de/africa/equatorial-guinea-latest.osm.pbf",
+"name": "Equatorial Guinea",
+"iso": [
+"GQ"
+]
+},
+{
+"id": "eritrea",
+"url": "https://download.geofabrik.de/africa/eritrea-latest.osm.pbf",
+"name": "Eritrea",
+"iso": [
+"ER"
+]
+},
+{
+"id": "estonia",
+"url": "https://download.geofabrik.de/europe/estonia-latest.osm.pbf",
+"name": "Estonia",
+"iso": [
+"EE"
+]
+},
+{
+"id": "ethiopia",
+"url": "https://download.geofabrik.de/africa/ethiopia-latest.osm.pbf",
+"name": "Ethiopia",
+"iso": [
+"ET"
+]
+},
+{
+"id": "faroe-islands",
+"url": "https://download.geofabrik.de/europe/faroe-islands-latest.osm.pbf",
+"name": "Faroe Islands",
+"iso": [
+"FO"
+]
+},
+{
+"id": "fiji",
+"url": "https://download.geofabrik.de/australia-oceania/fiji-latest.osm.pbf",
+"name": "Fiji",
+"iso": [
+"FJ"
+]
+},
+{
+"id": "finland",
+"url": "https://download.geofabrik.de/europe/finland-latest.osm.pbf",
+"name": "Finland",
+"iso": [
+"FI"
+]
+},
+{
+"id": "france",
+"url": "https://download.geofabrik.de/europe/france-latest.osm.pbf",
+"name": "France",
+"iso": [
+"FR"
+]
+},
+{
+"id": "gabon",
+"url": "https://download.geofabrik.de/africa/gabon-latest.osm.pbf",
+"name": "Gabon",
+"iso": [
+"GA"
+]
+},
+{
+"id": "gcc-states",
+"url": "https://download.geofabrik.de/asia/gcc-states-latest.osm.pbf",
+"name": "GCC States",
+"iso": [
+"QA",
+"AE",
+"OM",
+"BH",
+"KW"
+]
+},
+{
+"id": "georgia",
+"url": "https://download.geofabrik.de/europe/georgia-latest.osm.pbf",
+"name": "Georgia",
+"iso": [
+"GE"
+]
+},
+{
+"id": "germany",
+"url": "https://download.geofabrik.de/europe/germany-latest.osm.pbf",
+"name": "Germany",
+"iso": [
+"DE"
+]
+},
+{
+"id": "ghana",
+"url": "https://download.geofabrik.de/africa/ghana-latest.osm.pbf",
+"name": "Ghana",
+"iso": [
+"GH"
+]
+},
+{
+"id": "greece",
+"url": "https://download.geofabrik.de/europe/greece-latest.osm.pbf",
+"name": "Greece",
+"iso": [
+"GR"
+]
+},
+{
+"id": "greenland",
+"url": "https://download.geofabrik.de/north-america/greenland-latest.osm.pbf",
+"name": "Greenland",
+"iso": [
+"GL"
+]
+},
+{
+"id": "guatemala",
+"url": "https://download.geofabrik.de/central-america/guatemala-latest.osm.pbf",
+"name": "Guatemala",
+"iso": [
+"GT"
+]
+},
+{
+"id": "guinea",
+"url": "https://download.geofabrik.de/africa/guinea-latest.osm.pbf",
+"name": "Guinea",
+"iso": [
+"GN"
+]
+},
+{
+"id": "guinea-bissau",
+"url": "https://download.geofabrik.de/africa/guinea-bissau-latest.osm.pbf",
+"name": "Guinea-Bissau",
+"iso": [
+"GW"
+]
+},
+{
+"id": "guyana",
+"url": "https://download.geofabrik.de/south-america/guyana-latest.osm.pbf",
+"name": "Guyana",
+"iso": [
+"GY"
+]
+},
+{
+"id": "guyane",
+"url": "https://download.geofabrik.de/europe/france/guyane-latest.osm.pbf",
+"name": "Guyane",
+"iso": [
+"GF"
+]
+},
+{
+"id": "haiti-and-domrep",
+"url": "https://download.geofabrik.de/central-america/haiti-and-domrep-latest.osm.pbf",
+"name": "Haiti and Dominican Republic",
+"iso": [
+"HT",
+"DO"
+]
+},
+{
+"id": "honduras",
+"url": "https://download.geofabrik.de/central-america/honduras-latest.osm.pbf",
+"name": "Honduras",
+"iso": [
+"HN"
+]
+},
+{
+"id": "hungary",
+"url": "https://download.geofabrik.de/europe/hungary-latest.osm.pbf",
+"name": "Hungary",
+"iso": [
+"HU"
+]
+},
+{
+"id": "iceland",
+"url": "https://download.geofabrik.de/europe/iceland-latest.osm.pbf",
+"name": "Iceland",
+"iso": [
+"IS"
+]
+},
+{
+"id": "ile-de-clipperton",
+"url": "https://download.geofabrik.de/australia-oceania/ile-de-clipperton-latest.osm.pbf",
+"name": "Île de Clipperton",
+"iso": [
+"PF"
+]
+},
+{
+"id": "india",
+"url": "https://download.geofabrik.de/asia/india-latest.osm.pbf",
+"name": "India",
+"iso": [
+"IN"
+]
+},
+{
+"id": "indonesia",
+"url": "https://download.geofabrik.de/asia/indonesia-latest.osm.pbf",
+"name": "Indonesia (with East Timor)",
+"iso": [
+"ID"
+]
+},
+{
+"id": "iran",
+"url": "https://download.geofabrik.de/asia/iran-latest.osm.pbf",
+"name": "Iran",
+"iso": [
+"IR"
+]
+},
+{
+"id": "iraq",
+"url": "https://download.geofabrik.de/asia/iraq-latest.osm.pbf",
+"name": "Iraq",
+"iso": [
+"IQ"
+]
+},
+{
+"id": "ireland-and-northern-ireland",
+"url": "https://download.geofabrik.de/europe/ireland-and-northern-ireland-latest.osm.pbf",
+"name": "Ireland and Northern Ireland",
+"iso": [
+"IE"
+]
+},
+{
+"id": "israel-and-palestine",
+"url": "https://download.geofabrik.de/asia/israel-and-palestine-latest.osm.pbf",
+"name": "Israel and Palestine",
+"iso": [
+"PS",
+"IL"
+]
+},
+{
+"id": "italy",
+"url": "https://download.geofabrik.de/europe/italy-latest.osm.pbf",
+"name": "Italy",
+"iso": [
+"IT"
+]
+},
+{
+"id": "ivory-coast",
+"url": "https://download.geofabrik.de/africa/ivory-coast-latest.osm.pbf",
+"name": "Ivory Coast",
+"iso": [
+"CI"
+]
+},
+{
+"id": "jamaica",
+"url": "https://download.geofabrik.de/central-america/jamaica-latest.osm.pbf",
+"name": "Jamaica",
+"iso": [
+"JM"
+]
+},
+{
+"id": "japan",
+"url": "https://download.geofabrik.de/asia/japan-latest.osm.pbf",
+"name": "Japan",
+"iso": [
+"JP"
+]
+},
+{
+"id": "jordan",
+"url": "https://download.geofabrik.de/asia/jordan-latest.osm.pbf",
+"name": "Jordan",
+"iso": [
+"JO"
+]
+},
+{
+"id": "kazakhstan",
+"url": "https://download.geofabrik.de/asia/kazakhstan-latest.osm.pbf",
+"name": "Kazakhstan",
+"iso": [
+"KZ"
+]
+},
+{
+"id": "kenya",
+"url": "https://download.geofabrik.de/africa/kenya-latest.osm.pbf",
+"name": "Kenya",
+"iso": [
+"KE"
+]
+},
+{
+"id": "kiribati",
+"url": "https://download.geofabrik.de/australia-oceania/kiribati-latest.osm.pbf",
+"name": "Kiribati",
+"iso": [
+"KI"
+]
+},
+{
+"id": "kyrgyzstan",
+"url": "https://download.geofabrik.de/asia/kyrgyzstan-latest.osm.pbf",
+"name": "Kyrgyzstan",
+"iso": [
+"KG"
+]
+},
+{
+"id": "laos",
+"url": "https://download.geofabrik.de/asia/laos-latest.osm.pbf",
+"name": "Laos",
+"iso": [
+"LA"
+]
+},
+{
+"id": "latvia",
+"url": "https://download.geofabrik.de/europe/latvia-latest.osm.pbf",
+"name": "Latvia",
+"iso": [
+"LV"
+]
+},
+{
+"id": "lebanon",
+"url": "https://download.geofabrik.de/asia/lebanon-latest.osm.pbf",
+"name": "Lebanon",
+"iso": [
+"LB"
+]
+},
+{
+"id": "lesotho",
+"url": "https://download.geofabrik.de/africa/lesotho-latest.osm.pbf",
+"name": "Lesotho",
+"iso": [
+"LS"
+]
+},
+{
+"id": "liberia",
+"url": "https://download.geofabrik.de/africa/liberia-latest.osm.pbf",
+"name": "Liberia",
+"iso": [
+"LR"
+]
+},
+{
+"id": "libya",
+"url": "https://download.geofabrik.de/africa/libya-latest.osm.pbf",
+"name": "Libya",
+"iso": [
+"LY"
+]
+},
+{
+"id": "liechtenstein",
+"url": "https://download.geofabrik.de/europe/liechtenstein-latest.osm.pbf",
+"name": "Liechtenstein",
+"iso": [
+"LI"
+]
+},
+{
+"id": "lithuania",
+"url": "https://download.geofabrik.de/europe/lithuania-latest.osm.pbf",
+"name": "Lithuania",
+"iso": [
+"LT"
+]
+},
+{
+"id": "luxembourg",
+"url": "https://download.geofabrik.de/europe/luxembourg-latest.osm.pbf",
+"name": "Luxembourg",
+"iso": [
+"LU"
+]
+},
+{
+"id": "macedonia",
+"url": "https://download.geofabrik.de/europe/macedonia-latest.osm.pbf",
+"name": "Macedonia",
+"iso": [
+"MK"
+]
+},
+{
+"id": "madagascar",
+"url": "https://download.geofabrik.de/africa/madagascar-latest.osm.pbf",
+"name": "Madagascar",
+"iso": [
+"MG"
+]
+},
+{
+"id": "malawi",
+"url": "https://download.geofabrik.de/africa/malawi-latest.osm.pbf",
+"name": "Malawi",
+"iso": [
+"MW"
+]
+},
+{
+"id": "malaysia-singapore-brunei",
+"url": "https://download.geofabrik.de/asia/malaysia-singapore-brunei-latest.osm.pbf",
+"name": "Malaysia, Singapore, and Brunei",
+"iso": [
+"MY",
+"SG",
+"BN"
+]
+},
+{
+"id": "maldives",
+"url": "https://download.geofabrik.de/asia/maldives-latest.osm.pbf",
+"name": "Maldives",
+"iso": [
+"MV"
+]
+},
+{
+"id": "mali",
+"url": "https://download.geofabrik.de/africa/mali-latest.osm.pbf",
+"name": "Mali",
+"iso": [
+"ML"
+]
+},
+{
+"id": "malta",
+"url": "https://download.geofabrik.de/europe/malta-latest.osm.pbf",
+"name": "Malta",
+"iso": [
+"MT"
+]
+},
+{
+"id": "marshall-islands",
+"url": "https://download.geofabrik.de/australia-oceania/marshall-islands-latest.osm.pbf",
+"name": "Marshall Islands",
+"iso": [
+"MH"
+]
+},
+{
+"id": "mauritania",
+"url": "https://download.geofabrik.de/africa/mauritania-latest.osm.pbf",
+"name": "Mauritania",
+"iso": [
+"MR"
+]
+},
+{
+"id": "mauritius",
+"url": "https://download.geofabrik.de/africa/mauritius-latest.osm.pbf",
+"name": "Mauritius",
+"iso": [
+"MU"
+]
+},
+{
+"id": "mexico",
+"url": "https://download.geofabrik.de/north-america/mexico-latest.osm.pbf",
+"name": "Mexico",
+"iso": [
+"MX"
+]
+},
+{
+"id": "micronesia",
+"url": "https://download.geofabrik.de/australia-oceania/micronesia-latest.osm.pbf",
+"name": "Micronesia",
+"iso": [
+"FM"
+]
+},
+{
+"id": "moldova",
+"url": "https://download.geofabrik.de/europe/moldova-latest.osm.pbf",
+"name": "Moldova",
+"iso": [
+"MD"
+]
+},
+{
+"id": "monaco",
+"url": "https://download.geofabrik.de/europe/monaco-latest.osm.pbf",
+"name": "Monaco",
+"iso": [
+"MC"
+]
+},
+{
+"id": "mongolia",
+"url": "https://download.geofabrik.de/asia/mongolia-latest.osm.pbf",
+"name": "Mongolia",
+"iso": [
+"MN"
+]
+},
+{
+"id": "montenegro",
+"url": "https://download.geofabrik.de/europe/montenegro-latest.osm.pbf",
+"name": "Montenegro",
+"iso": [
+"ME"
+]
+},
+{
+"id": "morocco",
+"url": "https://download.geofabrik.de/africa/morocco-latest.osm.pbf",
+"name": "Morocco",
+"iso": [
+"MA"
+]
+},
+{
+"id": "mozambique",
+"url": "https://download.geofabrik.de/africa/mozambique-latest.osm.pbf",
+"name": "Mozambique",
+"iso": [
+"MZ"
+]
+},
+{
+"id": "myanmar",
+"url": "https://download.geofabrik.de/asia/myanmar-latest.osm.pbf",
+"name": "Myanmar (a.k.a. Burma)",
+"iso": [
+"MM"
+]
+},
+{
+"id": "namibia",
+"url": "https://download.geofabrik.de/africa/namibia-latest.osm.pbf",
+"name": "Namibia",
+"iso": [
+"NA"
+]
+},
+{
+"id": "nauru",
+"url": "https://download.geofabrik.de/australia-oceania/nauru-latest.osm.pbf",
+"name": "Nauru",
+"iso": [
+"NR"
+]
+},
+{
+"id": "nepal",
+"url": "https://download.geofabrik.de/asia/nepal-latest.osm.pbf",
+"name": "Nepal",
+"iso": [
+"NP"
+]
+},
+{
+"id": "netherlands",
+"url": "https://download.geofabrik.de/europe/netherlands-latest.osm.pbf",
+"name": "Netherlands",
+"iso": [
+"NL"
+]
+},
+{
+"id": "new-caledonia",
+"url": "https://download.geofabrik.de/australia-oceania/new-caledonia-latest.osm.pbf",
+"name": "New Caledonia",
+"iso": [
+"NC"
+]
+},
+{
+"id": "new-zealand",
+"url": "https://download.geofabrik.de/australia-oceania/new-zealand-latest.osm.pbf",
+"name": "New Zealand",
+"iso": [
+"NZ"
+]
+},
+{
+"id": "nicaragua",
+"url": "https://download.geofabrik.de/central-america/nicaragua-latest.osm.pbf",
+"name": "Nicaragua",
+"iso": [
+"NI"
+]
+},
+{
+"id": "niger",
+"url": "https://download.geofabrik.de/africa/niger-latest.osm.pbf",
+"name": "Niger",
+"iso": [
+"NE"
+]
+},
+{
+"id": "nigeria",
+"url": "https://download.geofabrik.de/africa/nigeria-latest.osm.pbf",
+"name": "Nigeria",
+"iso": [
+"NG"
+]
+},
+{
+"id": "niue",
+"url": "https://download.geofabrik.de/australia-oceania/niue-latest.osm.pbf",
+"name": "Niue",
+"iso": [
+"NU"
+]
+},
+{
+"id": "north-korea",
+"url": "https://download.geofabrik.de/asia/north-korea-latest.osm.pbf",
+"name": "North Korea",
+"iso": [
+"KP"
+]
+},
+{
+"id": "norway",
+"url": "https://download.geofabrik.de/europe/norway-latest.osm.pbf",
+"name": "Norway",
+"iso": [
+"NO"
+]
+},
+{
+"id": "pakistan",
+"url": "https://download.geofabrik.de/asia/pakistan-latest.osm.pbf",
+"name": "Pakistan",
+"iso": [
+"PK"
+]
+},
+{
+"id": "palau",
+"url": "https://download.geofabrik.de/australia-oceania/palau-latest.osm.pbf",
+"name": "Palau",
+"iso": [
+"PW"
+]
+},
+{
+"id": "panama",
+"url": "https://download.geofabrik.de/central-america/panama-latest.osm.pbf",
+"name": "Panama",
+"iso": [
+"PA"
+]
+},
+{
+"id": "papua-new-guinea",
+"url": "https://download.geofabrik.de/australia-oceania/papua-new-guinea-latest.osm.pbf",
+"name": "Papua New Guinea",
+"iso": [
+"PG"
+]
+},
+{
+"id": "paraguay",
+"url": "https://download.geofabrik.de/south-america/paraguay-latest.osm.pbf",
+"name": "Paraguay",
+"iso": [
+"PY"
+]
+},
+{
+"id": "peru",
+"url": "https://download.geofabrik.de/south-america/peru-latest.osm.pbf",
+"name": "Peru",
+"iso": [
+"PE"
+]
+},
+{
+"id": "philippines",
+"url": "https://download.geofabrik.de/asia/philippines-latest.osm.pbf",
+"name": "Philippines",
+"iso": [
+"PH"
+]
+},
+{
+"id": "pitcairn-islands",
+"url": "https://download.geofabrik.de/australia-oceania/pitcairn-islands-latest.osm.pbf",
+"name": "Pitcairn Islands",
+"iso": [
+"PN"
+]
+},
+{
+"id": "poland",
+"url": "https://download.geofabrik.de/europe/poland-latest.osm.pbf",
+"name": "Poland",
+"iso": [
+"PL"
+]
+},
+{
+"id": "polynesie-francaise",
+"url": "https://download.geofabrik.de/australia-oceania/polynesie-francaise-latest.osm.pbf",
+"name": "Polynésie française (French Polynesia)",
+"iso": [
+"PF"
+]
+},
+{
+"id": "portugal",
+"url": "https://download.geofabrik.de/europe/portugal-latest.osm.pbf",
+"name": "Portugal",
+"iso": [
+"PT"
+]
+},
+{
+"id": "romania",
+"url": "https://download.geofabrik.de/europe/romania-latest.osm.pbf",
+"name": "Romania",
+"iso": [
+"RO"
+]
+},
+{
+"id": "russia",
+"url": "https://download.geofabrik.de/russia-latest.osm.pbf",
+"name": "Russian Federation",
+"iso": [
+"RU"
+]
+},
+{
+"id": "rwanda",
+"url": "https://download.geofabrik.de/africa/rwanda-latest.osm.pbf",
+"name": "Rwanda",
+"iso": [
+"RW"
+]
+},
+{
+"id": "saint-helena-ascension-and-tristan-da-cunha",
+"url": "https://download.geofabrik.de/africa/saint-helena-ascension-and-tristan-da-cunha-latest.osm.pbf",
+"name": "Saint Helena, Ascension, and Tristan da Cunha",
+"iso": [
+"SH"
+]
+},
+{
+"id": "samoa",
+"url": "https://download.geofabrik.de/australia-oceania/samoa-latest.osm.pbf",
+"name": "Samoa",
+"iso": [
+"WS"
+]
+},
+{
+"id": "sao-tome-and-principe",
+"url": "https://download.geofabrik.de/africa/sao-tome-and-principe-latest.osm.pbf",
+"name": "Sao Tome and Principe",
+"iso": [
+"ST"
+]
+},
+{
+"id": "senegal-and-gambia",
+"url": "https://download.geofabrik.de/africa/senegal-and-gambia-latest.osm.pbf",
+"name": "Senegal and Gambia",
+"iso": [
+"SN",
+"GM"
+]
+},
+{
+"id": "serbia",
+"url": "https://download.geofabrik.de/europe/serbia-latest.osm.pbf",
+"name": "Serbia",
+"iso": [
+"RS"
+]
+},
+{
+"id": "seychelles",
+"url": "https://download.geofabrik.de/africa/seychelles-latest.osm.pbf",
+"name": "Seychelles",
+"iso": [
+"SC"
+]
+},
+{
+"id": "sierra-leone",
+"url": "https://download.geofabrik.de/africa/sierra-leone-latest.osm.pbf",
+"name": "Sierra Leone",
+"iso": [
+"SL"
+]
+},
+{
+"id": "slovakia",
+"url": "https://download.geofabrik.de/europe/slovakia-latest.osm.pbf",
+"name": "Slovakia",
+"iso": [
+"SK"
+]
+},
+{
+"id": "slovenia",
+"url": "https://download.geofabrik.de/europe/slovenia-latest.osm.pbf",
+"name": "Slovenia",
+"iso": [
+"SI"
+]
+},
+{
+"id": "solomon-islands",
+"url": "https://download.geofabrik.de/australia-oceania/solomon-islands-latest.osm.pbf",
+"name": "Solomon Islands",
+"iso": [
+"SB"
+]
+},
+{
+"id": "somalia",
+"url": "https://download.geofabrik.de/africa/somalia-latest.osm.pbf",
+"name": "Somalia",
+"iso": [
+"SO"
+]
+},
+{
+"id": "south-africa",
+"url": "https://download.geofabrik.de/africa/south-africa-latest.osm.pbf",
+"name": "South Africa",
+"iso": [
+"ZA"
+]
+},
+{
+"id": "south-korea",
+"url": "https://download.geofabrik.de/asia/south-korea-latest.osm.pbf",
+"name": "South Korea",
+"iso": [
+"KR"
+]
+},
+{
+"id": "south-sudan",
+"url": "https://download.geofabrik.de/africa/south-sudan-latest.osm.pbf",
+"name": "South Sudan",
+"iso": [
+"SS"
+]
+},
+{
+"id": "spain",
+"url": "https://download.geofabrik.de/europe/spain-latest.osm.pbf",
+"name": "Spain",
+"iso": [
+"ES"
+]
+},
+{
+"id": "sri-lanka",
+"url": "https://download.geofabrik.de/asia/sri-lanka-latest.osm.pbf",
+"name": "Sri Lanka",
+"iso": [
+"LK"
+]
+},
+{
+"id": "sudan",
+"url": "https://download.geofabrik.de/africa/sudan-latest.osm.pbf",
+"name": "Sudan",
+"iso": [
+"SD"
+]
+},
+{
+"id": "suriname",
+"url": "https://download.geofabrik.de/south-america/suriname-latest.osm.pbf",
+"name": "Suriname",
+"iso": [
+"SR"
+]
+},
+{
+"id": "swaziland",
+"url": "https://download.geofabrik.de/africa/swaziland-latest.osm.pbf",
+"name": "Swaziland",
+"iso": [
+"SZ"
+]
+},
+{
+"id": "sweden",
+"url": "https://download.geofabrik.de/europe/sweden-latest.osm.pbf",
+"name": "Sweden",
+"iso": [
+"SE"
+]
+},
+{
+"id": "switzerland",
+"url": "https://download.geofabrik.de/europe/switzerland-latest.osm.pbf",
+"name": "Switzerland",
+"iso": [
+"CH"
+]
+},
+{
+"id": "syria",
+"url": "https://download.geofabrik.de/asia/syria-latest.osm.pbf",
+"name": "Syria",
+"iso": [
+"SY"
+]
+},
+{
+"id": "taiwan",
+"url": "https://download.geofabrik.de/asia/taiwan-latest.osm.pbf",
+"name": "Taiwan",
+"iso": [
+"TW"
+]
+},
+{
+"id": "tajikistan",
+"url": "https://download.geofabrik.de/asia/tajikistan-latest.osm.pbf",
+"name": "Tajikistan",
+"iso": [
+"TJ"
+]
+},
+{
+"id": "tanzania",
+"url": "https://download.geofabrik.de/africa/tanzania-latest.osm.pbf",
+"name": "Tanzania",
+"iso": [
+"TZ"
+]
+},
+{
+"id": "thailand",
+"url": "https://download.geofabrik.de/asia/thailand-latest.osm.pbf",
+"name": "Thailand",
+"iso": [
+"TH"
+]
+},
+{
+"id": "togo",
+"url": "https://download.geofabrik.de/africa/togo-latest.osm.pbf",
+"name": "Togo",
+"iso": [
+"TG"
+]
+},
+{
+"id": "tokelau",
+"url": "https://download.geofabrik.de/australia-oceania/tokelau-latest.osm.pbf",
+"name": "Tokelau",
+"iso": [
+"TK"
+]
+},
+{
+"id": "tonga",
+"url": "https://download.geofabrik.de/australia-oceania/tonga-latest.osm.pbf",
+"name": "Tonga",
+"iso": [
+"TO"
+]
+},
+{
+"id": "tunisia",
+"url": "https://download.geofabrik.de/africa/tunisia-latest.osm.pbf",
+"name": "Tunisia",
+"iso": [
+"TN"
+]
+},
+{
+"id": "turkey",
+"url": "https://download.geofabrik.de/europe/turkey-latest.osm.pbf",
+"name": "Turkey",
+"iso": [
+"TR"
+]
+},
+{
+"id": "turkmenistan",
+"url": "https://download.geofabrik.de/asia/turkmenistan-latest.osm.pbf",
+"name": "Turkmenistan",
+"iso": [
+"TM"
+]
+},
+{
+"id": "tuvalu",
+"url": "https://download.geofabrik.de/australia-oceania/tuvalu-latest.osm.pbf",
+"name": "Tuvalu",
+"iso": [
+"TV"
+]
+},
+{
+"id": "uganda",
+"url": "https://download.geofabrik.de/africa/uganda-latest.osm.pbf",
+"name": "Uganda",
+"iso": [
+"UG"
+]
+},
+{
+"id": "ukraine",
+"url": "https://download.geofabrik.de/europe/ukraine-latest.osm.pbf",
+"name": "Ukraine (with Crimea)",
+"iso": [
+"UA"
+]
+},
+{
+"id": "united-kingdom",
+"url": "https://download.geofabrik.de/europe/united-kingdom-latest.osm.pbf",
+"name": "United Kingdom",
+"iso": [
+"GB"
+]
+},
+{
+"id": "uruguay",
+"url": "https://download.geofabrik.de/south-america/uruguay-latest.osm.pbf",
+"name": "Uruguay",
+"iso": [
+"UY"
+]
+},
+{
+"id": "us",
+"url": "https://download.geofabrik.de/north-america/us-latest.osm.pbf",
+"name": "United States of America",
+"iso": [
+"US"
+]
+},
+{
+"id": "us/puerto-rico",
+"url": "https://download.geofabrik.de/north-america/us/puerto-rico-latest.osm.pbf",
+"name": "us/puerto-rico",
+"iso": [
+"PR"
+]
+},
+{
+"id": "us/us-virgin-islands",
+"url": "https://download.geofabrik.de/north-america/us/us-virgin-islands-latest.osm.pbf",
+"name": "us/us-virgin-islands",
+"iso": [
+"VI"
+]
+},
+{
+"id": "uzbekistan",
+"url": "https://download.geofabrik.de/asia/uzbekistan-latest.osm.pbf",
+"name": "Uzbekistan",
+"iso": [
+"UZ"
+]
+},
+{
+"id": "vanuatu",
+"url": "https://download.geofabrik.de/australia-oceania/vanuatu-latest.osm.pbf",
+"name": "Vanuatu",
+"iso": [
+"VU"
+]
+},
+{
+"id": "venezuela",
+"url": "https://download.geofabrik.de/south-america/venezuela-latest.osm.pbf",
+"name": "Venezuela",
+"iso": [
+"VE"
+]
+},
+{
+"id": "vietnam",
+"url": "https://download.geofabrik.de/asia/vietnam-latest.osm.pbf",
+"name": "Vietnam",
+"iso": [
+"VN"
+]
+},
+{
+"id": "wallis-et-futuna",
+"url": "https://download.geofabrik.de/australia-oceania/wallis-et-futuna-latest.osm.pbf",
+"name": "Wallis et Futuna",
+"iso": [
+"WF"
+]
+},
+{
+"id": "yemen",
+"url": "https://download.geofabrik.de/asia/yemen-latest.osm.pbf",
+"name": "Yemen",
+"iso": [
+"YE"
+]
+},
+{
+"id": "zambia",
+"url": "https://download.geofabrik.de/africa/zambia-latest.osm.pbf",
+"name": "Zambia",
+"iso": [
+"ZM"
+]
+},
+{
+"id": "zimbabwe",
+"url": "https://download.geofabrik.de/africa/zimbabwe-latest.osm.pbf",
+"name": "Zimbabwe",
+"iso": [
+"ZW"
+]
+}
+]
