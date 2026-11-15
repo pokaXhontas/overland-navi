@@ -145,10 +145,18 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   // Bestimmtes Restaurant suchen: als Einrichtung erkannt, Infofenster mit Details
   const rest = await page.evaluate(async () => {
     map.jumpTo({ center: [74.59, 42.875], zoom: 13 });
-    const web = await Search.online('Navat');
-    const r = web.find((x) => x.type === 'poi');
-    if (!r) return 'kein Restaurant erkannt: ' + web.map((x) => x.name + '/' + x.type).join(', ');
-    Search.show(r);
+    // wie auf dem Gerät: eintippen und den Treffer in der Liste antippen
+    openSearch();
+    $('#search-input').value = 'Navat';
+    runSearch();
+    let btn = null;
+    for (let i = 0; i < 40 && !btn; i++) {
+      await new Promise((res) => setTimeout(res, 300));
+      btn = [...document.querySelectorAll('#search-results .place-item')].find((b) => /Café|Restaurant/.test(b.innerText));
+    }
+    if (!btn) return 'kein Restaurant in der Liste: ' + $('#search-results').innerText.replace(/\s+/g, ' ').slice(0, 200);
+    const r = { name: btn.querySelector('b').textContent, sub: btn.querySelector('small').textContent };
+    btn.click();
     await new Promise((res) => setTimeout(res, 3000));
     const pop = document.querySelector('.hk-popup');
     return r.name + ' | ' + r.sub + ' | Infofenster: ' + (pop ? pop.innerText.replace(/\s+/g, ' ').slice(0, 160) : 'fehlt');

@@ -1652,10 +1652,10 @@ async function runSearch() {
   const seq = ++searchSeq;
   $('#search-cats').hidden = !!q.trim();
   if (!q.trim()) { renderRecent(); return; }
-  const cats = Poi.match(q).map((m) => ({ name: m.cat.label + (m.place ? ' in ' + m.place : ' in der Nähe'), sub: m.place ? 'Mit Öffnungszeiten und mehr' : 'Im Kartenausschnitt, mit Öffnungszeiten und mehr', color: m.cat.color, icon: m.cat.d, poiCat: m }));
+  const cats = Poi.match(q).map((m) => ({ name: m.cat.label + (m.place ? ' in ' + m.place : ' in der Nähe'), sub: m.place ? 'Mit Öffnungszeiten und mehr' : 'Im Kartenausschnitt, mit Öffnungszeiten und mehr', color: m.cat.color, icon: m.cat.d, catHit: m }));
   if (cats.length) {
-    renderResultList($('#search-results'), cats, '', (r) => Poi.run(r.poiCat.cat, r.poiCat.place));
-    if (cats[0].poiCat.place || norm(q).split(' ').length === 1) {
+    renderResultList($('#search-results'), cats, '', (r) => Poi.run(r.catHit.cat, r.catHit.place));
+    if (cats[0].catHit.place || norm(q).split(' ').length === 1) {
       // reine Kategorie-Eingabe: keine Ortssuche dazu
       const local0 = Search.query(q);
       if (!local0.length) return;
@@ -1665,7 +1665,7 @@ async function runSearch() {
   await Search.loadAll();
   if (seq !== searchSeq) return;
   const local = [...cats, ...Search.query(q)];
-  const pick = (r) => (r.poiCat ? Poi.run(r.poiCat.cat, r.poiCat.place) : Search.show(r));
+  const pick = (r) => (r.catHit ? Poi.run(r.catHit.cat, r.catHit.place) : Search.show(r));
   renderResultList($('#search-results'), local, local.length ? '' : (navigator.onLine ? 'Suche online …' : 'Nichts gefunden. Offline sind nur Orte aus geladenen Kartengebieten suchbar.'), pick);
   const web = await Search.online(q);
   if (seq !== searchSeq) return;
