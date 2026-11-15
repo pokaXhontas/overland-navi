@@ -28,9 +28,7 @@ member = defaultdict(list)
 
 # ---------- Punkte: Biwaks, Hütten, Unterstände, Wasser ----------
 BIWAK_RE = re.compile(r"biwak|bivacc|bivouac|bivak|bivac|biwakschachtel|refuge non gard|abri", re.I)
-NO_SHELTER = {"public_transport", "picnic_shelter", "pavilion", "gazebo", "field_shelter", "sun_shelter",
-              "changing_rooms", "smoking_shelter", "parking", "bicycle_parking"}
-PT_MINZOOM = {"biwak": 9, "huette": 9, "unterstand": 11, "wasser": 12, "quelle": 12}
+PT_MINZOOM = {"biwak": 9, "huette": 9, "wasser": 12, "quelle": 12}
 
 
 def point_kind(t):
@@ -40,10 +38,8 @@ def point_kind(t):
     if tour == "alpine_hut":
         return "biwak" if BIWAK_RE.search(t.get("name", "")) or t.get("alpine_hut") == "unattended" else "huette"
     if am == "shelter":
-        st = t.get("shelter_type", "")
-        if st in NO_SHELTER or t.get("public_transport") or t.get("bus") == "yes":
-            return None
-        return "biwak" if st == "basic_hut" else "unterstand"
+        # nur geschlossene Hütten zum Übernachten, keine Unterstände, Wartehäuschen oder Pavillons
+        return "biwak" if t.get("shelter_type") == "basic_hut" and not t.get("public_transport") else None
     if am in ("drinking_water", "water_point"):
         return "wasser"
     if t.get("natural") == "spring":

@@ -20,16 +20,18 @@ jobs:
           for d in $(seq 0 14); do D=$(date -u -d "-$d day" +%Y%m%d); if curl -sfI "https://build.protomaps.com/$D.pmtiles" > /dev/null; then break; fi; done
           echo "== Karte $D"; curl -s -D - -o /dev/null -H "Range: bytes=0-99" -H "Origin: https://pokaxhontas.github.io" "$P/$D.pmtiles" | grep -iE "^HTTP|access-control-allow-origin|content-range"
           echo "== Wanderwege (Testdatei)"; curl -sL -D /tmp/h -H "Origin: https://pokaxhontas.github.io" "$P/wander/test.json"; echo; grep -iE "^HTTP|access-control-allow-origin" /tmp/h
-      - name: OpenStreetMap-Abfragedienste (Overpass) erreichbar?
+      - name: OpenStreetMap-Abfragedienste erreichbar?
         run: |
-          q='data=[out:json][timeout:20];nwr["amenity"="atm"](around:3000,42.875,74.59);out center tags 3;'
-          for ua in "overland-navi/1.0 (+https://github.com/pokaXhontas/overland-navi)" "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"; do
-            for u in https://overpass-api.de https://overpass.private.coffee https://maps.mail.ru/osm/tools/overpass; do
-              echo "== $u | $ua"
-              curl -s -m 30 -o /tmp/o -w "HTTP %{http_code} in %{time_total}s\n" "$u/api/interpreter" -A "$ua" --data-urlencode "$q" || true
-              head -c 160 /tmp/o 2>/dev/null; echo
-            done
-          done
-          echo "== Proxy /overpass"
-          curl -s -m 40 -o /tmp/o -w "HTTP %{http_code} in %{time_total}s\n" "https://ovl-karte.y3m.workers.dev/overpass" -H "Origin: https://pokaxhontas.github.io" --data-urlencode "$q" || true
-          head -c 160 /tmp/o 2>/dev/null; echo
+          set +e
+          UA="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+          R="https://pokaxhontas.github.io/overland-navi/"
+          echo "== Nominatim Geldautomaten Bischkek"
+          curl -s -m 30 -o /tmp/o -w "HTTP %{http_code} in %{time_total}s\n" -A "$UA" -e "$R" "https://nominatim.openstreetmap.org/search?amenity=atm&viewbox=74.55,42.90,74.63,42.85&bounded=1&extratags=1&format=jsonv2&limit=50&accept-language=de"
+          python3 -c "import json;d=json.load(open('/tmp/o'));print(len(d),'Treffer');[print(x.get('name'),x.get('category'),x.get('type'),(x.get('extratags') or {}).get('opening_hours')) for x in d[:5]]"
+          echo "== Nominatim Supermarkt"
+          curl -s -m 30 -o /tmp/o -w "HTTP %{http_code} in %{time_total}s\n" -A "$UA" -e "$R" "https://nominatim.openstreetmap.org/search?q=supermarket&viewbox=74.55,42.90,74.63,42.85&bounded=1&extratags=1&format=jsonv2&limit=50"
+          python3 -c "import json;d=json.load(open('/tmp/o'));print(len(d),'Treffer');[print(x.get('name'),x.get('category'),x.get('type')) for x in d[:5]]"
+          echo "== Overpass"
+          curl -s -m 20 -o /tmp/o -w "HTTP %{http_code} in %{time_total}s\n" -A "$UA" -e "$R" "https://overpass-api.de/api/interpreter" --data-urlencode 'data=[out:json][timeout:15];nwr["amenity"="atm"](around:3000,42.875,74.59);out center tags 3;'
+          head -c 160 /tmp/o; echo
+          exit 0

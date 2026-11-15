@@ -18,7 +18,6 @@ const ROUTE_COLORS = { red: '#D62828', blue: '#1C6DD0', yellow: '#E3A700', green
 const HK_PTS = {
   biwak: { label: 'Biwak', long: 'Biwak oder unbewirtschaftete Hütte', color: '#B5482A', d: 'M3 19 12 5l9 14ZM9.5 19l2.5-4 2.5 4' },
   huette: { label: 'Hütte', long: 'Bewirtschaftete Hütte', color: '#C92A2A', d: 'M4 20v-9l8-6 8 6v9M3 20h18M10 20v-5h4v5' },
-  unterstand: { label: 'Unterstand', long: 'Unterstand oder Schutzdach', color: '#6741D9', d: 'M3 9l18-4M5 8.6V20M19 5.4V20M3 20h18' },
   wasser: { label: 'Trinkwasser', long: 'Trinkwasser', color: '#1C7ED6', d: 'M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z' },
   quelle: { label: 'Quelle', long: 'Quelle', color: '#0B7285', d: 'M12 4s5 5.5 5 9.2a5 5 0 0 1-10 0C7 9.5 12 4 12 4ZM4 21c2-1.3 4-1.3 6 0s4 1.3 6 0 3-1 4-.5' }
 };
@@ -59,7 +58,7 @@ const Hike = {
 
   on() { return store.get('hikeOn', true); },
   max() { return store.get('hikeMax', 6); },
-  pts() { return store.get('hikePts', Object.keys(HK_PTS)); },
+  pts() { return store.get('hikePts', Object.keys(HK_PTS)).filter((k) => HK_PTS[k]); },
   keys() { return Object.keys(this.index); },
   url(key) { return Tiles.sources.hike ? Tiles.sources.hike.replace('{id}', key) : null; },
 
@@ -180,7 +179,7 @@ const Hike = {
       top: [
         ...(this.pts().length ? [{ id: 'hike-pts', type: 'symbol', source: 'hike', 'source-layer': 'punkte', filter: ['in', ['get', 'k'], ['literal', this.pts()]],
           layout: { 'icon-image': ['concat', 'hkpt-', ['get', 'k']], 'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.7, 14, 1],
-            'icon-allow-overlap': ['step', ['zoom'], false, 13, true], 'symbol-sort-key': ['match', ['get', 'k'], 'biwak', 0, 'huette', 1, 'unterstand', 2, 3],
+            'icon-allow-overlap': ['step', ['zoom'], false, 13, true], 'symbol-sort-key': ['match', ['get', 'k'], 'biwak', 0, 'huette', 1, 2],
             'text-field': ['step', ['zoom'], '', 12, ['coalesce', ['get', 'n'], '']], 'text-font': ['Noto Sans Medium'], 'text-size': 11,
             'text-offset': [0, 1.3], 'text-anchor': 'top', 'text-optional': true, 'text-max-width': 9 },
           paint: { 'text-color': dark || sat ? '#E9EEF1' : '#3B2A1A', 'text-halo-color': dark || sat ? '#0B0F12' : '#FFFFFF', 'text-halo-width': 1.5 } }] : [])
