@@ -22,10 +22,14 @@ jobs:
           echo "== Wanderwege (Testdatei)"; curl -sL -D /tmp/h -H "Origin: https://pokaxhontas.github.io" "$P/wander/test.json"; echo; grep -iE "^HTTP|access-control-allow-origin" /tmp/h
       - name: OpenStreetMap-Abfragedienste (Overpass) erreichbar?
         run: |
-          for u in https://overpass-api.de https://overpass.private.coffee https://maps.mail.ru/osm/tools/overpass https://overpass.kumi.systems; do
-            echo "== $u"
-            curl -s -m 30 -o /tmp/o -w "HTTP %{http_code} in %{time_total}s\n" "$u/api/interpreter" -H "Origin: https://pokaxhontas.github.io" -H "Referer: https://pokaxhontas.github.io/overland-navi/" \
-              -A "Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1" \
-              --data-urlencode 'data=[out:json][timeout:20];nwr["amenity"="atm"](around:3000,42.875,74.59);out center tags 3;' || true
-            head -c 200 /tmp/o; echo
+          q='data=[out:json][timeout:20];nwr["amenity"="atm"](around:3000,42.875,74.59);out center tags 3;'
+          for ua in "overland-navi/1.0 (+https://github.com/pokaXhontas/overland-navi)" "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"; do
+            for u in https://overpass-api.de https://overpass.private.coffee https://maps.mail.ru/osm/tools/overpass; do
+              echo "== $u | $ua"
+              curl -s -m 30 -o /tmp/o -w "HTTP %{http_code} in %{time_total}s\n" "$u/api/interpreter" -A "$ua" --data-urlencode "$q" || true
+              head -c 160 /tmp/o 2>/dev/null; echo
+            done
           done
+          echo "== Proxy /overpass"
+          curl -s -m 40 -o /tmp/o -w "HTTP %{http_code} in %{time_total}s\n" "https://ovl-karte.y3m.workers.dev/overpass" -H "Origin: https://pokaxhontas.github.io" --data-urlencode "$q" || true
+          head -c 160 /tmp/o 2>/dev/null; echo
