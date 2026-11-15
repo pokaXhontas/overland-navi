@@ -1,0 +1,81 @@
+name: Wanderwege bauen
+
+on:
+  workflow_dispatch:
+  schedule:
+    # einmal im Monat aus frischen OpenStreetMap-Daten
+    - cron: '23 3 5 * *'
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: hiking
+  cancel-in-progress: false
+
+jobs:
+  land:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        include:
+          - { id: berlin, osm: europe/germany/brandenburg }
+          - { id: kirgistan, osm: asia/kyrgyzstan }
+          - { id: tadschikistan, osm: asia/tajikistan }
+          - { id: usbekistan, osm: asia/uzbekistan }
+          - { id: kasachstan, osm: asia/kazakhstan }
+          - { id: tuerkei, osm: europe/turkey }
+          - { id: griechenland, osm: europe/greece }
+          - { id: norwegen, osm: europe/norway }
+          - { id: schweden, osm: europe/sweden }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Werkzeuge (osmium, tippecanoe)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq osmium-tool libsqlite3-dev zlib1g-dev > /dev/null
+          pip install --quiet osmium
+          git clone -q --depth 1 https://github.com/felt/tippecanoe.git /tmp/tc && make -s -C /tmp/tc -j4 > /dev/null && sudo make -s -C /tmp/tc install > /dev/null
+          tippecanoe --version
+
+      - name: OpenStreetMap-Daten laden (Geofabrik)
+        run: curl -sfL -o land.osm.pbf "https://download.geofabrik.de/${{ matrix.osm }}-latest.osm.pbf" && ls -lh land.osm.pbf
+
+      - name: Wanderwege herausfiltern
+        run: |
+          osmium tags-filter land.osm.pbf w/sac_scale w/highway=path r/route=hiking,foot -o wege.osm.pbf --overwrite
+          ls -lh wege.osm.pbf
+          python3 scripts/build_hiking.py wege.osm.pbf wege.geojsonseq
+
+      - name: Kartendatei bauen
+        run: |
+          tippecanoe -o ${{ matrix.id }}.pmtiles -l wege -Z8 -z14 -P --read-parallel \
+            --simplification=6 --drop-densest-as-needed \
+            --attribution='© OpenStreetMap-Mitwirkende' -n "Wanderwege ${{ matrix.id }}" --force wege.geojsonseq 2>&1 | tail -3
+          ls -lh ${{ matrix.id }}.pmtiles
+
+      - name: In die Downloads legen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view wanderwege > /dev/null 2>&1 || gh release create wanderwege --title "Wanderwege" --notes "Wanderwege-Kartendateien für die App (werden automatisch erneuert)."
+          gh release upload wanderwege ${{ matrix.id }}.pmtiles --clobber
+
+  liste:
+    needs: land
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Übersicht der vorhandenen Wanderwege-Dateien
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/${{ github.repository }}/releases/tags/wanderwege \
+            --jq '[.assets[] | select(.name | endswith(".pmtiles")) | {key: (.name | rtrimstr(".pmtiles")), value: {size: .size, date: .updated_at}}] | from_entries' > index.json
+          cat index.json
+          gh release upload wanderwege index.json --clobber -R ${{ github.repository }}
+          gh workflow run deploy.yml --ref main -R ${{ github.repository }}
