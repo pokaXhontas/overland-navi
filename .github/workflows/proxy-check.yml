@@ -1,0 +1,22 @@
+name: Proxy prüfen
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download-Bereich „wanderwege“ anlegen und Testdatei ablegen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view wanderwege -R ${{ github.repository }} > /dev/null 2>&1 || \
+            gh release create wanderwege -R ${{ github.repository }} --title "Wanderwege" --notes "Wanderwege-Kartendateien für die App (werden automatisch erneuert)."
+          echo '{"test":true}' > test.json
+          gh release upload wanderwege test.json -R ${{ github.repository }} --clobber
+      - name: Karte und Wanderwege über den Proxy abrufen
+        run: |
+          P=https://ovl-karte.y3m.workers.dev
+          for d in $(seq 0 14); do D=$(date -u -d "-$d day" +%Y%m%d); if curl -sfI "https://build.protomaps.com/$D.pmtiles" > /dev/null; then break; fi; done
+          echo "== Karte $D"; curl -s -D - -o /dev/null -H "Range: bytes=0-99" -H "Origin: https://pokaxhontas.github.io" "$P/$D.pmtiles" | grep -iE "^HTTP|access-control-allow-origin|content-range"
+          echo "== Wanderwege (Testdatei)"; curl -sL -D /tmp/h -H "Origin: https://pokaxhontas.github.io" "$P/wander/test.json"; echo; grep -iE "^HTTP|access-control-allow-origin" /tmp/h
