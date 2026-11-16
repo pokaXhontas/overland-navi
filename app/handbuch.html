@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F2F0EA">
+<title>Handbuch · Overland-Navi</title>
+<link rel="icon" href="icons/icon-192.png">
+<style>
+:root {
+  --bg: #F2F0EA; --card: #FFFFFF; --text: #15191D; --muted: #5B6670; --line: rgba(20,24,28,.10);
+  --accent: #FF7A1A; --accent-text: #C2560A; --mark: #E8590C; --tip: #FFF4E6; --tip-line: #FFD8A8;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+  color: var(--text); background: var(--bg); -webkit-text-size-adjust: 100%;
+}
+html.dark {
+  --bg: #0B0F12; --card: #141A1F; --text: #EEF2F4; --muted: #A3AEB6; --line: rgba(255,255,255,.10);
+  --accent-text: #FF9A4D; --tip: #2A1D10; --tip-line: #5C3A16;
+}
+* { box-sizing: border-box; }
+body { margin: 0; line-height: 1.55; font-size: 17px; }
+main { max-width: 860px; margin: 0 auto; padding: calc(env(safe-area-inset-top, 0px) + 18px) 18px calc(env(safe-area-inset-bottom, 0px) + 60px); }
+header.top { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+header.top img { width: 56px; height: 56px; border-radius: 14px; }
+h1 { font-size: 28px; line-height: 1.15; margin: 0; }
+.lead { color: var(--muted); margin: 6px 0 22px; }
+h2 { font-size: 23px; margin: 46px 0 10px; padding-top: 10px; border-top: 1px solid var(--line); scroll-margin-top: 14px; }
+h2 .n { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 16px; background: var(--accent); color: #140A02; font-size: 17px; margin-right: 8px; vertical-align: 2px; }
+h3 { font-size: 18px; margin: 26px 0 6px; }
+p, ul, ol { margin: 8px 0; }
+li { margin: 4px 0; }
+a { color: var(--accent-text); }
+b { font-weight: 650; }
+.toc { background: var(--card); border-radius: 18px; padding: 14px 18px; columns: 2 240px; column-gap: 28px; }
+.toc a { display: block; padding: 7px 0; text-decoration: none; color: var(--text); font-weight: 600; break-inside: avoid; }
+.toc a span { color: var(--accent-text); display: inline-block; width: 28px; }
+figure { margin: 16px auto; text-align: center; }
+figure img { width: 100%; max-width: 300px; border-radius: 26px; border: 1px solid var(--line); box-shadow: 0 8px 24px rgba(40,30,15,.18); background: var(--card); }
+figure.pair { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+figure.pair img { max-width: 260px; flex: 1 1 200px; }
+figcaption { color: var(--muted); font-size: 14px; margin-top: 8px; }
+.wrap { display: flow-root; }
+@media (min-width: 700px) {
+  .wrap figure.side { float: right; width: 280px; margin: 4px 0 16px 26px; }
+  .wrap figure.side.left { float: left; margin: 4px 26px 16px 0; }
+}
+.legend { list-style: none; padding: 0; }
+.legend li { display: flex; gap: 10px; align-items: flex-start; }
+.dot { flex: 0 0 26px; height: 26px; border-radius: 13px; background: var(--mark); color: #fff; font-weight: 800; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; margin-top: 1px; }
+.tip { background: var(--tip); border: 1px solid var(--tip-line); border-radius: 14px; padding: 10px 14px; margin: 14px 0; }
+.tip::before { content: "💡 "; }
+.warn { background: var(--tip); border-left: 4px solid var(--accent); border-radius: 10px; padding: 10px 14px; margin: 14px 0; }
+.steps { counter-reset: s; list-style: none; padding: 0; }
+.steps li { counter-increment: s; position: relative; padding-left: 38px; margin: 10px 0; }
+.steps li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 13px; background: var(--card); border: 2px solid var(--accent); font-weight: 800; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+table { border-collapse: collapse; width: 100%; background: var(--card); border-radius: 14px; overflow: hidden; font-size: 15px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+tr:last-child td { border-bottom: 0; }
+.ok { color: #2E8A47; font-weight: 700; } html.dark .ok { color: #7BD88F; }
+.no { color: #C92A2A; font-weight: 700; } html.dark .no { color: #FF8787; }
+.key { display: inline-block; padding: 1px 8px; border-radius: 8px; background: var(--card); border: 1px solid var(--line); font-weight: 600; font-size: 15px; white-space: nowrap; }
+.back { display: none; margin-bottom: 14px; font-weight: 600; text-decoration: none; }
+.standalone .back { display: inline-block; }
+.totop { display: block; text-align: right; font-size: 14px; margin-top: 18px; }
+footer { color: var(--muted); font-size: 14px; margin-top: 50px; }
+</style>
+<script>
+  // Farbschema wie in der App (wird per ?t=dark|light übergeben), sonst nach Systemeinstellung
+  (function () {
+    var t = new URLSearchParams(location.search).get('t');
+    if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.classList.add('dark');
+    if (window.top === window) document.documentElement.classList.add('standalone');
+  })();
+</script>
+</head>
+<body>
+<main>
+<a class="back" href="./">‹ Zur Karte</a>
+<header class="top" id="oben">
+  <img src="icons/icon-192.png" alt="">
+  <div><h1>Handbuch</h1><span class="lead">Overland-Navi · Karte, Navi und Stellplätze für unterwegs, auch ohne Netz</span></div>
+</header>
+<p class="lead">Hier steht alles, was du zum Loslegen brauchst. Tipp auf ein Kapitel, um direkt hinzuspringen. Die Bilder sind vom iPhone; auf dem iPad sieht alles gleich aus, nur breiter.</p>
+
+<nav class="toc" aria-label="Inhalt">
+  <a href="#start"><span>1</span>Einrichten</a>
+  <a href="#ueberblick"><span>2</span>Der Bildschirm</a>
+  <a href="#offline"><span>3</span>Karten offline laden</a>
+  <a href="#suche"><span>4</span>Suchen &amp; In der Nähe</a>
+  <a href="#route"><span>5</span>Route planen &amp; navigieren</a>
+  <a href="#fuss"><span>6</span>Zu Fuß, Bus &amp; Bahn</a>
+  <a href="#ohnenetz"><span>7</span>Ohne Internet</a>
+  <a href="#orte"><span>8</span>Orte speichern</a>
+  <a href="#wandern"><span>9</span>Wandern &amp; Touren</a>
+  <a href="#zeichnen"><span>10</span>Route zeichnen &amp; Tracks</a>
+  <a href="#karte"><span>11</span>Karte einstellen</a>
+  <a href="#fragen"><span>12</span>Tipps &amp; Fragen</a>
+</nav>
+
+<!-- 1 -->
+<h2 id="start"><span class="n">1</span>Einrichten</h2>
+<p>Overland-Navi ist eine Web-App: Sie kommt nicht aus dem App Store, sondern wird aus dem Browser auf den Startbildschirm gelegt. Danach startet sie wie jede andere App, im Vollbild und auch ohne Internet.</p>
+<h3>iPhone und iPad</h3>
+<ol class="steps">
+  <li><b>pokaxhontas.github.io/overland-navi</b> in <b>Safari</b> öffnen.</li>
+  <li>Unten (iPhone) oder oben (iPad) auf <span class="key">Teilen ⬆︎</span> tippen → <span class="key">Zum Home-Bildschirm</span>.</li>
+  <li>Die App vom Home-Bildschirm starten und den <b>Standort erlauben</b> („Beim Verwenden der App“).</li>
+</ol>
+<h3>Android</h3>
+<ol class="steps">
+  <li>Die gleiche Adresse in <b>Chrome</b> öffnen.</li>
+  <li>Menü <span class="key">⋮</span> → <span class="key">App installieren</span> (oder „Zum Startbildschirm hinzufügen“).</li>
+  <li>Die App starten und den Standort erlauben.</li>
+</ol>
+<div class="tip">Unterwegs im Menü <b>Bildschirm anlassen</b> einschalten, dann geht das Display beim Navigieren nicht aus. Das Gerät dabei am besten am Strom lassen.</div>
+<div class="warn"><b>Wichtig:</b> Die App muss beim Navigieren geöffnet und im Vordergrund sein. Bei gesperrtem Bildschirm gibt es keine Ansagen – das ist bei Web-Apps auf iPhone und Android leider so.</div>
+
+<!-- 2 -->
+<h2 id="ueberblick"><span class="n">2</span>Der Bildschirm im Überblick</h2>
+<div class="wrap">
+<figure class="side"><img src="handbuch/01-start.webp" alt="Startbildschirm mit nummerierten Knöpfen" loading="lazy"><figcaption>Die Karte mit allen Knöpfen</figcaption></figure>
+<ul class="legend">
+  <li><span class="dot">1</span><span><b>Tacho:</b> Tempo, Kurs, Höhe und GPS-Genauigkeit. Nach links wischen klappt ihn weg, Antippen holt ihn zurück.</span></li>
+  <li><span class="dot">2</span><span><b>Status:</b> zeigt, ob du online bist und ob das Gebiet, in dem du gerade bist, offline geladen ist.</span></li>
+  <li><span class="dot">3</span><span><b>Suche:</b> Orte, Gipfel, Pässe, Seen, Restaurants, Koordinaten – und „In der Nähe“ (Supermarkt, Geldautomat, Werkstatt …).</span></li>
+  <li><span class="dot">4</span><span><b>Menü „Karten &amp; Ebenen“:</b> deine gespeicherten Daten, Import, Ansagen, Kartenart, Offline-Karten – und ganz unten dieses Handbuch.</span></li>
+  <li><span class="dot">5</span><span><b>Route planen:</b> Start, Zwischenstopps und Ziel, mit Auto, zu Fuß oder mit Bus &amp; Bahn.</span></li>
+  <li><span class="dot">6</span><span><b>Wandern:</b> Wanderwege, Hütten und Biwaks, Sehenswertes und Tourenvorschläge.</span></li>
+  <li><span class="dot">7</span><span><b>Route zeichnen:</b> eine eigene Strecke mit dem Finger auf die Karte legen.</span></li>
+  <li><span class="dot">8</span><span><b>Kompass:</b> <span class="key">N</span> = Norden oben, <span class="key">FAHRT</span> = Karte dreht sich in Fahrtrichtung.</span></li>
+  <li><span class="dot">9</span><span><b>Mein Standort:</b> springt zu dir und folgt dir wieder.</span></li>
+  <li><span class="dot">10</span><span><b>Zoom:</b> rein und raus (geht natürlich auch mit zwei Fingern).</span></li>
+  <li><span class="dot">11</span><span><b>Ort speichern:</b> Stellplatz, Wasser, Diesel, Werkstatt … für später merken.</span></li>
+</ul>
+<p>Außerdem: <b>Lange auf die Karte drücken</b> legt dort sofort einen neuen Ort an. Ein <b>Antippen</b> von Symbolen, Wegen und Tracks zeigt ihre Infos. Fenster und Leisten lassen sich mit dem Finger wegwischen (nach unten oder oben) und an ihrem kleinen Rest wieder hervorholen.</p>
+</div>
+
+<!-- 3 -->
+<h2 id="offline"><span class="n">3</span>Karten offline laden</h2>
+<div class="wrap">
+<figure class="side"><img src="handbuch/05-offline-karten.webp" alt="Liste der Offline-Karten" loading="lazy"><figcaption>Menü → Offline-Karten</figcaption></figure>
+<p>Damit die App ohne Netz funktioniert, lädst du vorher die Gebiete, durch die du fährst. Am besten im WLAN und am Strom.</p>
+<ol class="steps">
+  <li>Menü <span class="key">Karten &amp; Ebenen</span> öffnen und nach unten zu <b>Offline-Karten</b> scrollen.</li>
+  <li>Beim gewünschten Gebiet auf <span class="key">Laden</span> tippen. Die ungefähre Größe steht daneben.</li>
+  <li><b>App offen lassen</b>, bis „✓ Offline verfügbar“ erscheint. Bricht der Download ab, geht es mit <span class="key">Fortsetzen</span> an der gleichen Stelle weiter.</li>
+</ol>
+<p>Mit einem Gebiet kommen automatisch mit: Karte mit Höhenlinien und Gelände, <b>Suche</b>, <b>Wanderwege</b> und das <b>Straßennetz für die Routenberechnung</b>. Bei Gebieten, die du früher schon geladen hast, steht ein Knopf wie <span class="key">Wanderwege &amp; Offline-Routen laden</span> – einmal antippen, dann ist alles auf dem neuesten Stand.</p>
+</div>
+<div class="wrap">
+<figure class="side left"><img src="handbuch/06-gebiet-hinzufuegen.webp" alt="Gebiet hinzufügen" loading="lazy"><figcaption>„Land oder Gebiet hinzufügen“</figcaption></figure>
+<h3>Weitere Länder und eigene Gebiete</h3>
+<p>Unter der Liste auf <span class="key">Land oder Gebiet hinzufügen</span> tippen:</p>
+<ul>
+  <li><b>Land suchen</b> und antippen – jedes Land der Welt ist möglich.</li>
+  <li><b>Aktueller Kartenausschnitt:</b> lädt genau das, was du gerade siehst. Praktisch für eine Strecke, ein Gebirge oder ein Grenzgebiet. Vorher Karte passend verschieben und zoomen, Namen eingeben, <span class="key">Hinzufügen</span>.</li>
+</ul>
+<div class="tip">Fertige Gebiete aus der Liste (z. B. Schweden, Norwegen, Kirgistan) haben einen vollständigen Suchindex. Bei selbst hinzugefügten Gebieten baut die App ihn beim Laden selbst – das kann lückenhaft werden („Suche x von y Abschnitten“). Dann später mit Internet <span class="key">Suche ergänzen</span> tippen.</div>
+<p>Ganz unten zeigt die App, wie viel Speicher belegt ist. Ein geladenes Gebiet löschst du mit <span class="key">Löschen</span> → <span class="key">Wirklich löschen?</span>.</p>
+</div>
+
+<!-- 4 -->
+<h2 id="suche"><span class="n">4</span>Suchen &amp; In der Nähe</h2>
+<div class="wrap">
+<figure class="side"><img src="handbuch/07-suche.webp" alt="Suche nach Karakol" loading="lazy"><figcaption>Suche mit Treffern</figcaption></figure>
+<p>Tippe auf die <b>Lupe</b> und gib ein, was du suchst: einen Ort, einen Gipfel, einen Pass, einen See, eine Adresse, ein bestimmtes Restaurant – oder Koordinaten wie <span class="key">42.49, 78.39</span>.</p>
+<ul>
+  <li>Einen Treffer antippen zeigt ihn auf der Karte mit einer kleinen Karte: <span class="key">Route</span> berechnet sofort den Weg dorthin, <span class="key">✕</span> schließt sie.</li>
+  <li>Unter dem Suchfeld stehen deine <b>letzten Suchen</b>.</li>
+  <li>Ohne Internet sucht die App in den geladenen Offline-Gebieten.</li>
+</ul>
+</div>
+<div class="wrap">
+<figure class="pair"><img src="handbuch/08-in-der-naehe.webp" alt="Geldautomaten in der Nähe" loading="lazy"><img src="handbuch/09-ort-infos.webp" alt="Infos zu einem Geldautomaten" loading="lazy"><figcaption>„In der Nähe“: Geldautomaten in Bischkek und die Infos zu einem davon</figcaption></figure>
+<h3>In der Nähe</h3>
+<p>Die runden Knöpfe unter dem Suchfeld suchen im aktuellen Kartenausschnitt: <b>Supermärkte, Restaurants, Cafés, Geldautomaten, Banken, Tankstellen, Werkstätten, Baumärkte, Apotheken, Ärzte, Trinkwasser, Wäschereien, Toiletten &amp; Duschen, SIM-Karten, Post</b> und <b>Camping &amp; Unterkünfte</b>. Antippen zeigt Öffnungszeiten (mit „jetzt geöffnet“), Telefon, Webseite und Adresse, soweit bekannt.</p>
+<p>Oben erscheint ein Hinweis mit der Anzahl der Treffer; das <span class="key">✕</span> darin blendet sie wieder aus.</p>
+</div>
+
+<!-- 5 -->
+<h2 id="route"><span class="n">5</span>Route planen &amp; navigieren</h2>
+<div class="wrap">
+<figure class="side"><img src="handbuch/10-route-planen.webp" alt="Route planen mit Zwischenstopp" loading="lazy"><figcaption>Planer mit Zwischenstopp</figcaption></figure>
+<ol class="steps">
+  <li>Auf <b>Route planen</b> tippen. Start ist automatisch <b>Mein Standort</b>.</li>
+  <li>Ins Zielfeld tippen und suchen – oder <span class="key">Auf der Karte wählen</span>: Karte unter die Nadel schieben, <span class="key">Punkt übernehmen</span>.</li>
+  <li>Mit <span class="key">+ Zwischenstopp hinzufügen</span> weitere Halte einfügen. Am Griff <span class="key">≡</span> festhalten und ziehen, um die Reihenfolge zu ändern; der Pfeil oben tauscht Start und Ziel.</li>
+  <li>Wählen: <b>🚙 Auto</b>, <b>🥾 Zu Fuß</b> oder <b>🚆 Bus &amp; Bahn</b>, und beim Auto <b>Schnellste</b>, <b>Kürzeste</b> oder <b>Pisten</b> (nimmt unbefestigte Wege gern mit).</li>
+  <li><span class="key">Route berechnen</span> – oder <span class="key">Luftlinie</span>, wenn es gar keinen Weg gibt.</li>
+</ol>
+</div>
+<div class="wrap">
+<figure class="side left"><img src="handbuch/11-routenauswahl.webp" alt="Routenauswahl" loading="lazy"><figcaption>Mehrere Vorschläge zur Auswahl</figcaption></figure>
+<h3>Route auswählen</h3>
+<p>Meist bekommst du mehrere Vorschläge mit Fahrzeit und Länge. Antippen zeigt sie auf der Karte. Hinweise wie <b>⛴ Fähre</b>, <b>€ Maut</b> oder <b>ohne Maut</b> stehen direkt dabei. Die Auswahl lässt sich nach unten wischen, um mehr Karte zu sehen, und wieder hochziehen.</p>
+<ul>
+  <li><span class="key">Losfahren</span> startet die Navigation.</li>
+  <li><span class="key">‹ Route ändern</span> führt zurück in den Planer.</li>
+  <li><span class="key">Als Track speichern</span> legt die Strecke in deine Tracks, z. B. zum Vorausplanen.</li>
+</ul>
+<div class="tip"><b>Bestimmte Fähre nehmen:</b> In der Suche z. B. „Fähre Trelleborg“ eingeben und die Fähre (⛴) antippen. Sie wird als Zwischenstopp eingeplant und die Route fährt über diese Fähre.</div>
+</div>
+<div class="wrap">
+<figure class="side"><img src="handbuch/12-navigation.webp" alt="Navigation läuft" loading="lazy"><figcaption>Unterwegs mit Abbiegehinweis</figcaption></figure>
+<h3>Während der Fahrt</h3>
+<ul class="legend">
+  <li><span class="dot">1</span><span><b>Nächster Hinweis</b> mit Entfernung, bei Autobahnen auch die Fahrspuren.</span></li>
+  <li><span class="dot">2</span><span><b>Ansagen</b> an oder aus.</span></li>
+  <li><span class="dot">3</span><span><b>Ändern:</b> Zwischenstopp einfügen oder neues Ziel.</span></li>
+  <li><span class="dot">4</span><span><b>Übersicht:</b> ganze Strecke zeigen, danach folgt die Karte dir wieder.</span></li>
+  <li><span class="dot">5</span><span><b>Beenden.</b></span></li>
+</ul>
+<p>Unten stehen Restweg und Ankunftszeit. Kommst du von der Route ab, rechnet die App nach ein paar Sekunden neu – mit Netz über die Routenserver, ohne Netz selbst auf dem Gerät.</p>
+<p>Vor mautpflichtigen Abschnitten kommt ein Hinweis. Stimme, Tempo, Navi-Kamera und 3D-Ansicht stellst du im Menü unter <b>Navigation &amp; Ansagen</b> ein.</p>
+</div>
+
+<!-- 6 -->
+<h2 id="fuss"><span class="n">6</span>Zu Fuß, Bus &amp; Bahn</h2>
+<div class="wrap">
+<figure class="pair"><img src="handbuch/13-zu-fuss.webp" alt="Route zu Fuß" loading="lazy"><img src="handbuch/14-bus-bahn.webp" alt="Verbindungen mit Bus und Bahn" loading="lazy"><figcaption>Links zu Fuß zu einem Wasserfall, rechts eine Verbindung in Berlin</figcaption></figure>
+<h3>🥾 Zu Fuß</h3>
+<p>Die App bevorzugt markierte Wanderwege und Fußwege und zeigt, wie viel der Strecke auf <b>markierten Wanderwegen</b> und wie viel <b>an Straßen</b> entlangführt, dazu die schwierigste Stelle (T1–T6) und die Höhenmeter. Gibt es keinen durchgehenden Wanderweg, steht ein Hinweis dabei. Wie schwierig die Wege sein dürfen, stellst du im Wander-Menü unter „Zeige Wege bis“ ein.</p>
+<h3>🚆 Bus &amp; Bahn</h3>
+<p>Zeigt Verbindungen mit Abfahrt, Ankunft, Linien und Umstiegen. Unter <b>Jetzt / Abfahrt / Ankunft</b> kannst du eine andere Zeit wählen – nachts fahren z. B. manche U-Bahnen nicht. Während der Fahrt sagt die App Ein- und Aussteigen an. Bus &amp; Bahn braucht Internet.</p>
+</div>
+
+<!-- 7 -->
+<h2 id="ohnenetz"><span class="n">7</span>Ohne Internet</h2>
+<div class="wrap">
+<figure class="side"><img src="handbuch/15-offline-route.webp" alt="Auf dem Gerät berechnete Route" loading="lazy"><figcaption>„📴 auf dem Gerät berechnet“</figcaption></figure>
+<p>Ist ein Gebiet offline geladen, rechnet die App Routen mit dem <b>Auto</b> und <b>zu Fuß</b> selbst auf dem Gerät, mit Abbiegehinweisen, Ansagen und Neuberechnung. Solche Routen sind mit <b>📴 auf dem Gerät berechnet</b> markiert. Das springt auch ein, wenn die Routenserver mal nicht antworten.</p>
+<table>
+  <tr><th>Funktion</th><th>Ohne Netz</th></tr>
+  <tr><td>Karte, Höhenlinien, Gelände</td><td class="ok">✓ in geladenen Gebieten</td></tr>
+  <tr><td>Suche nach Orten, Gipfeln, Seen …</td><td class="ok">✓ in geladenen Gebieten</td></tr>
+  <tr><td>Route mit Auto oder zu Fuß, Ansagen</td><td class="ok">✓ in geladenen Gebieten</td></tr>
+  <tr><td>Wanderwege, Hütten, geladene Touren</td><td class="ok">✓</td></tr>
+  <tr><td>Eigene Orte, Tracks, Route zeichnen</td><td class="ok">✓</td></tr>
+  <tr><td>In der Nähe (Supermarkt, Geldautomat …)</td><td>nur was auf der Karte steht</td></tr>
+  <tr><td>Luftbild und Hybrid</td><td class="no">✗ nur online</td></tr>
+  <tr><td>Bus &amp; Bahn</td><td class="no">✗ nur online</td></tr>
+</table>
+<div class="tip">Eine Route geht nur so weit, wie das geladene Gebiet reicht. Für eine Fahrt über eine Grenze beide Länder laden.</div>
+</div>
+
+<!-- 8 -->
+<h2 id="orte"><span class="n">8</span>Orte speichern</h2>
+<div class="wrap">
+<figure class="pair"><img src="handbuch/16-ort-position.webp" alt="Position für neuen Ort wählen" loading="lazy"><img src="handbuch/17-ort-eintragen.webp" alt="Ort eintragen" loading="lazy"><figcaption>Erst die Stelle wählen, dann eintragen</figcaption></figure>
+<ol class="steps">
+  <li>Auf <span class="key">Ort speichern</span> tippen. Die App fragt <b>„Wo soll der Ort hin?“</b>: Karte verschieben, bis die Nadel genau sitzt, und <span class="key">Hier setzen</span> – oder <span class="key">Mein Standort</span> für die aktuelle Position. So kannst du auch vorab Orte eintragen, an denen du gar nicht bist.</li>
+  <li>Bei <b>Was ist hier?</b> die Art wählen: Wildcamping, Campingplatz, Wasser, Werkstatt, Diesel, Grenze, Warnung oder Sonstiges.</li>
+  <li>Fotos, Name, Sterne, Merkmale (eben, windgeschützt, Handynetz, nur mit Allrad …) und eine Notiz ergänzen – alles freiwillig.</li>
+  <li><span class="key">Speichern</span>. Die Höhe trägt die App selbst ein.</li>
+</ol>
+<p>Schneller geht es mit <b>langem Drücken auf die Karte</b>. Einen gespeicherten Ort antippen öffnet ihn wieder – zum Ändern, <span class="key">Position verschieben</span>, <span class="key">Hierhin navigieren</span> oder Löschen.</p>
+<h3>Meine Daten, Import und Sichern</h3>
+<p>Im Menü unter <b>Meine Daten</b> stehen deine Orte und Tracks nach Art sortiert. Der Schalter blendet eine ganze Art aus, Antippen zeigt die Liste.</p>
+<ul>
+  <li><b>Importieren:</b> GPX, KML oder ZIP aus MapOut, iOverlander und anderen Apps öffnen.</li>
+  <li><b>Als GPX teilen:</b> alle Orte als Datei sichern oder weitergeben.</li>
+</ul>
+<div class="warn"><b>Deine Orte, Fotos und Tracks liegen nur auf diesem Gerät.</b> Wer die App vom Home-Bildschirm löscht oder die Website-Daten in Safari entfernt, löscht sie mit. Deshalb ab und zu <span class="key">Als GPX teilen</span> und die Datei z. B. in die Dateien-App oder per Mail sichern.</div>
+</div>
+
+<!-- 9 -->
+<h2 id="wandern"><span class="n">9</span>Wandern &amp; Touren</h2>
+<div class="wrap">
+<figure class="pair"><img src="handbuch/18-wanderweg.webp" alt="Infos zu einem Wanderweg" loading="lazy"><img src="handbuch/19-wandermenue.webp" alt="Wander-Menü" loading="lazy"><figcaption>Wanderwege in Ala-Artscha und das Wander-Menü</figcaption></figure>
+<p>Wanderwege erscheinen ab Zoomstufe 11 gestrichelt; die <b>Farbe zeigt die Schwierigkeit</b> nach der Schweizer SAC-Skala, von T1 (Wanderweg) bis T6 (schwieriges Alpinwandern). Breite farbige Bänder sind markierte Wanderrouten. Einen Weg antippen zeigt Name, Schwierigkeit und Beschaffenheit.</p>
+<p>Im <b>Wander-Menü</b> (Berg-Knopf):</p>
+<ul>
+  <li><b>Biwaks und Hütten</b> sowie <b>Sehenswertes</b> (Ruinen, Burgen, Aussichtspunkte, Wasserfälle, Höhlen …) einzeln ein- und ausblenden. Ein Symbol antippen zeigt Höhe, Schlafplätze, Geschichte, Wikipedia.</li>
+  <li><b>Zeige Wege bis:</b> schwierigere Wege ausblenden.</li>
+  <li><b>Touren:</b> Tourenvorschläge auf der Karte.</li>
+</ul>
+</div>
+<div class="wrap">
+<figure class="side"><img src="handbuch/20-tour.webp" alt="Tour mit Infos" loading="lazy"><figcaption>Eine Tour mit allen Infos</figcaption></figure>
+<h3>Touren laden</h3>
+<p>Mit <span class="key">Touren für ein Land laden</span> holst du die bekanntesten Wanderungen eines Landes in die App. ★ bedeutet: von Hand recherchiert, mit Infos zu Anreise, Kosten, Unterkünften und Gefahren. Geladene Touren gehen auch offline.</p>
+<p>Eine Tour antippen öffnet Länge, Höhenmeter, Höhenprofil, Wegpunkte und Infos. Dann:</p>
+<ul>
+  <li><span class="key">Diesem Weg folgen</span> – Navigation entlang der Tour,</li>
+  <li><span class="key">Route zum Startpunkt</span> – mit dem Auto hinfahren,</li>
+  <li><span class="key">In meine Tracks übernehmen</span>.</li>
+</ul>
+</div>
+
+<!-- 10 -->
+<h2 id="zeichnen"><span class="n">10</span>Route zeichnen &amp; Tracks</h2>
+<div class="wrap">
+<figure class="side"><img src="handbuch/21-route-zeichnen.webp" alt="Route zeichnen" loading="lazy"><figcaption>Eigene Strecke antippen</figcaption></figure>
+<ol class="steps">
+  <li>Auf den <b>Stift-Knopf</b> tippen.</li>
+  <li>Nacheinander Punkte auf die Karte tippen. Bei <b>Wegen folgen</b> verbindet die App sie entlang von Straßen und Pisten, bei <b>Gerade Linie</b> direkt.</li>
+  <li><span class="key">Zurück</span> nimmt den letzten Punkt weg, <span class="key">⇄</span> dreht die Richtung um.</li>
+  <li><span class="key">Fertig</span> speichert die Strecke als Track.</li>
+</ol>
+<p>Einen <b>Track antippen</b> zeigt Länge, Anstieg, höchsten Punkt, Höhenprofil und Abstand zu dir. Dort kannst du Namen, Farbe und Notiz ändern, <span class="key">Diesem Track folgen</span> (Navigation entlang der Linie) oder <span class="key">Route bearbeiten</span>.</p>
+</div>
+
+<!-- 11 -->
+<h2 id="karte"><span class="n">11</span>Karte einstellen</h2>
+<div class="wrap">
+<figure class="pair"><img src="handbuch/02-menue.webp" alt="Menü Karten und Ebenen" loading="lazy"><img src="handbuch/04-menue-darstellung.webp" alt="Darstellung" loading="lazy"><figcaption>Menü „Karten &amp; Ebenen“: oben deine Daten, weiter unten die Darstellung</figcaption></figure>
+<ul>
+  <li><b>Kartenart:</b> Topo (geht offline), Luftbild oder Hybrid (Luftbild mit Straßen und Namen, braucht Internet).</li>
+  <li><b>Wasserstellen:</b> Trinkwasser, Quellen und Stellen zum Wassertanken.</li>
+  <li><b>Toiletten &amp; Duschen:</b> öffentliche, mit Angabe, ob kostenlos.</li>
+  <li><b>Pisten und Feldwege:</b> unbefestigte Wege, braun gestrichelt. In Deutschland meist für Autos gesperrt, anderswo oft die schönsten Strecken.</li>
+  <li><b>Bus &amp; Bahn:</b> Linien und Haltestellen in größeren Städten.</li>
+  <li><b>Farbschema</b> hell, dunkel oder automatisch; <b>Höhenlinien</b> und <b>Geländeschattierung</b>.</li>
+  <li><b>Positionssymbol:</b> Pfeil oder dein Fahrzeug, auch in deiner Farbe.</li>
+</ul>
+</div>
+<figure class="pair"><img src="handbuch/22-hybrid.webp" alt="Hybrid-Karte" loading="lazy"><img src="handbuch/23-bus-bahn-karte.webp" alt="Bus und Bahn auf der Karte" loading="lazy"><img src="handbuch/24-wasser-toiletten.webp" alt="Wasserstellen und Toiletten" loading="lazy"><figcaption>Hybrid · Bus &amp; Bahn · Wasser und Toiletten</figcaption></figure>
+<div class="wrap">
+<figure class="side"><img src="handbuch/03-menue-ansagen.webp" alt="Einstellungen für Ansagen" loading="lazy"><figcaption>Navigation &amp; Ansagen</figcaption></figure>
+<h3>Ansagen</h3>
+<ul>
+  <li><b>Ansagen bei der Navigation</b> an oder aus (unterwegs auch per Lautsprecher-Knopf).</li>
+  <li><b>Auch im Stummmodus ansagen:</b> am iPhone trotz Stummschalter hörbar.</li>
+  <li><b>Stimme</b> und <b>Tempo</b> wählen, <span class="key">Probe hören</span>. Die mitgelieferten Stimmen gehen auch offline.</li>
+  <li><b>Navi-Kamera</b> zoomt vor Abzweigungen heran, <b>3D-Ansicht</b> kippt die Karte nach vorn.</li>
+</ul>
+</div>
+
+<!-- 12 -->
+<h2 id="fragen"><span class="n">12</span>Tipps &amp; Fragen</h2>
+<h3>Ein Ort wird offline nicht gefunden</h3>
+<p>Ohne Netz kennt die Suche nur die geladenen Gebiete. Liegt der Ort außerhalb (z. B. Niesky, wenn nur „Berlin &amp; Umgebung“ geladen ist), ein größeres Gebiet oder das ganze Land laden.</p>
+<h3>Wie bekomme ich die neueste Version?</h3>
+<p>Die App aktualisiert sich selbst, sobald sie mit Internet geöffnet wird. Neue Funktionen sind meist nach dem <b>zweiten</b> Öffnen da (App ganz schließen und wieder starten). Die Versionsnummer steht ganz unten im Menü.</p>
+<h3>Der Standort ist ungenau oder springt</h3>
+<p>Ein paar Sekunden unter freiem Himmel warten; die Genauigkeit steht im Tacho („GPS ± 6 m“). Am iPad ohne SIM-Karte (nur WLAN) gibt es kein eingebautes GPS.</p>
+<h3>Es kommen keine Ansagen</h3>
+<p>Lautstärke prüfen, im Menü <b>Ansagen bei der Navigation</b> einschalten und am iPhone <b>Auch im Stummmodus ansagen</b>. Die App muss im Vordergrund sein.</p>
+<h3>Der Speicher wird knapp</h3>
+<p>Nicht mehr benötigte Gebiete unter Offline-Karten löschen. Große Länder wie Deutschland können mehrere Gigabyte belegen, kleinere Ausschnitte viel weniger.</p>
+<h3>Woher kommen die Daten?</h3>
+<p>Karte, Wege, Orte und Straßennetz kommen von OpenStreetMap, von Freiwilligen erstellt und vierteljährlich aktualisiert. Fehlt etwas oder stimmt etwas nicht, kann es jeder auf openstreetmap.org verbessern. Die Höhen kommen von Mapterhorn, Bus &amp; Bahn von Transitous. Alle Angaben ohne Gewähr – vor Ort zählt, was die Schilder sagen.</p>
+
+<a class="totop" href="#oben">↑ nach oben</a>
+<footer>Kartendaten © OpenStreetMap-Mitwirkende · Protomaps · Höhen: Mapterhorn · Fahrpläne: Transitous</footer>
+</main>
+<script>
+  // fehlende Bilder (noch nicht erzeugt) still ausblenden
+  document.querySelectorAll('figure').forEach(function (f) {
+    var imgs = f.querySelectorAll('img'), left = imgs.length;
+    imgs.forEach(function (img) {
+      img.addEventListener('error', function () { img.style.display = 'none'; if (--left <= 0) f.style.display = 'none'; });
+    });
+  });
+</script>
+</body>
+</html>

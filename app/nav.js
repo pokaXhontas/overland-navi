@@ -467,7 +467,7 @@ const Nav = {
       case 'arrive': return 'Ziel erreicht';
       case 'roundabout': case 'rotary': return `Im Kreisverkehr die ${s.maneuver.exit || ''}. Ausfahrt nehmen${on}`;
       case 'continue': case 'new name': return (mod && mod !== 'geradeaus' ? mod.charAt(0).toUpperCase() + mod.slice(1) + ' halten' : 'Weiter') + on;
-      default: return mod === 'wenden' ? 'Wenden' : (mod ? mod.charAt(0).toUpperCase() + mod.slice(1) + ' abbiegen' : 'Weiter') + on;
+      default: return mod === 'wenden' ? 'Wenden' : (mod === 'geradeaus' ? 'Geradeaus weiter' : mod ? mod.charAt(0).toUpperCase() + mod.slice(1) + ' abbiegen' : 'Weiter') + on;
     }
   },
 

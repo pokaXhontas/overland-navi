@@ -160,6 +160,9 @@
     <button class="add-region" id="btn-add-region"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span><b>Land oder Gebiet hinzufügen</b><small>Jedes Land der Welt oder der aktuelle Kartenausschnitt</small></span></button>
     <p class="muted small" id="storage"></p>
 
+    <h2>Hilfe</h2>
+    <button class="add-region" id="btn-manual"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5ZM5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3M9 7h6M9 10.5h6"/></svg><span><b>Handbuch</b><small>So funktioniert die App – Schritt für Schritt mit Bildern</small></span></button>
+
     <p class="muted small foot">Kartendaten © OpenStreetMap-Mitwirkende · Protomaps · Höhen: Mapterhorn<br>Version __BUILD__</p>
   </div>
 
@@ -407,6 +410,14 @@
     <button class="btn primary" id="pick-ok">Hier setzen</button>
   </div>
 </div>
+
+<section class="manual" id="manual" aria-label="Handbuch" hidden>
+  <div class="manual-head">
+    <button class="back" id="manual-close" aria-label="Handbuch schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Zurück</span></button>
+    <b>Handbuch</b>
+  </div>
+  <iframe id="manual-frame" title="Handbuch"></iframe>
+</section>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="fatal" id="fatal" hidden></div>

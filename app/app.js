@@ -1056,6 +1056,18 @@ async function cacheAssets() {
   for (const f of FONTS) for (const r of GLYPH_RANGES) urls.push(BASE + 'fonts/' + encodeURIComponent(f) + '/' + r + '.pbf');
   for (const fl of ['light', 'dark']) for (const s of ['', '@2x']) for (const ext of ['.json', '.png']) urls.push(BASE + 'sprites/v4/' + fl + s + ext);
   await Promise.all(urls.map((u) => cache.add(u).catch(() => {})));
+  await cacheManual();
+}
+
+/* Handbuch mit allen Bildern speichern, damit es auch unterwegs ohne Netz lesbar ist */
+async function cacheManual() {
+  if (!('caches' in window) || !navigator.onLine) return;
+  try {
+    const cache = await caches.open('ovl-assets');
+    const html = await (await fetch('handbuch.html', { cache: 'no-cache' })).text();
+    const imgs = [...new Set([...html.matchAll(/src="(handbuch\/[^"]+)"/g)].map((m) => m[1]))];
+    await Promise.all(imgs.map((u) => cache.add(u).catch(() => {})));
+  } catch (e) { /* später */ }
 }
 
 function regionSize(r) {
@@ -1373,6 +1385,14 @@ function setupUI() {
   $('#cat-close').onclick = closeSheet;
   $('#cat-back').onclick = closeCatPage;
   $('#btn-add-region').onclick = openAddPage;
+  // Handbuch: eigene Seite, im gleichen Farbschema wie die App
+  $('#btn-manual').onclick = () => {
+    const f = $('#manual-frame'), t = isDark() ? 'dark' : 'light';
+    if (f.dataset.t !== t) { f.src = 'handbuch.html?t=' + t; f.dataset.t = t; }
+    $('#manual').hidden = false;
+    cacheManual();
+  };
+  $('#manual-close').onclick = () => { $('#manual').hidden = true; };
   $('#add-back').onclick = () => { $('#add-page').hidden = true; };
   $('#add-close').onclick = closeSheet;
   $('#add-input').oninput = renderCountries;

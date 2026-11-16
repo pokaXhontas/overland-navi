@@ -22,6 +22,7 @@ const SHELL = [
   'hike.js',
   'tours.js',
   'poi.js',
+  'handbuch.html',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',
@@ -83,6 +84,17 @@ self.addEventListener('fetch', (event) => {
       } catch (e) {
         return (await cache.match(req)) || new Response(null, { status: 404 });
       }
+    })());
+    return;
+  }
+
+  // Bilder fürs Handbuch: aus dem Speicher, im Hintergrund erneuern
+  if (path.includes('/handbuch/')) {
+    event.respondWith((async () => {
+      const cache = await caches.open(ASSET_CACHE);
+      const hit = await cache.match(req, { ignoreSearch: true });
+      const net = fetch(req).then((resp) => { if (resp.ok) cache.put(req, resp.clone()); return resp; }).catch(() => null);
+      return hit || (await net) || new Response(null, { status: 404 });
     })());
     return;
   }

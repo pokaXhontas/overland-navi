@@ -788,3 +788,10 @@ html.dark .na-tag.ferry { color: #74C0FC; } html.dark .na-tag.toll { color: #FFC
 .pl-when[hidden] { display: none; }
 .pl-when input { height: 44px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--faint); padding: 0 12px; font: inherit; color: var(--text); }
 .pl-when input[hidden] { display: none; }
+
+/* Handbuch (eigene Seite im Rahmen, über allem) */
+.manual { position: fixed; inset: 0; z-index: 3000; background: var(--bg); display: flex; flex-direction: column; }
+.manual[hidden] { display: none; }
+.manual-head { display: flex; align-items: center; gap: 12px; padding: calc(var(--safe-t) + 8px) calc(var(--safe-r) + 14px) 8px calc(var(--safe-l) + 10px); background: var(--panel-solid); border-bottom: 1px solid var(--line); }
+.manual-head b { font-size: 17px; }
+.manual iframe { flex: 1; width: 100%; border: 0; background: var(--bg); }

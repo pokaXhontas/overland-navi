@@ -38,8 +38,8 @@ const BKK = { lat: 42.8746, lon: 74.5698 };
       const b = document.createElement('div');
       b.className = 'mm-badge';
       b.textContent = n;
-      const x = side === 'right' ? r.right + 4 : side === 'top' ? r.left + r.width / 2 - 13 : side === 'in' ? r.left + 6 : r.left - 30;
-      const y = side === 'top' ? r.top - 30 : side === 'in' ? r.top + 6 : r.top + r.height / 2 - 13;
+      const x = side === 'right' ? r.right + 4 : side === 'top' || side === 'below' ? r.left + r.width / 2 - 13 : side === 'in' ? r.left + 6 : side === 'inr' ? r.right - 32 : r.left - 30;
+      const y = side === 'top' ? r.top - 30 : side === 'below' ? r.bottom + 4 : side === 'in' || side === 'inr' ? r.top + 6 : r.top + r.height / 2 - 13;
       b.style.cssText = `position:fixed;left:${x}px;top:${y}px;width:26px;height:26px;border-radius:13px;background:#E8590C;color:#fff;font:800 14px/26px system-ui,sans-serif;text-align:center;z-index:99999;box-shadow:0 0 0 2px #fff,0 2px 6px rgba(0,0,0,.35)`;
       document.body.appendChild(b);
     }
@@ -53,7 +53,7 @@ const BKK = { lat: 42.8746, lon: 74.5698 };
     try { Planner.close(); } catch (e) { /* zu */ }
     try { Hike.close(); if (Hike.popup) Hike.popup.remove(); } catch (e) { /* zu */ }
     try { Tours.close(); } catch (e) { /* zu */ }
-    try { if (Draw.active) Draw.cancel(); } catch (e) { /* zu */ }
+    try { if (Draw.active) Draw.exit(); } catch (e) { /* zu */ }
     try { Poi.clear(); if (Poi.popup) Poi.popup.remove(); } catch (e) { /* zu */ }
     try { closeTrackInfo(); } catch (e) { /* zu */ }
     document.querySelectorAll('.maplibregl-popup').forEach((p) => p.remove());
@@ -75,7 +75,7 @@ const BKK = { lat: 42.8746, lon: 74.5698 };
   await scene('01-start', async () => {
     await ev(() => { gps.follow = false; map.jumpTo({ center: [74.5698, 42.8746], zoom: 13.5, bearing: 0, pitch: 0 }); });
     await sleep(3000);
-    await marks([['.hud', 1, 'right'], ['#mapchip', 2, 'top'], ['#btn-search', 3], ['#btn-layers', 4], ['#btn-route', 5], ['#btn-hike', 6], ['#btn-draw', 7],
+    await marks([['.hud', 1, 'top'], ['#mapchip', 2, 'below'], ['#btn-search', 3], ['#btn-layers', 4], ['#btn-route', 5], ['#btn-hike', 6], ['#btn-draw', 7],
       ['#btn-compass', 8], ['#btn-locate', 9], ['.zoom', 10], ['#fab', 11, 'top']]);
     await shot('01-start', 2000);
   });
@@ -121,12 +121,15 @@ const BKK = { lat: 42.8746, lon: 74.5698 };
     // ein Stück fahren, damit der nächste Hinweis oben steht
     await ev(async () => {
       const c = Nav.active.coords;
-      for (let i = 0; i < Math.min(c.length - 1, 90); i += 3) {
+      // fahren, bis eine echte Abbiegung kurz bevorsteht
+      for (let i = 0; i < c.length - 1; i += 2) {
         onPosition({ coords: { latitude: c[i][1], longitude: c[i][0], accuracy: 6, speed: 13, heading: null, altitude: 790 }, timestamp: Date.now() + i * 2000 });
-        await new Promise((r) => setTimeout(r, 25));
+        await new Promise((r) => setTimeout(r, 15));
+        const m = Nav.next();
+        if (i > 20 && m && m.at - Nav.active.along < 300 && [9, 10, 15, 16, 26].includes(m.type)) break;
       }
     });
-    await marks([['#nb-dist', 1, 'right'], ['#nb-voice', 2], ['#nf-edit', 3, 'top'], ['#nf-overview', 4, 'top'], ['#nf-stop', 5, 'top']]);
+    await marks([['#nb-dist', 1, 'below'], ['#nb-voice', 2, 'below'], ['#nf-edit', 3, 'top'], ['#nf-overview', 4, 'top'], ['#nf-stop', 5, 'top']]);
     await shot('12-navigation', 3000);
   });
 
@@ -156,7 +159,7 @@ const BKK = { lat: 42.8746, lon: 74.5698 };
   });
 
   await scene('16-ort-speichern', async () => {
-    await ev(() => { map.jumpTo({ center: [76.95, 42.43], zoom: 13, bearing: 0 }); });
+    await ev(() => { map.jumpTo({ center: [77.005, 42.155], zoom: 14, bearing: 0 }); });
     await sleep(2500);
     await ev(() => newPlaceHere());
     await shot('16-ort-position', 2000);
