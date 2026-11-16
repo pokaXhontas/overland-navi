@@ -30,7 +30,7 @@ member = defaultdict(list)
 
 # ---------- Punkte: Biwaks, Hütten, Unterstände, Wasser ----------
 BIWAK_RE = re.compile(r"biwak|bivacc|bivouac|bivak|bivac|biwakschachtel|refuge non gard|abri", re.I)
-PT_MINZOOM = {"biwak": 9, "huette": 9, "tank": 10, "wasser": 12, "quelle": 12, "ruine": 11, "burg": 11, "archaeologie": 11,
+PT_MINZOOM = {"biwak": 9, "huette": 9, "tank": 10, "wasser": 12, "quelle": 12, "wc": 13, "dusche": 12, "ruine": 11, "burg": 11, "archaeologie": 11,
               "denkmal": 13, "hoehle": 12, "wasserfall": 12, "aussicht": 12, "sehenswert": 12}
 MEMORIAL_SMALL = {"plaque", "stolperstein", "blue_plaque", "bench", "ghost_bike", "stone", "cross", "tree"}
 
@@ -48,6 +48,9 @@ def point_kind(t):
         return "tank"        # zum Befüllen von Fahrzeug- oder Wohnmobiltanks
     if am == "drinking_water" or (t.get("man_made") == "water_tap" and t.get("drinking_water") == "yes"):
         return "wasser"
+    # öffentliche Toiletten und Duschen (keine privaten)
+    if am in ("toilets", "shower") and t.get("access") not in ("private", "no"):
+        return "dusche" if am == "shower" or t.get("shower") not in (None, "no") else "wc"
     if t.get("natural") == "spring":
         return "quelle"
     # Sehenswertes unterwegs
@@ -82,11 +85,16 @@ def point_props(k, t):
     cap = t.get("capacity") or t.get("beds")
     if cap and re.match(r"^\d{1,4}$", cap):
         p["cap"] = int(cap)
-    for key, short in (("fireplace", "fp"), ("locked", "lk"), ("drinking_water", "dw"), ("reservation", "res"), ("fee", "fee")):
-        if t.get(key) in ("yes", "no", "required", "recommended"):
+    for key, short in (("fireplace", "fp"), ("locked", "lk"), ("drinking_water", "dw"), ("reservation", "res"), ("fee", "fee"),
+                       ("wheelchair", "rw"), ("access", "acc"), ("hot_water", "hw")):
+        if t.get(key) in ("yes", "no", "required", "recommended", "customers", "limited", "permissive"):
             p[short] = t[key]
     if t.get("shelter_type"):
         p["st"] = t["shelter_type"][:20]
+    if k == "dusche" and t.get("shower") and t["shower"] not in ("yes", "no"):
+        p["sh"] = t["shower"][:15]
+    if t.get("charge") and len(t["charge"]) <= 30:
+        p["chg"] = t["charge"]
     if t.get("operator"):
         p["op"] = t["operator"][:50]
     web = t.get("website") or t.get("contact:website")

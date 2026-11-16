@@ -18,8 +18,9 @@ const ROUTE_COLORS = { red: '#D62828', blue: '#1C6DD0', yellow: '#E3A700', green
 const HK_PTS = {
   biwak: { label: 'Biwak', long: 'Biwak oder unbewirtschaftete Hütte', color: '#B5482A', d: 'M3 19 12 5l9 14ZM9.5 19l2.5-4 2.5 4' },
   huette: { label: 'Hütte', long: 'Bewirtschaftete Hütte', color: '#C92A2A', d: 'M4 20v-9l8-6 8 6v9M3 20h18M10 20v-5h4v5' },
-  wasser: { label: 'Trinkwasser', long: 'Trinkwasser', color: '#1C7ED6', d: 'M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z' },
-  quelle: { label: 'Quelle', long: 'Quelle', color: '#0B7285', d: 'M12 4s5 5.5 5 9.2a5 5 0 0 1-10 0C7 9.5 12 4 12 4ZM4 21c2-1.3 4-1.3 6 0s4 1.3 6 0 3-1 4-.5' },
+  tank: { label: 'Wasser tanken', long: 'Wasserstelle zum Befüllen von Fahrzeug- oder Wohnmobiltanks', color: '#1864AB', g: 'water', d: 'M5 9h11v11H5ZM8 9V6h5v3M16 12h2l2 2v6h-4M10.5 12s2 2.2 2 3.6a2 2 0 0 1-4 0c0-1.4 2-3.6 2-3.6Z' },
+  wasser: { label: 'Trinkwasser', long: 'Trinkwasser', color: '#1C7ED6', g: 'water', d: 'M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z' },
+  quelle: { label: 'Quelle', long: 'Quelle', color: '#0B7285', g: 'water', d: 'M12 4s5 5.5 5 9.2a5 5 0 0 1-10 0C7 9.5 12 4 12 4ZM4 21c2-1.3 4-1.3 6 0s4 1.3 6 0 3-1 4-.5' },
   ruine: { label: 'Ruinen', long: 'Ruine', color: '#7A5230', g: 'see', d: 'M4 20v-9l2-2 2 2V7l2-2 2 2v13M14 20v-6l2-2 2 2v6M3 20h18' },
   burg: { label: 'Burgen', long: 'Burg, Festung oder Turm', color: '#9C4221', g: 'see', d: 'M4 20V8h2.5v2H9V8h2.5v2H14V8h2.5v2H19V8h1v12ZM10 20v-4a2 2 0 0 1 4 0v4' },
   archaeologie: { label: 'Ausgrabungen', long: 'Archäologische Stätte', color: '#A0522D', g: 'see', d: 'M4 8h16M5 8l7-4 7 4M6.5 8v10M10.5 8v10M13.5 8v10M17.5 8v10M4 20h16' },
@@ -173,6 +174,8 @@ const Hike = {
 
   /* Kartenebenen; werden in buildStyle eingefügt */
   oev() { return store.get('oevOn', false); },
+  water() { return store.get('waterOn', true); },
+  tracks() { return store.get('hikeTracks', true); },
 
   /* Bus und Bahn (aus denselben Länderdateien, Ebenen „oev“ und „halt“) */
   oevLayers(dark, sat) {
@@ -203,43 +206,50 @@ const Hike = {
 
   layers(dark, sat) {
     const ov = this.oevLayers(dark, sat);
-    if (!this.on() || (!this.keys().length && !this.local.size)) return { lines: ov.lines, labels: [], top: ov.top };
+    if (!this.keys().length && !this.local.size) return { lines: [], labels: [], top: [] };
+    const hikeOn = this.on();
     const max = this.max();
     const isTrack = ['all', ['==', ['get', 'h'], 't'], ['==', ['get', 's'], 0], ['!', ['has', 'net']]];
     const sacOk = ['any', ['==', ['get', 's'], 0], ['<=', ['get', 's'], max]];
     const f = ['all', sacOk, ['!', isTrack]];
-    const ft = store.get('hikeTracks', true) ? isTrack : ['==', 1, 0];
-    const any = ['any', f, ft];
+    const ft = this.tracks() ? isTrack : ['==', 1, 0];
+    const hit = hikeOn ? ['any', f, ft] : ft;
     const sacColor = ['match', ['get', 's'], 1, '#E3A700', 2, '#D62828', 3, '#D62828', 4, '#1C6DD0', 5, '#1C6DD0', 6, '#1C6DD0', dark || sat ? '#C9A27A' : '#8A5A2B'];
     const routeColor = ['match', ['coalesce', ['get', 'c'], ''], ...Object.entries(ROUTE_COLORS).flat(), '#C2255C'];
     const w = (a, b) => ['interpolate', ['linear'], ['zoom'], 11, a, 16, b];
+    // Punkte: Wasser unabhängig von den Wanderwegen, Biwaks/Hütten/Sehenswertes nur mit Wanderwegen
+    const kinds = [...(hikeOn ? this.pts().filter((k) => HK_PTS[k].g !== 'water') : []), ...(this.water() ? Object.keys(HK_PTS).filter((k) => HK_PTS[k].g === 'water') : [])];
+    const trackLayer = { id: 'hike-track', type: 'line', source: 'hike', 'source-layer': 'wege', filter: ft, layout: { 'line-join': 'round' },
+      paint: { 'line-color': dark || sat ? '#B89A78' : '#9C7B57', 'line-opacity': 0.85, 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 1, 16, 2.4], 'line-dasharray': [4, 2] } };
+    const hitLayer = { id: 'hike-hit', type: 'line', source: 'hike', 'source-layer': 'wege', filter: hit, minzoom: 11, paint: { 'line-color': '#000', 'line-opacity': 0, 'line-width': 18 } };
     return {
       lines: [
-        { id: 'hike-route', type: 'line', source: 'hike', 'source-layer': 'wege', filter: ['all', f, ['has', 'net']], layout: { 'line-cap': 'round', 'line-join': 'round' },
-          paint: { 'line-color': routeColor, 'line-opacity': 0.28, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 3, 12, 7, 16, 12] } },
-        { id: 'hike-track', type: 'line', source: 'hike', 'source-layer': 'wege', filter: ft, layout: { 'line-join': 'round' },
-          paint: { 'line-color': dark || sat ? '#B89A78' : '#9C7B57', 'line-opacity': 0.85, 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 1, 16, 2.4], 'line-dasharray': [4, 2] } },
-        { id: 'hike-casing', type: 'line', source: 'hike', 'source-layer': 'wege', filter: f, minzoom: 11, layout: { 'line-join': 'round' },
-          paint: { 'line-color': dark || sat ? 'rgba(11,15,18,0.65)' : 'rgba(255,255,255,0.85)', 'line-width': w(2.6, 5.4) } },
-        { id: 'hike-line', type: 'line', source: 'hike', 'source-layer': 'wege', filter: f, layout: { 'line-join': 'round' },
-          paint: { 'line-color': sacColor, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1, 11, 1.4, 16, 3.2], 'line-dasharray': [2, 1.3] } },
-        { id: 'hike-hit', type: 'line', source: 'hike', 'source-layer': 'wege', filter: any, minzoom: 11, paint: { 'line-color': '#000', 'line-opacity': 0, 'line-width': 18 } },
+        ...(hikeOn ? [
+          { id: 'hike-route', type: 'line', source: 'hike', 'source-layer': 'wege', filter: ['all', f, ['has', 'net']], layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: { 'line-color': routeColor, 'line-opacity': 0.28, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 3, 12, 7, 16, 12] } },
+          trackLayer,
+          { id: 'hike-casing', type: 'line', source: 'hike', 'source-layer': 'wege', filter: f, minzoom: 11, layout: { 'line-join': 'round' },
+            paint: { 'line-color': dark || sat ? 'rgba(11,15,18,0.65)' : 'rgba(255,255,255,0.85)', 'line-width': w(2.6, 5.4) } },
+          { id: 'hike-line', type: 'line', source: 'hike', 'source-layer': 'wege', filter: f, layout: { 'line-join': 'round' },
+            paint: { 'line-color': sacColor, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1, 11, 1.4, 16, 3.2], 'line-dasharray': [2, 1.3] } },
+          hitLayer
+        ] : this.tracks() ? [trackLayer, hitLayer] : []),
         ...ov.lines
       ],
-      labels: [
+      labels: hikeOn ? [
         { id: 'hike-label', type: 'symbol', source: 'hike', 'source-layer': 'wege', filter: f, minzoom: 13,
           layout: { 'symbol-placement': 'line', 'text-font': ['Noto Sans Medium'], 'text-size': 11, 'symbol-spacing': 280,
             'text-field': ['case', ['>', ['get', 's'], 0],
               ['concat', 'T', ['to-string', ['get', 's']], ['case', ['has', 'n'], ['concat', ' · ', ['get', 'n']], '']],
               ['coalesce', ['get', 'n'], ['get', 'ref'], '']] },
-          paint: { 'text-color': sacColor, 'text-halo-color': dark || sat ? '#0B0F12' : '#FFFFFF', 'text-halo-width': 1.6 } },
-      ],
+          paint: { 'text-color': sacColor, 'text-halo-color': dark || sat ? '#0B0F12' : '#FFFFFF', 'text-halo-width': 1.6 } }
+      ] : [],
       top: [
         ...ov.top,
-        ...(this.pts().length ? [{ id: 'hike-pts', type: 'symbol', source: 'hike', 'source-layer': 'punkte', filter: ['in', ['get', 'k'], ['literal', this.pts()]],
+        ...(kinds.length ? [{ id: 'hike-pts', type: 'symbol', source: 'hike', 'source-layer': 'punkte', filter: ['in', ['get', 'k'], ['literal', kinds]],
           layout: { 'icon-image': ['concat', 'hkpt-', ['get', 'k']], 'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.7, 14, 1],
-            'icon-allow-overlap': ['step', ['zoom'], false, 13, true], 'symbol-sort-key': ['match', ['get', 'k'], 'biwak', 0, 'huette', 1, 'ruine', 2, 'burg', 2, 'wasser', 3, 4],
-            'text-field': ['step', ['zoom'], '', 12, ['coalesce', ['get', 'n'], ['match', ['get', 'k'], 'ruine', 'Ruine', 'hoehle', 'Höhle', 'wasserfall', 'Wasserfall', 'aussicht', 'Aussicht', 'archaeologie', 'Ausgrabung', '']]], 'text-font': ['Noto Sans Medium'], 'text-size': 11,
+            'icon-allow-overlap': ['step', ['zoom'], false, 13, true], 'symbol-sort-key': ['match', ['get', 'k'], 'tank', 0, 'biwak', 1, 'huette', 2, 'ruine', 3, 'burg', 3, 'wasser', 4, 5],
+            'text-field': ['step', ['zoom'], '', 12, ['coalesce', ['get', 'n'], ['match', ['get', 'k'], 'tank', 'Wasser tanken', 'ruine', 'Ruine', 'hoehle', 'Höhle', 'wasserfall', 'Wasserfall', 'aussicht', 'Aussicht', 'archaeologie', 'Ausgrabung', '']]], 'text-font': ['Noto Sans Medium'], 'text-size': 11,
             'text-offset': [0, 1.3], 'text-anchor': 'top', 'text-optional': true, 'text-max-width': 9 },
           paint: { 'text-color': dark || sat ? '#E9EEF1' : '#3B2A1A', 'text-halo-color': dark || sat ? '#0B0F12' : '#FFFFFF', 'text-halo-width': 1.5 } }] : [])
       ]
@@ -326,11 +336,10 @@ const Hike = {
 
   renderSheet() {
     $('#hk-on').checked = this.on();
-    $('#hk-tracks').checked = store.get('hikeTracks', true);
     for (const [box, grp] of [[$('#hk-pts'), undefined], [$('#hk-see'), 'see']]) {
       box.innerHTML = '';
       for (const [k, c] of Object.entries(HK_PTS)) {
-        if (c.g !== grp) continue;
+        if (c.g !== grp || c.g === 'water') continue;
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'hk-chip';
@@ -380,7 +389,6 @@ const Hike = {
     $('#btn-hike').onclick = () => ($('#hike-sheet').hidden ? this.open() : this.close());
     $('#hk-close').onclick = () => this.close();
     $('#hk-on').onchange = () => { store.set('hikeOn', $('#hk-on').checked); refreshStyle(); };
-    $('#hk-tracks').onchange = () => { store.set('hikeTracks', $('#hk-tracks').checked); refreshStyle(); };
     document.querySelectorAll('[data-hkmax]').forEach((b) => {
       b.onclick = () => { store.set('hikeMax', +b.dataset.hkmax); this.renderSheet(); refreshStyle(); };
     });

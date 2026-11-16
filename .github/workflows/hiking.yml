@@ -83,7 +83,7 @@ jobs:
         if: steps.size.outputs.skip != '1'
         run: |
           osmium tags-filter land.osm.pbf w/sac_scale w/highway=path,footway,bridleway,steps,via_ferrata,track r/route=hiking,foot \
-            nw/tourism=alpine_hut,wilderness_hut,viewpoint,attraction nw/amenity=shelter,drinking_water,water_point n/natural=spring,cave_entrance n/man_made=water_tap \
+            nw/tourism=alpine_hut,wilderness_hut,viewpoint,attraction nw/amenity=shelter,drinking_water,water_point,toilets,shower n/natural=spring,cave_entrance n/man_made=water_tap \
             nw/historic=ruins,castle,fort,city_gate,tower,archaeological_site,monument,memorial nw/building=ruins n/waterway=waterfall \
             n/place=city,town r/route=bus,trolleybus,tram,subway,light_rail,train,monorail,share_taxi,minibus \
             n/highway=bus_stop n/railway=station,halt,tram_stop -o wege.osm.pbf --overwrite
