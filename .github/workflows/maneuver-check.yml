@@ -1,0 +1,22 @@
+name: Abbiegehinweise prüfen
+on:
+  workflow_dispatch:
+    inputs:
+      von: { description: 'Start (Adresse oder lat,lon)', required: true }
+      nach: { description: 'Ziel (Adresse oder lat,lon)', required: true }
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Online-Routenrechner
+        run: python3 scripts/check_maneuvers.py "${{ github.event.inputs.von }}" "${{ github.event.inputs.nach }}" | tee out.txt
+      - name: Offline-Routenrechner (Straßennetz Deutschland)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download wanderwege -p "germany-route.pmtiles" -R ${{ github.repository }}
+          P=$(tail -1 out.txt | python3 -c "import json,sys; d=json.load(sys.stdin); print(json.dumps([[d['a'][1], d['a'][0], d['b'][1], d['b'][0], 'car', 'Offline']]))")
+          ALL=1 node scripts/check_routing.js germany-route.pmtiles "$P" || true

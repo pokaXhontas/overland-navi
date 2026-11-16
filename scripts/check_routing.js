@@ -21,7 +21,7 @@ const fs = require('fs');
       if (j.trip) ref = ` · Valhalla ${j.trip.summary.length.toFixed(1)} km, ${Math.round(j.trip.summary.time / 60)} min`;
     } catch (e) { /* ohne Vergleich */ }
     console.log(`✓ ${label} (${travel}): ${(own.len / 1000).toFixed(1)} km, ${Math.round(own.time / 60)} min, ${own.maneuvers.length} Hinweise, ${ms} ms, ${net.loaded} Kacheln${ref}`);
-    for (const m of own.maneuvers.slice(0, 14)) console.log(`    ${m.type} ${m.text} (${m.km.toFixed(1)} km)`);
+    for (const m of own.maneuvers.slice(0, process.env.ALL ? 999 : 14)) console.log(`    ${m.type} ${m.text} (${m.km.toFixed(1)} km)`);
     if (own.ferries.length) console.log('    Fähren:', own.ferries.map((f) => f.name + ' ' + f.km.toFixed(0) + ' km').join(', '));
   }
   console.log(`Größe ${(size / 1e6).toFixed(1)} MB`);
