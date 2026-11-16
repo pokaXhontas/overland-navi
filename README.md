@@ -23,6 +23,12 @@ Offline-Navigation fürs Overlanding auf iPad und iPhone – als Web-App, ohne A
 3. App vom Home-Bildschirm starten, Standort erlauben.
 4. Oben rechts auf das Ebenen-Symbol → bei **Offline-Karten** ein Gebiet **Laden**. Während des Downloads die App offen lassen.
 
+## Navigation ohne Internet
+
+- Beim Laden eines Gebiets kommt das Straßennetz für das Offline-Routing mit. Für schon geladene Gebiete unter **Offline-Karten** auf **Offline-Routen laden** tippen.
+- Ohne Netz (oder wenn die Routenserver nicht antworten) rechnet die App Routen mit dem Auto und zu Fuß selbst, inklusive Abbiegehinweisen, Neuberechnung und Abbiegeverboten. Bus & Bahn geht nur online.
+- Die Daten baut der Lauf **Offline-Straßennetz bauen** (`scripts/build_routing.py`) einmal pro Land aus OpenStreetMap, alle drei Monate neu.
+
 ## Kartengebiete ändern
 
 Die Gebiete stehen in `regions.json` (Name, Begrenzung als `[West, Süd, Ost, Nord]`, höchste Zoomstufe). Nach einer Änderung baut GitHub die Kartendaten automatisch neu. Die gesamte Seite darf bei GitHub Pages höchstens 1 GB groß sein.
