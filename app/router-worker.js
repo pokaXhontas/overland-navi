@@ -285,9 +285,12 @@ const OvlRouter = (() => {
     }
 
     /* nächstgelegene passende Kante zu einem Punkt */
-    async snap(pt, prof) {
+    async snap(pt, prof, strict) {
       const [cx, cy] = tileOf(pt.lon, pt.lat, ZF);
-      let best = null;
+      const kx = 111320 * Math.cos(pt.lat * Math.PI / 180), ky = 110574;
+      const cand = [];            // beste Stelle je Kante, aufsteigend nach Abstand
+      const K = 8;
+      const worst = () => cand.length < K ? Infinity : cand[cand.length - 1].d + cand[cand.length - 1].pen;
       for (let ring = 0; ring <= 1; ring++) {
         for (let dx = -ring; dx <= ring; dx++) for (let dy = -ring; dy <= ring; dy++) {
           if (Math.max(Math.abs(dx), Math.abs(dy)) !== ring) continue;
@@ -295,38 +298,61 @@ const OvlRouter = (() => {
             for (let i = 0; i < t.n; i++) {
               if (t.dup && t.dup[i]) continue;
               if (!prof.ok(t, i, 1) && !prof.ok(t, i, 0)) continue;
-              if (t.cls[i] === FERRY) continue;
+              if (t.cls[i] === FERRY || (strict && t.cls[i] > 7)) continue;
               // grob vorsortieren über die Endpunkte
               const lx = Math.min(t.xa[i], t.xb[i]) / SC, hx = Math.max(t.xa[i], t.xb[i]) / SC, ly = Math.min(t.ya[i], t.yb[i]) / SC, hy = Math.max(t.ya[i], t.yb[i]) / SC;
-              const ex = Math.max(0, lx - pt.lon, pt.lon - hx) * 111320 * Math.cos(pt.lat * Math.PI / 180), ey = Math.max(0, ly - pt.lat, pt.lat - hy) * 110574;
-              if (best && Math.hypot(ex, ey) > best.d + t.len[i]) continue;
+              const ex = Math.max(0, lx - pt.lon, pt.lon - hx) * kx, ey = Math.max(0, ly - pt.lat, pt.lat - hy) * ky;
+              if (Math.hypot(ex, ey) - t.len[i] > worst()) continue;
               const c = geom(t, i);
-              let along = 0;
+              // Hauptstraßen beim Einrasten leicht bevorzugen, Feld- und Zufahrtswege für Autos meiden
+              const pen = prof.foot ? 0 : (t.cls[i] === 9 ? 25 : t.cls[i] === 8 ? 8 : 0);
+              let along = 0, bd = Infinity, bAlong = 0, proj = null;
               for (let k = 1; k < c.length; k++) {
-                const kx = 111320 * Math.cos(pt.lat * Math.PI / 180), ky = 110574;
                 const ax = (c[k - 1][0] - pt.lon) * kx, ay = (c[k - 1][1] - pt.lat) * ky, bx = (c[k][0] - pt.lon) * kx, by = (c[k][1] - pt.lat) * ky;
                 const vx = bx - ax, vy = by - ay, L2 = vx * vx + vy * vy;
                 const u = L2 > 0 ? Math.max(0, Math.min(1, -(ax * vx + ay * vy) / L2)) : 0;
-                const px = ax + u * vx, py = ay + u * vy;
-                const d = Math.hypot(px, py);
+                const d = Math.hypot(ax + u * vx, ay + u * vy);
                 const segLen = Math.sqrt(L2);
-                // Hauptstraßen beim Einrasten leicht bevorzugen, Feldwege für Autos meiden
-                const pen = prof.foot ? 0 : (t.cls[i] === 9 ? 25 : t.cls[i] === 8 ? 8 : 0);
-                if (!best || d + pen < best.d + best.pen) {
-                  best = { t, i, d, pen, k, u, along: along + u * segLen, proj: [c[k - 1][0] + u * (c[k][0] - c[k - 1][0]), c[k - 1][1] + u * (c[k][1] - c[k - 1][1])], c };
-                }
+                if (d < bd) { bd = d; bAlong = along + u * segLen; proj = [c[k - 1][0] + u * (c[k][0] - c[k - 1][0]), c[k - 1][1] + u * (c[k][1] - c[k - 1][1])]; }
                 along += segLen;
               }
-              if (best && best.t === t && best.i === i) best.geomLen = along;
+              if (bd + pen >= worst()) continue;
+              cand.push({ t, i, d: bd, pen, proj, frac: along > 0 ? Math.min(1, bAlong / along) : 0 });
+              cand.sort((x, y) => (x.d + x.pen) - (y.d + y.pen));
+              if (cand.length > K) cand.pop();
             }
           }
         }
-        if (best && best.d < 500) break;
+        if (cand.length && cand[0].d < 500) break;
       }
-      if (!best || best.d > (prof.foot ? 3000 : 5000)) return null;
-      // Anteil entlang der Kante (Linie ist vereinfacht, Länge aus den Rohdaten)
-      best.frac = best.geomLen > 0 ? Math.min(1, best.along / best.geomLen) : 0;
-      return best;
+      const max = prof.foot ? 3000 : 5000;
+      const ok = cand.filter((c) => c.d <= max);
+      if (!ok.length) return null;
+      // abgeschnittene Inselchen (Privatgelände, Parkplatz ohne Zufahrt) überspringen
+      for (const c of ok.slice(0, 5)) if (await this.connected(c, prof)) return c;
+      return ok[0];
+    }
+
+    /* hängt die Kante an einem größeren Netz? (kurze Breitensuche ohne Richtung) */
+    async connected(c, prof) {
+      const seen = new Set(), queue = [];
+      const add = (id, x, y, h) => { if (!seen.has(id)) { seen.add(id); queue.push([id, x, y, h]); } };
+      add(c.t.a[c.i], c.t.xa[c.i], c.t.ya[c.i], [c.t.tax[c.i], c.t.tay[c.i]]);
+      add(c.t.b[c.i], c.t.xb[c.i], c.t.yb[c.i], [c.t.tbx[c.i], c.t.tby[c.i]]);
+      for (let q = 0; q < queue.length; q++) {
+        if (seen.size > 400) return true;
+        const [id, , , h] = queue[q];
+        await this.tile(ZF, h[0], h[1]);
+        const l = this.adj[0].get(id) || [];
+        for (let k = 0; k < l.length; k += 3) {
+          const t = l[k], i = l[k + 1];
+          if (!prof.ok(t, i, 1) && !prof.ok(t, i, 0)) continue;
+          if (!prof.foot && t.cls[i] <= 4) return true;
+          add(t.a[i], t.xa[i], t.ya[i], [t.tax[i], t.tay[i]]);
+          add(t.b[i], t.xb[i], t.yb[i], [t.tbx[i], t.tby[i]]);
+        }
+      }
+      return false;
     }
   }
 
@@ -416,7 +442,7 @@ const OvlRouter = (() => {
     return [p0, ...c.slice(k0, k1), p1];
   }
 
-  function streetOf(t, i) { return t.names[t.name[i]] || t.names[t.ref[i]] || ''; }
+  function streetOf(t, i) { return (t.names[t.name[i]] || t.names[t.ref[i]] || '').replace(/;\s*/g, ' / '); }
   function compass(b) { return ['Norden', 'Nordosten', 'Osten', 'Südosten', 'Süden', 'Südwesten', 'Westen', 'Nordwesten'][Math.round(b / 45) % 8]; }
 
   /* Winkel der anderen Abzweige an einem Knoten (ohne den Weg, auf dem man kommt, und den, den man nimmt) */
@@ -433,7 +459,7 @@ const OvlRouter = (() => {
       if (same(t, i, a) || same(t, i, b) || !prof.ok(t, i, dir) || t.cls[i] === FERRY) continue;
       let c = geom(t, i);
       if (!dir) c = c.reverse();
-      out.push({ ang: turnAngle(inB, headBearing(c)), minor: !prof.foot && (t.cls[i] >= 8), name: streetOf(t, i) });
+      out.push({ ang: turnAngle(inB, headBearing(c)), minor: !prof.foot && (t.cls[i] >= 8), name: streetOf(t, i), link: (t.fl[i] & 8) !== 0 });
     }
     return out;
   }
@@ -533,7 +559,9 @@ const OvlRouter = (() => {
         if (!prof.foot && aLink && !bLink && bt.cls[bi] <= 1) { push(25, 'Auffahren' + on); continue; }
         // die Straße geht einfach weiter (gleicher Name, keine andere Straße mit dem Namen): kein Hinweis bei leichten Knicken
         const aName = streetOf(at, ai);
-        if (abs < 50 && street && street === aName && !alts.some((x) => x.name === street && Math.abs(x.ang) < 60)) continue;
+        if (abs < 50 && street && street === aName && !alts.some((x) => !x.link && x.name === street && Math.abs(x.ang) < 60)) continue;
+        // auf der Autobahn/Schnellstraße bleiben, rechts geht nur eine Ausfahrt ab: kein Hinweis
+        if (!prof.foot && !bLink && abs < 35 && alts.every((x) => x.link || x.minor || Math.abs(x.ang) >= 35)) continue;
         const straightest = alts.every((x) => Math.abs(x.ang) > abs);
         const fork = alts.filter((x) => !x.minor && Math.abs(x.ang) < 45);
         if (abs < 35 && straightest) {
@@ -596,12 +624,21 @@ const OvlRouter = (() => {
       snaps.push(sn);
     }
     for (let k = 1; k < snaps.length; k++) {
-      const s = snaps[k - 1], e = snaps[k];
-      const d = dist(s.proj[0], s.proj[1], e.proj[0], e.proj[1]);
-      let res = null;
-      for (const near of NEAR) {
-        res = await search(net, prof, s, e, prof.foot ? Infinity : near);
-        if (res || near >= d || prof.foot) break;
+      let s = snaps[k - 1], e = snaps[k];
+      const run = async () => {
+        const d = dist(s.proj[0], s.proj[1], e.proj[0], e.proj[1]);
+        for (const near of NEAR) {
+          const r = await search(net, prof, s, e, prof.foot ? Infinity : near);
+          if (r || near >= d || prof.foot) return r;
+        }
+        return null;
+      };
+      let res = await run();
+      if (!res && !prof.foot) {
+        // eingerastet auf einem Feld- oder Privatweg ohne Anschluss: an der nächsten richtigen Straße versuchen
+        const s2 = s.t.cls[s.i] > 7 ? await net.snap(o.pts[k - 1], prof, true) : null;
+        const e2 = e.t.cls[e.i] > 7 ? await net.snap(o.pts[k], prof, true) : null;
+        if (s2 || e2) { s = s2 || s; e = e2 || e; snaps[k] = e; res = await run(); }
       }
       if (!res) throw new Error('Keine Verbindung im Offline-Straßennetz gefunden');
       legs.push({ s, e, res });
