@@ -78,7 +78,7 @@ const OvlRouter = (() => {
     let p = 0;
     const rv = () => { let v = 0, m = 1, b; do { b = buf[p++]; v += (b & 0x7f) * m; m *= 128; } while (b & 0x80); return v; };
     const rz = () => { const v = rv(); return v % 2 ? -(v + 1) / 2 : v / 2; };
-    if (rv() !== 1) throw new Error('Unbekanntes Routenformat');
+    if (rv() !== 2) throw new Error('Unbekanntes Routenformat (bitte Offline-Routen neu laden)');
     const ox = rz(), oy = rz();
     const ns = rv(), names = [''];
     const dec = new TextDecoder();
@@ -91,23 +91,36 @@ const OvlRouter = (() => {
       tax: new Int32Array(n), tay: new Int32Array(n), tbx: new Int32Array(n), tby: new Int32Array(n),
       cls: new Uint8Array(n), fl: new Uint16Array(n), grade: new Uint8Array(n), sac: new Uint8Array(n), ms: new Uint8Array(n),
       len: new Float32Array(n), name: new Uint32Array(n), ref: new Uint32Array(n), dest: new Uint32Array(n),
-      xa: new Int32Array(n), ya: new Int32Array(n), xb: new Int32Array(n), yb: new Int32Array(n), g: new Uint32Array(n)
+      xa: new Int32Array(n), ya: new Int32Array(n), xb: new Int32Array(n), yb: new Int32Array(n), nm: new Uint32Array(n), g: new Uint32Array(n)
     };
     let last = 0;
+    for (let i = 0; i < n; i++) { last += rz(); t.a[i] = last; }
+    for (let i = 0; i < n; i++) t.b[i] = t.a[i] + rz();
     for (let i = 0; i < n; i++) {
-      last += rz(); t.a[i] = last; t.b[i] = last + rz();
       const dxa = rz(), dya = rz(), dxb = rz(), dyb = rz();
       t.tax[i] = tx + dxa; t.tay[i] = ty + dya; t.tbx[i] = tx + dxb; t.tby[i] = ty + dyb;
       t.hA[i] = dxa === 0 && dya === 0 ? 1 : 0; t.hB[i] = dxb === 0 && dyb === 0 ? 1 : 0;
-      const cf = rv(); t.cls[i] = cf % 16; t.fl[i] = Math.floor(cf / 16);
-      const ex = rv(); t.grade[i] = ex % 8; t.sac[i] = Math.floor(ex / 8) % 8; t.ms[i] = Math.floor(ex / 64);
-      t.len[i] = rv() / 10;
-      t.name[i] = rv(); t.ref[i] = rv(); t.dest[i] = rv();
-      const gl = rv(), end = p + gl;
-      t.g[i] = p;
-      t.xa[i] = ox + rz(); t.ya[i] = oy + rz(); t.xb[i] = t.xa[i] + rz(); t.yb[i] = t.ya[i] + rz();
-      p = end;
     }
+    for (let i = 0; i < n; i++) { const cf = rv(); t.cls[i] = cf % 16; t.fl[i] = Math.floor(cf / 16); }
+    for (let i = 0; i < n; i++) { const ex = rv(); t.grade[i] = ex % 8; t.sac[i] = Math.floor(ex / 8) % 8; t.ms[i] = Math.floor(ex / 64); }
+    for (let i = 0; i < n; i++) t.len[i] = rv();
+    for (let i = 0; i < n; i++) { t.name[i] = rv(); t.ref[i] = rv(); t.dest[i] = rv(); }
+    let px = ox, py = oy;
+    for (let i = 0; i < n; i++) { px += rz(); py += rz(); t.xa[i] = px; t.ya[i] = py; }
+    for (let i = 0; i < n; i++) { t.xb[i] = t.xa[i] + rz(); t.yb[i] = t.ya[i] + rz(); }
+    for (let i = 0; i < n; i++) t.nm[i] = rv();
+    // Zwischenpunkte: nur die Anfänge merken, entschlüsselt wird bei Bedarf
+    for (let i = 0; i < n; i++) {
+      t.g[i] = p;
+      for (let k = 2 * t.nm[i]; k > 0; k--) { while (buf[p++] & 0x80); }
+    }
+    t.sb = new Uint8Array(n); t.eb = new Uint8Array(n);
+    for (let i = 0; i < n; i++) { t.sb[i] = buf[p++]; t.eb[i] = buf[p++]; }
+    // Abbiegeverbote: [Knoten, von, nach, Art, …]
+    const nr = p < buf.length ? rv() : 0;
+    t.restr = [];
+    let lv = 0;
+    for (let k = 0; k < nr; k++) { lv += rz(); const f = lv + rz(), to = lv + rz(); t.restr.push(lv, f, to, rv()); }
     return t;
   }
   /* ganze Linie einer Kante (A → B) als [[lon, lat], …] */
@@ -116,8 +129,7 @@ const OvlRouter = (() => {
     let p = t.g[i];
     const rv = () => { let v = 0, m = 1, b; do { b = buf[p++]; v += (b & 0x7f) * m; m *= 128; } while (b & 0x80); return v; };
     const rz = () => { const v = rv(); return v % 2 ? -(v + 1) / 2 : v / 2; };
-    rz(); rz(); rz(); rz();
-    const nm = rv();
+    const nm = t.nm[i];
     let x = t.xa[i], y = t.ya[i];
     const out = [[x / SC, y / SC]];
     for (let k = 0; k < nm; k++) { x += rz(); y += rz(); out.push([x / SC, y / SC]); }
@@ -126,6 +138,10 @@ const OvlRouter = (() => {
   }
 
   /* ---------- Hilfen ---------- */
+  const Q = 360 / 256;
+  /* Fahrtrichtung beim Losfahren auf einer Kante bzw. beim Ankommen am Ende (in Grad) */
+  function depart(t, i, dir) { return dir ? t.sb[i] * Q : (t.eb[i] * Q + 180) % 360; }
+  function arrive(t, i, dir) { return dir ? t.eb[i] * Q : (t.sb[i] * Q + 180) % 360; }
   function tileOf(lon, lat, z) {
     const n = Math.pow(2, z);
     const la = Math.max(-85.0511, Math.min(85.0511, lat)) * Math.PI / 180;
@@ -191,7 +207,7 @@ const OvlRouter = (() => {
       const max = o.sac || 3;
       const F = [0, 2, 1.6, 1.35, 1.15, 1.05, 1, 1, 1, 1, 1, 1, 1, 1.25];
       return {
-        foot: true, hv: 1.25 * 1.15, w: 1.1,
+        foot: true, hv: 1.25 * 1.15, w: 1.1, turn: () => 0,
         ok: (t, i, dir) => (t.fl[i] & 4) !== 0 && t.sac[i] <= max,
         time(t, i) {
           const c = t.cls[i];
@@ -207,6 +223,13 @@ const OvlRouter = (() => {
     const prof = o.profile || 'road';
     return {
       foot: false, w: 1.1, hv: prof === 'short' ? 0 : 36,
+      // Abbiegen kostet Zeit: links mehr als rechts, Wenden viel (sonst entstehen Wendemanöver auf getrennten Fahrbahnen)
+      turn(a) {
+        const x = Math.abs(a), k = prof === 'short' ? 10 : 1;
+        if (x < 40) return 0;
+        if (x > 150) return 60 * k;
+        return (a > 0 ? 4 : 10) * k;
+      },
       ok: (t, i, dir) => (t.fl[i] & (dir ? 1 : 2)) !== 0,
       time(t, i) {
         const c = t.cls[i], f = t.fl[i], ms = t.ms[i];
@@ -240,6 +263,8 @@ const OvlRouter = (() => {
       this.sources = sources;            // [{ reader, bbox }]
       this.tiles = new Map();            // "z/x/y" → Promise<[decoded …]>
       this.adj = [new Map(), new Map()]; // 0: alle Wege (z10), 1: große Straßen (z7)
+      this.restr = new Map();            // Knoten → [von, nach, Art, …]
+      this.restrSeen = new Set();
       this.loaded = 0;
     }
     level(z) { return z === ZF ? 0 : 1; }
@@ -277,6 +302,14 @@ const OvlRouter = (() => {
           if (dup && dup[i]) continue;
           if (t.hA[i]) { let l = adj.get(t.a[i]); if (!l) adj.set(t.a[i], l = []); l.push(t, i, 1); }
           if (t.hB[i]) { let l = adj.get(t.b[i]); if (!l) adj.set(t.b[i], l = []); l.push(t, i, 0); }
+        }
+        for (let k = 0; k < t.restr.length; k += 4) {
+          const key = t.restr[k] + '_' + t.restr[k + 1] + '_' + t.restr[k + 2];
+          if (this.restrSeen.has(key)) continue;
+          this.restrSeen.add(key);
+          let l = this.restr.get(t.restr[k]);
+          if (!l) this.restr.set(t.restr[k], l = []);
+          l.push(t.restr[k + 1], t.restr[k + 2], t.restr[k + 3]);
         }
         e.list.push(t);
         this.loaded++;
@@ -375,7 +408,8 @@ const OvlRouter = (() => {
     const relax = (id, g, x, y, h10, h7, par, t, i, dir) => {
       const old = labels.get(id);
       if (old && old.g <= g) return;
-      labels.set(id, { g, x, y, h10, h7, par, t, i, dir, done: false });
+      // prev: Knoten, von dem man kommt (für Abbiegeverbote; am Start das andere Ende der Startkante)
+      labels.set(id, { g, x, y, h10, h7, par, t, i, dir, done: false, hb: arrive(t, i, dir), prev: dir ? t.a[i] : t.b[i] });
       heap.push(g + W * H(x / SC, y / SC), id);
     };
     // vom Startpunkt zu beiden Enden der Startkante
@@ -391,9 +425,14 @@ const OvlRouter = (() => {
       if (!L || L.done) continue;
       L.done = true;
       if (++settled > MAX_SETTLED) throw new Error('Strecke zu lang für die Offline-Berechnung');
+      // Abbiegeverbote an diesem Knoten (je nachdem, woher man kommt)
+      let banned = null, only = null;
+      const rl = prof.foot ? null : net.restr.get(id);
+      if (rl) for (let k = 0; k < rl.length; k += 3) if (rl[k] === L.prev) { if (rl[k + 2]) (only = only || new Set()).add(rl[k + 1]); else (banned = banned || new Set()).add(rl[k + 1]); }
+      const allowed = (o) => !((banned && banned.has(o)) || (only && !only.has(o)));
       // Ziel über die Zielkante erreichen
-      if (id === eA && prof.ok(e.t, e.i, 1)) { const g = L.g + ec * e.frac; if (!best || g < best.g) best = { g, last: id, dir: 1 }; }
-      if (id === eB && prof.ok(e.t, e.i, 0)) { const g = L.g + ec * (1 - e.frac); if (!best || g < best.g) best = { g, last: id, dir: 0 }; }
+      if (id === eA && prof.ok(e.t, e.i, 1) && allowed(eB)) { const g = L.g + ec * e.frac + prof.turn(turnAngle(L.hb, depart(e.t, e.i, 1))); if (!best || g < best.g) best = { g, last: id, dir: 1 }; }
+      if (id === eB && prof.ok(e.t, e.i, 0) && allowed(eA)) { const g = L.g + ec * (1 - e.frac) + prof.turn(turnAngle(L.hb, depart(e.t, e.i, 0))); if (!best || g < best.g) best = { g, last: id, dir: 0 }; }
       const lon = L.x / SC, lat = L.y / SC;
       const isNear = dist(lon, lat, sLon, sLat) < near || dist(lon, lat, eLon, eLat) < near;
       let z, home;
@@ -406,7 +445,8 @@ const OvlRouter = (() => {
         const t = list[k], i = list[k + 1], dir = list[k + 2];
         if (!prof.ok(t, i, dir)) continue;
         if (L.t === t && L.i === i) continue;
-        const g = L.g + costOf(t, i);
+        if ((banned || only) && !allowed(dir ? t.b[i] : t.a[i])) continue;
+        const g = L.g + costOf(t, i) + prof.turn(turnAngle(L.hb, depart(t, i, dir)));
         if (dir) relax(t.b[i], g, t.xb[i], t.yb[i], z === ZF ? [t.tbx[i], t.tby[i]] : null, z === ZM ? [t.tbx[i], t.tby[i]] : null, id, t, i, 1);
         else relax(t.a[i], g, t.xa[i], t.ya[i], z === ZF ? [t.tax[i], t.tay[i]] : null, z === ZM ? [t.tax[i], t.tay[i]] : null, id, t, i, 0);
       }
@@ -457,9 +497,7 @@ const OvlRouter = (() => {
     for (let k = 0; k < list.length; k += 3) {
       const t = list[k], i = list[k + 1], dir = list[k + 2];
       if (same(t, i, a) || same(t, i, b) || !prof.ok(t, i, dir) || t.cls[i] === FERRY) continue;
-      let c = geom(t, i);
-      if (!dir) c = c.reverse();
-      out.push({ ang: turnAngle(inB, headBearing(c)), minor: !prof.foot && (t.cls[i] >= 8), name: streetOf(t, i), link: (t.fl[i] & 8) !== 0 });
+      out.push({ ang: turnAngle(inB, depart(t, i, dir)), minor: !prof.foot && (t.cls[i] >= 8), name: streetOf(t, i), link: (t.fl[i] & 8) !== 0 });
     }
     return out;
   }
@@ -493,7 +531,7 @@ const OvlRouter = (() => {
         const f0 = Math.min(s.frac, e.frac), f1 = Math.max(s.frac, e.frac);
         let c = sliceFrac(geom(s.t, s.i), f0, f1);
         if (!res.best.fwd) c = c.reverse();
-        parts.push({ c, t: s.t, i: s.i, f: f1 - f0, from: null, to: null });
+        parts.push({ c, t: s.t, i: s.i, f: f1 - f0, from: null, to: null, dir: res.best.fwd ? 1 : 0 });
       } else {
         const st = res.steps;
         for (let k = 0; k < st.length; k++) {
@@ -501,12 +539,12 @@ const OvlRouter = (() => {
           let c = geom(t, i), f = 1;
           if (k === 0) { c = dir ? sliceFrac(c, s.frac, 1) : sliceFrac(c, 0, s.frac).reverse(); f = dir ? 1 - s.frac : s.frac; }
           else if (!dir) c = c.reverse();
-          parts.push({ c, t, i, f, from: k === 0 ? null : (dir ? t.a[i] : t.b[i]), to: dir ? t.b[i] : t.a[i] });
+          parts.push({ c, t, i, f, from: k === 0 ? null : (dir ? t.a[i] : t.b[i]), to: dir ? t.b[i] : t.a[i], dir });
         }
         const c = geom(e.t, e.i);
         const fw = res.best.dir;
         parts.push({ c: fw ? sliceFrac(c, 0, e.frac) : sliceFrac(c, e.frac, 1).reverse(), t: e.t, i: e.i, f: fw ? e.frac : 1 - e.frac,
-          from: fw ? e.t.a[e.i] : e.t.b[e.i], to: null });
+          from: fw ? e.t.a[e.i] : e.t.b[e.i], to: null, dir: fw });
       }
       const pIdx = [];
       for (const p of parts) {
@@ -544,7 +582,7 @@ const OvlRouter = (() => {
         }
         if (aR && !bR) { push(27, 'Kreisverkehr verlassen' + on); continue; }
         if (aR && bR) continue;
-        const inB = tailBearing(a.c), outB = headBearing(b.c);
+        const inB = arrive(at, ai, a.dir), outB = depart(bt, bi, b.dir);
         const ang = turnAngle(inB, outB), abs = Math.abs(ang);
         const alts = b.from === null ? [] : altAngles(net, prof, b.from, inB, a, b);
         if (!alts.length) continue;            // keine Wahl an dieser Stelle: kein Hinweis

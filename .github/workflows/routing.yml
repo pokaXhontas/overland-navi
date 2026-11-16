@@ -15,9 +15,8 @@ permissions:
   contents: write
   actions: write
 
-# gleiche Gruppe wie die Wanderwege: nie gleichzeitig (gleicher Download-Bereich, Geofabrik schonen)
 concurrency:
-  group: hiking
+  group: routing
   cancel-in-progress: false
 
 jobs:
@@ -64,7 +63,8 @@ jobs:
         if: steps.size.outputs.skip != '1'
         run: |
           ALT=$(echo "${{ matrix.url }}" | sed 's#https://download.geofabrik.de/#https://download.openstreetmap.fr/extracts/#')
-          for u in "${{ matrix.url }}" "$ALT" "${{ matrix.url }}" "$ALT" "${{ matrix.url }}"; do
+          # zuerst der Spiegel von OpenStreetMap France (die Wanderwege laden bei Geofabrik)
+          for u in "$ALT" "${{ matrix.url }}" "$ALT" "${{ matrix.url }}" "$ALT"; do
             echo "lade $u"
             if curl -sfL --retry 3 --retry-delay 30 --retry-all-errors --connect-timeout 30 -o land.osm.pbf "$u"; then ls -lh land.osm.pbf; exit 0; fi
             sleep 120
@@ -74,7 +74,7 @@ jobs:
       - name: Straßennetz bauen
         if: steps.size.outputs.skip != '1'
         run: |
-          osmium tags-filter land.osm.pbf w/highway w/route=ferry -o wege.osm.pbf --overwrite
+          osmium tags-filter land.osm.pbf w/highway w/route=ferry r/type=restriction -o wege.osm.pbf --overwrite
           rm land.osm.pbf
           ls -lh wege.osm.pbf
           set -o pipefail

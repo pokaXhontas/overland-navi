@@ -11,20 +11,26 @@ Die Kanten liegen in Kacheln (PMTiles, eigenes Binärformat, gzip):
 Knoten werden über ihre OpenStreetMap-Kennung verbunden; dadurch passen Kacheln aus
 Nachbarländern an der Grenze von selbst zusammen.
 
-Kachelformat (alles varint, zz = zigzag):
-  version(1), zz(origin_x), zz(origin_y)                 Ursprung der Kachel in 1e-5 Grad
+Kachelformat 2 (alles varint, zz = zigzag), Kanten nach Knoten A sortiert und spaltenweise abgelegt:
+  version(2), zz(origin_x), zz(origin_y)                 Ursprung der Kachel in 1e-5 Grad
   n_strings, je (len, utf8)                               Namen (Index 1-basiert, 0 = ohne)
-  n_edges, je Kante:
-    zz(idA - letzte idA), zz(idB - idA)
-    zz(dxA), zz(dyA), zz(dxB), zz(dyB)                     Heimatkachel der Endpunkte relativ zu dieser (0,0 = hier)
-    cls + 16 * flags                                      flags: 1 Auto vor, 2 Auto zurück, 4 zu Fuß, 8 Zubringer,
+  n_edges, dann die Spalten, jede für alle Kanten hintereinander:
+    1 zz(idA - vorige idA)                                OpenStreetMap-Kennung von Knoten A
+    2 zz(idB - idA)
+    3 zz(dxA), zz(dyA), zz(dxB), zz(dyB)                  Heimatkachel der Endpunkte relativ zu dieser (0,0 = hier)
+    4 cls + 16 * flags                                    flags: 1 Auto vor, 2 Auto zurück, 4 zu Fuß, 8 Zubringer,
                                                           16 Kreisverkehr, 32 unbefestigt, 64 Maut, 128 nur Anlieger,
                                                           256 Tunnel, 512 Brücke
-    grade + 8 * sac + 64 * maxspeed                       Track-Güte 0-5, SAC 0-6, Tempo km/h (Fähre: Reisetempo)
-    Länge in Dezimetern
-    name, ref, dest                                       Index in die Namen (dest: Ziel-Beschilderung an Zubringern)
-    geom_len, dann geom_len Bytes:                         zz(xA - origin), zz(yA - origin), zz(xB - xA), zz(yB - yA),
-                                                          n_mid, je zz(dx), zz(dy) (ab A)
+    5 grade + 8 * sac + 64 * maxspeed                     Track-Güte 0-5, SAC 0-6, Tempo km/h (Fähre: Reisetempo)
+    6 Länge in Metern
+    7 name, ref, dest                                     Index in die Namen (dest: Ziel-Beschilderung an Zubringern)
+    8 zz(xA - voriges xA), zz(yA - voriges yA)            (das erste ab dem Ursprung)
+    9 zz(xB - xA), zz(yB - yA)
+   10 Zahl der Zwischenpunkte
+   11 Zwischenpunkte aller Kanten: je zz(dx), zz(dy) ab A
+   12 je Kante 2 Bytes: Richtung beim Losfahren an A und beim Ankommen an B (0-255 = 0-360°)
+  n_restr, je Abbiegeverbot (sortiert nach Knoten): zz(via - voriger via), zz(von - via), zz(nach - via), Art (0 verboten, 1 nur)
+     von/nach sind die Nachbarknoten auf dem Weg, von dem man kommt / in den man abbiegt (nur fürs Auto)
 """
 import array
 import gzip
@@ -51,7 +57,7 @@ GRADE = {'grade1': 1, 'grade2': 2, 'grade3': 3, 'grade4': 4, 'grade5': 5}
 UNPAVED = {'unpaved', 'gravel', 'fine_gravel', 'dirt', 'earth', 'ground', 'grass', 'mud', 'sand', 'compacted',
            'pebblestone', 'rock', 'woodchips', 'grass_paver', 'clay', 'shells', 'salt', 'snow', 'ice'}
 NO = {'no', 'private', 'agricultural', 'forestry', 'delivery;agricultural', 'agricultural;forestry', 'forestry;agricultural',
-      'discouraged', 'military', 'restricted', 'emergency', 'use_sidepath'}
+      'discouraged', 'military', 'restricted', 'emergency'}
 YES = {'yes', 'permissive', 'designated', 'destination', 'customers', 'official'}
 DEST = {'destination', 'customers', 'delivery'}
 SKIP_SERVICE = {'parking_aisle', 'driveway', 'drive-through', 'emergency_access'}
@@ -213,6 +219,27 @@ def hav(x1, y1, x2, y2):
     return 2 * 6371008.8 * math.asin(min(1.0, math.sqrt(a)))
 
 
+def bearing_q(pts, rev=False):
+    """Richtung am Anfang einer Linie (etwa 15 m weit geschaut), auf 256 Stufen."""
+    if rev:
+        pts = pts[::-1]
+    x0, y0 = pts[0]
+    k = 1
+    d = 0.0
+    while k < len(pts) - 1:
+        d += hav(pts[k - 1][0], pts[k - 1][1], pts[k][0], pts[k][1])
+        if d > 15:
+            break
+        k += 1
+    x1, y1 = pts[min(k, len(pts) - 1)]
+    la0, la1 = math.radians(y0 / SCALE), math.radians(y1 / SCALE)
+    dl = math.radians((x1 - x0) / SCALE)
+    b = math.degrees(math.atan2(math.sin(dl) * math.cos(la1), math.cos(la0) * math.sin(la1) - math.sin(la0) * math.cos(la1) * math.cos(dl)))
+    if rev:
+        b += 180
+    return int(round((b % 360) / 360 * 256)) % 256
+
+
 def simplify(pts, tol_m):
     """Douglas-Peucker in einer lokalen Ebene; pts = [(x, y)], Endpunkte bleiben."""
     if len(pts) <= 2:
@@ -249,16 +276,20 @@ def simplify(pts, tol_m):
     return [p for p, k in zip(pts, keep) if k]
 
 
+REC = struct.Struct('<qqhhhhHHIIIIiiiiBBHI')   # … Richtung an A und B, Zahl der Zwischenpunkte, Bytes der Zwischenpunkte
+
+
 class Tile:
-    __slots__ = ('z', 'x', 'y', 'ox', 'oy', 'buf', 'names', 'n', 'last')
+    """Kanten einer Kachel; erst als feste Datensätze gesammelt, am Ende sortiert und spaltenweise geschrieben."""
+    __slots__ = ('z', 'x', 'y', 'ox', 'oy', 'recs', 'names', 'n', 'restr')
 
     def __init__(self, z, x, y):
         self.z, self.x, self.y = z, x, y
         self.ox, self.oy = tile_origin(z, x, y)
-        self.buf = bytearray()
+        self.recs = bytearray()
         self.names = {}
         self.n = 0
-        self.last = 0
+        self.restr = []
 
     def name(self, s):
         if not s:
@@ -268,37 +299,47 @@ class Tile:
             i = self.names[s] = len(self.names) + 1
         return i
 
-    def add(self, e, ta, tb, geom):
-        b = self.buf
-        put(b, zz(e[0] - self.last))
-        self.last = e[0]
-        put(b, zz(e[1] - e[0]))
-        put(b, zz(ta[0] - self.x)); put(b, zz(ta[1] - self.y))
-        put(b, zz(tb[0] - self.x)); put(b, zz(tb[1] - self.y))
+    def add(self, e, ta, tb, geom, mids):
         a = e[2]
-        put(b, a['cls'] + 16 * a['flags'])
-        put(b, a['grade'] + 8 * a['sac'] + 64 * e[4])
-        put(b, e[3])
-        put(b, self.name(a['name']))
-        put(b, self.name(a['ref']))
-        put(b, self.name(a['dest']))
-        g = bytearray()
         x0, y0 = geom[0]
         x1, y1 = geom[-1]
-        put(g, zz(x0 - self.ox)); put(g, zz(y0 - self.oy))
-        put(g, zz(x1 - x0)); put(g, zz(y1 - y0))
-        put(g, len(geom) - 2)
-        px, py = x0, y0
-        for x, y in geom[1:-1]:
-            put(g, zz(x - px)); put(g, zz(y - py))
-            px, py = x, y
-        put(b, len(g))
-        b += g
+        self.recs += REC.pack(e[0], e[1], ta[0] - self.x, ta[1] - self.y, tb[0] - self.x, tb[1] - self.y,
+                              a['cls'] + 16 * a['flags'], a['grade'] + 8 * a['sac'] + 64 * e[4], e[3],
+                              self.name(a['name']), self.name(a['ref']), self.name(a['dest']),
+                              x0, y0, x1, y1, e[5], e[6], len(geom) - 2, len(mids))
+        self.recs += mids
         self.n += 1
 
     def bytes(self):
+        recs = []
+        b = self.recs
+        p = 0
+        while p < len(b):
+            r = REC.unpack_from(b, p)
+            p += REC.size
+            recs.append((r, p, r[19]))
+            p += r[19]
+        recs.sort(key=lambda x: (x[0][0], x[0][1]))
+        cols = [bytearray() for _ in range(12)]
+        last = 0
+        px, py = self.ox, self.oy
+        for r, mp, ml in recs:
+            ida, idb, dxa, dya, dxb, dyb, cf, ex, ln, nm, rf, de, xa, ya, xb, yb, sb, eb, nmid, _ = r
+            put(cols[0], zz(ida - last)); last = ida
+            put(cols[1], zz(idb - ida))
+            c = cols[2]; put(c, zz(dxa)); put(c, zz(dya)); put(c, zz(dxb)); put(c, zz(dyb))
+            put(cols[3], cf)
+            put(cols[4], ex)
+            put(cols[5], ln)
+            c = cols[6]; put(c, nm); put(c, rf); put(c, de)
+            c = cols[7]; put(c, zz(xa - px)); put(c, zz(ya - py)); px, py = xa, ya
+            c = cols[8]; put(c, zz(xb - xa)); put(c, zz(yb - ya))
+            put(cols[9], nmid)
+            cols[10] += b[mp:mp + ml]
+            cols[11].append(sb)
+            cols[11].append(eb)
         out = bytearray()
-        put(out, 1)
+        put(out, 2)
         put(out, zz(self.ox)); put(out, zz(self.oy))
         names = sorted(self.names.items(), key=lambda kv: kv[1])
         put(out, len(names))
@@ -306,8 +347,15 @@ class Tile:
             u = s.encode('utf-8')
             put(out, len(u))
             out += u
-        put(out, self.n)
-        out += self.buf
+        put(out, len(recs))
+        for c in cols:
+            out += c
+        rs = sorted(set(self.restr))
+        put(out, len(rs))
+        last = 0
+        for via, frm, to, kind in rs:
+            put(out, zz(via - last)); last = via
+            put(out, zz(frm - via)); put(out, zz(to - via)); put(out, kind)
         return bytes(out)
 
 
@@ -315,7 +363,14 @@ class Graph:
     def __init__(self):
         self.tiles = {}
         self.bbox = [1e9, 1e9, -1e9, -1e9]
-        self.stats = {'edges': 0, 'major': 0, 'points': 0, 'points_raw': 0}
+        self.stats = {'edges': 0, 'major': 0, 'points': 0, 'points_raw': 0, 'restr': 0}
+
+    def restriction(self, via, x, y, frm, to, kind):
+        self.stats['restr'] += 1
+        for z in (Z_FULL, Z_MAJOR):
+            t = self.tiles.get((z,) + tile_of(x, y, z))
+            if t is not None or z == Z_FULL:
+                self.tile(z, *tile_of(x, y, z)).restr.append((via, frm, to, kind))
 
     def tile(self, z, x, y):
         k = (z, x, y)
@@ -333,12 +388,12 @@ class Graph:
             length += hav(raw[i - 1][0], raw[i - 1][1], raw[i][0], raw[i][1])
         if ida == idb and length < 1:
             return
-        geom = simplify(raw, 4.0 if a['cls'] <= 8 else 2.5)
+        geom = simplify(raw, 5.0 if a['cls'] <= 8 else 3.5)
         ms = a['ms']
         if a['cls'] == FERRY:
             d = duration_s(a['duration']) if a['duration'] else None
             ms = max(5, min(60, round(length / d * 3.6))) if d else 0
-        e = (ida, idb, a, max(1, round(length * 10)), ms)
+        e = (ida, idb, a, max(1, round(length)), ms, bearing_q(raw), bearing_q(raw, True))
         s = self.stats
         s['edges'] += 1
         s['points'] += len(geom)
@@ -353,15 +408,72 @@ class Graph:
         if (a['flags'] & 3) and (a['cls'] in MAJOR_CLS or a['cls'] == FERRY):
             levels.append(Z_MAJOR)
             s['major'] += 1
+        mids = bytearray()
+        px, py = geom[0]
+        for x, y in geom[1:-1]:
+            put(mids, zz(x - px)); put(mids, zz(y - py))
+            px, py = x, y
         for z in levels:
             ta = tile_of(geom[0][0], geom[0][1], z)
             tb = tile_of(geom[-1][0], geom[-1][1], z)
-            self.tile(z, *ta).add(e, ta, tb, geom)
+            self.tile(z, *ta).add(e, ta, tb, geom, mids)
             if tb != ta:
-                self.tile(z, *tb).add(e, ta, tb, geom)
+                self.tile(z, *tb).add(e, ta, tb, geom, mids)
 
 
 # ---------------- Einlesen ----------------
+
+def parse_restriction(tags, members):
+    """Abbiegeverbot fürs Auto: (von-Weg, über-Knoten, nach-Weg, 0 verboten / 1 nur) oder None."""
+    if tags.get('type') != 'restriction':
+        return None
+    r = tags.get('restriction:motorcar') or tags.get('restriction')
+    if not r or 'motorcar' in (tags.get('except') or '').replace(' ', '').split(';'):
+        return None
+    kind = 0 if r.startswith('no_') else 1 if r.startswith('only_') else None
+    if kind is None:
+        return None
+    fr = [m[1] for m in members if m[0] == 'w' and m[2] == 'from']
+    via = [m[1] for m in members if m[0] == 'n' and m[2] == 'via']
+    to = [m[1] for m in members if m[0] == 'w' and m[2] == 'to']
+    if len(fr) != 1 or len(via) != 1 or len(to) != 1:
+        return None
+    return fr[0], via[0], to[0], kind
+
+
+class Restrictions:
+    def __init__(self):
+        self.list = []          # [von-Weg, Knoten, nach-Weg, Art, von-Nachbar, nach-Nachbar, x, y]
+        self.ways = {}          # Weg → [(Index, 'f'|'t')]
+
+    def add(self, r):
+        i = len(self.list)
+        self.list.append([r[0], r[1], r[2], r[3], None, None, None, None])
+        self.ways.setdefault(r[0], []).append((i, 4))
+        self.ways.setdefault(r[2], []).append((i, 5))
+
+    def way(self, wid, pts, nodes):
+        for i, slot in self.ways.get(wid, ()):
+            e = self.list[i]
+            via = e[1]
+            ids = [p[0] for p in pts]
+            if ids[0] == via:
+                seq = ids[1:]
+                xy = pts[0]
+            elif ids[-1] == via:
+                seq = ids[-2::-1]
+                xy = pts[-1]
+            else:
+                continue                      # Weg läuft durch den Knoten: unklar, weglassen
+            nb = next((n for n in seq if n in nodes), seq[-1] if seq else None)
+            e[slot] = nb
+            e[6], e[7] = xy[1], xy[2]
+
+    def apply(self, g):
+        for f, via, t, kind, nf, nt, x, y in self.list:
+            if nf is not None and nt is not None and x is not None:
+                g.restriction(via, x, y, nf, nt, kind)
+
 
 def split_way(g, a, pts, nodes):
     start = 0
@@ -375,6 +487,19 @@ def split_way(g, a, pts, nodes):
 def read_pbf(path, g):
     import numpy as np
     import osmium
+
+    rs = Restrictions()
+
+    class Rels(osmium.SimpleHandler):
+        def relation(self, r):
+            if r.tags.get('type') != 'restriction':
+                return
+            x = parse_restriction(r.tags, [(m.type, m.ref, m.role) for m in r.members])
+            if x:
+                rs.add(x)
+
+    Rels().apply_file(path)
+    print(f'{len(rs.list):,} Abbiegeverbote', file=sys.stderr)
 
     class Count(osmium.SimpleHandler):
         def __init__(self):
@@ -418,11 +543,14 @@ def read_pbf(path, g):
                 self.bad += 1
                 return
             split_way(g, a, pts, nodes)
+            if w.id in rs.ways:
+                rs.way(w.id, pts, nodes)
 
     b = Build()
     b.apply_file(path, locations=True, idx='flex_mem')
     if b.bad:
         print(f'{b.bad} Wege ohne Koordinaten übersprungen', file=sys.stderr)
+    rs.apply(g)
 
 
 def read_xml(path, g):
@@ -432,22 +560,32 @@ def read_xml(path, g):
     loc = {}
     for n in root.iter('node'):
         loc[int(n.get('id'))] = (round(float(n.get('lon')) * SCALE), round(float(n.get('lat')) * SCALE))
+    rs = Restrictions()
+    for r in root.iter('relation'):
+        tags = {t.get('k'): t.get('v') for t in r.iter('tag')}
+        mem = [(m.get('type')[0], int(m.get('ref')), m.get('role')) for m in r.iter('member')]
+        x = parse_restriction(tags, mem)
+        if x:
+            rs.add(x)
     ways = []
     for w in root.iter('way'):
         tags = {t.get('k'): t.get('v') for t in w.iter('tag')}
         refs = [int(nd.get('ref')) for nd in w.iter('nd')]
         a = classify(tags)
         if a and len(refs) >= 2:
-            ways.append((a, refs))
+            ways.append((a, refs, int(w.get('id'))))
     count = {}
-    for _, refs in ways:
+    for _, refs, _ in ways:
         for r in refs:
             count[r] = count.get(r, 0) + 1
         count[refs[0]] = count.get(refs[0], 0) + 2
         count[refs[-1]] = count.get(refs[-1], 0) + 2
     nodes = {k for k, v in count.items() if v >= 2}
-    for a, refs in ways:
-        split_way(g, a, [(r,) + loc[r] for r in refs], nodes)
+    for a, refs, wid in ways:
+        pts = [(r,) + loc[r] for r in refs]
+        split_way(g, a, pts, nodes)
+        rs.way(wid, pts, nodes)
+    rs.apply(g)
 
 
 # ---------------- PMTiles schreiben ----------------
@@ -549,7 +687,7 @@ def main():
         sys.exit(1)
     size = write_pmtiles(out, g, name)
     s = g.stats
-    print(f"{s['edges']:,} Kanten ({s['major']:,} große Straßen), Punkte {s['points_raw']:,} → {s['points']:,}, "
+    print(f"{s['edges']:,} Kanten ({s['major']:,} große Straßen), {s['restr']:,} Abbiegeverbote, Punkte {s['points_raw']:,} → {s['points']:,}, "
           f"{len(g.tiles):,} Kacheln, {size / 1e6:.1f} MB", file=sys.stderr)
 
 
