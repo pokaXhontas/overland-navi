@@ -29,6 +29,7 @@ routes = []
 member = defaultdict(list)
 
 # ---------- Punkte: Biwaks, Hütten, Unterstände, Wasser ----------
+SMOKE_RE = re.compile(r"raucher|rauchen|smok|fumeur|fumador|fumatori|palarn|курил|курен|sigara", re.I)
 BIWAK_RE = re.compile(r"biwak|bivacc|bivouac|bivak|bivac|biwakschachtel|refuge non gard|abri", re.I)
 PT_MINZOOM = {"biwak": 9, "huette": 9, "tank": 10, "wasser": 12, "quelle": 12, "wc": 13, "dusche": 12, "ruine": 11, "burg": 11, "archaeologie": 11,
               "denkmal": 13, "hoehle": 12, "wasserfall": 12, "aussicht": 12, "sehenswert": 12}
@@ -42,8 +43,10 @@ def point_kind(t):
     if tour == "alpine_hut":
         return "biwak" if BIWAK_RE.search(t.get("name", "")) or t.get("alpine_hut") == "unattended" else "huette"
     if am == "shelter":
-        # nur geschlossene Hütten zum Übernachten, keine Unterstände, Wartehäuschen oder Pavillons
-        return "biwak" if t.get("shelter_type") == "basic_hut" and not t.get("public_transport") else None
+        # nur geschlossene Hütten zum Übernachten, keine Unterstände, Wartehäuschen, Pavillons oder Raucherbereiche
+        if t.get("shelter_type") != "basic_hut" or t.get("public_transport") or t.get("smoking") in ("yes", "dedicated", "isolated", "separated"):
+            return None
+        return None if SMOKE_RE.search(t.get("name", "") + " " + t.get("description", "")) else "biwak"
     if am == "water_point" or (am == "drinking_water" and (t.get("motorcar") == "yes" or t.get("motorhome") == "yes" or t.get("caravan") == "yes")):
         return "tank"        # zum Befüllen von Fahrzeug- oder Wohnmobiltanks
     if am == "drinking_water" or (t.get("man_made") == "water_tap" and t.get("drinking_water") == "yes"):
@@ -124,18 +127,61 @@ def write_point(out, k, t, lon, lat):
     out.write(json.dumps(f, ensure_ascii=False, separators=(",", ":")) + "\n")
 
 
+class Places(osmium.SimpleHandler):
+    """Orte, um Hütten und Biwaks in Städten und Dörfern auszusortieren (dort sind es keine Hütten in der Natur)."""
+    R = {"town": 1800, "village": 350, "suburb": 1000, "quarter": 700, "neighbourhood": 400, "borough": 1500}
+
+    def __init__(self):
+        super().__init__()
+        self.grid = defaultdict(list)
+
+    def node(self, n):
+        pl = n.tags.get("place")
+        if not pl:
+            return
+        if pl == "city":
+            m = re.match(r"^\s*([\d.,\s]+)", n.tags.get("population", ""))
+            pop = int(re.sub(r"[^\d]", "", m.group(1)) or 0) if m else 0
+            r = min(15000, max(4000, 2500 * (max(pop, 50000) / 10000) ** 0.4))
+        elif pl in self.R:
+            r = self.R[pl]
+        else:
+            return
+        lon, lat = n.location.lon, n.location.lat
+        self.grid[(int(lon * 10), int(lat * 10))].append((lon, lat, r))
+
+    def urban(self, lon, lat):
+        cx, cy = int(lon * 10), int(lat * 10)
+        k = math.cos(math.radians(lat)) * 111320
+        for dx in (-2, -1, 0, 1, 2):
+            for dy in (-2, -1, 0, 1, 2):
+                for plon, plat, r in self.grid.get((cx + dx, cy + dy), ()):
+                    if ((plon - lon) * k) ** 2 + ((plat - lat) * 111320) ** 2 < r * r:
+                        return True
+        return False
+
+
 class Points(osmium.SimpleHandler):
-    def __init__(self, out):
+    def __init__(self, out, places=None):
         super().__init__()
         self.out = out
         self.n = 0
+        self.places = places
+        self.skipped = 0
+
+    def keep(self, k, lon, lat):
+        # Hütten und Biwaks nur draußen, nicht mitten im Ort
+        if k in ("biwak", "huette") and self.places and self.places.urban(lon, lat):
+            self.skipped += 1
+            return False
+        return True
 
     def node(self, n):
         if not n.tags:
             return
         t = {x.k: x.v for x in n.tags}
         k = point_kind(t)
-        if k:
+        if k and self.keep(k, n.location.lon, n.location.lat):
             write_point(self.out, k, t, n.location.lon, n.location.lat)
             self.n += 1
 
@@ -151,8 +197,10 @@ class Points(osmium.SimpleHandler):
         except osmium.InvalidLocationError:
             return
         if cs:
-            write_point(self.out, k, t, sum(c[0] for c in cs) / len(cs), sum(c[1] for c in cs) / len(cs))
-            self.n += 1
+            lon, lat = sum(c[0] for c in cs) / len(cs), sum(c[1] for c in cs) / len(cs)
+            if self.keep(k, lon, lat):
+                write_point(self.out, k, t, lon, lat)
+                self.n += 1
 
 
 # ---------- Touren-Paket: die bekanntesten Wanderrouten ----------
@@ -426,9 +474,11 @@ with open(dst, "w", encoding="utf-8") as out:
 print(f"{h.n} Wege", flush=True)
 if dst_pts:
     with open(dst_pts, "w", encoding="utf-8") as out:
-        ph = Points(out)
+        places = Places()
+        places.apply_file(src)
+        ph = Points(out, places)
         ph.apply_file(src, locations=True, idx="flex_mem")
-    print(f"{ph.n} Punkte (Biwaks, Hütten, Unterstände, Wasser)", flush=True)
+    print(f"{ph.n} Punkte (Biwaks, Hütten, Wasser, Sehenswertes …), {ph.skipped} Hütten/Biwaks im Ort ausgelassen", flush=True)
 if dst_tours:
     write_tours(dst_tours)
 

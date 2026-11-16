@@ -16,5 +16,5 @@ jobs:
           pip install --quiet osmium
           G="${{ github.event.inputs.gebiet }}"
           curl -sfL --retry 3 -o land.osm.pbf "https://download.openstreetmap.fr/extracts/$G-latest.osm.pbf" || curl -sfL --retry 3 -o land.osm.pbf "https://download.geofabrik.de/$G-latest.osm.pbf"
-          osmium tags-filter land.osm.pbf nw/tourism=alpine_hut,wilderness_hut nw/amenity=shelter -o p.osm.pbf
+          osmium tags-filter land.osm.pbf nw/tourism=alpine_hut,wilderness_hut nw/amenity=shelter n/place=city,town,village,suburb,quarter,neighbourhood,borough -o p.osm.pbf
           python3 scripts/check_points.py p.osm.pbf "${{ github.event.inputs.arten }}"
