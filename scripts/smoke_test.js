@@ -266,6 +266,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.evaluate(() => { if (Nav.pending) $('#na-cancel').click(); });
   console.log('Bus & Bahn:', await tryTravel('transit', { name: 'Alexanderplatz', lat: 52.5219, lon: 13.4132 }, { name: 'Checkpoint Charlie', lat: 52.5076, lon: 13.3904 }));
   await shot('12f-bus-bahn');
+  await page.evaluate(() => { if (Nav.pending) $('#na-cancel').click(); Nav.when = { mode: 'dep', at: '2026-11-17T08:00' }; });
+  console.log('Bus & Bahn U9 Di 8 Uhr:', await tryTravel('transit', { name: 'Osloer Straße', lat: 52.5606, lon: 13.3733 }, { name: 'Rathaus Steglitz', lat: 52.4572, lon: 13.3209 }));
+  await page.evaluate(() => { Nav.when = { mode: 'now', at: '' }; });
+  console.log('Punkte-Arten:', await page.evaluate(() => JSON.stringify(map.getLayer('hike-pts') ? map.getFilter('hike-pts')[2][1] : 'keine Ebene')));
   await page.evaluate(() => { if (Nav.pending) $('#na-cancel').click(); Nav.travel = 'car'; });
 
   // Route zeichnen: echte Taps auf die Karte

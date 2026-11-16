@@ -137,6 +137,9 @@
       <button role="radio" data-maptype="sat">Luftbild</button>
       <button role="radio" data-maptype="hybrid">Hybrid</button>
     </div>
+    <label class="row"><span><b>Wasserstellen</b><small>Wasser tanken, Trinkwasser und Quellen, auch ohne Wanderwege</small></span><input type="checkbox" class="switch" id="t-water"></label>
+    <label class="row"><span><b>Toiletten &amp; Duschen</b><small>Öffentlich, mit Angabe ob kostenlos (ab Straßen-Zoom)</small></span><input type="checkbox" class="switch" id="t-service"></label>
+    <label class="row"><span><b>Pisten und Feldwege</b><small>Unbefestigte Feld-, Wald- und Wirtschaftswege, gestrichelt braun (in Deutschland meist für Autos gesperrt)</small></span><input type="checkbox" class="switch" id="t-tracks"></label>
     <label class="row"><span><b>Bus &amp; Bahn</b><small>Linien und Haltestellen in Städten ab 50.000 Einwohnern</small></span><input type="checkbox" class="switch" id="t-oev"></label>
     <p class="sub-head"><b>Farbschema</b></p>
     <div class="seg" role="radiogroup" aria-label="Farbschema">
@@ -204,6 +207,14 @@
     <button role="radio" data-travel="car">🚙 Auto</button>
     <button role="radio" data-travel="foot">🥾 Zu Fuß</button>
     <button role="radio" data-travel="transit">🚆 Bus &amp; Bahn</button>
+  </div>
+  <div class="pl-when" id="pl-when" hidden>
+    <div class="seg" role="radiogroup" aria-label="Zeit">
+      <button role="radio" data-when="now">Jetzt</button>
+      <button role="radio" data-when="dep">Abfahrt</button>
+      <button role="radio" data-when="arr">Ankunft</button>
+    </div>
+    <input type="datetime-local" id="pl-time" aria-label="Datum und Uhrzeit">
   </div>
   <div class="seg pl-seg" role="radiogroup" aria-label="Routenart">
     <button role="radio" data-profile="road">Schnellste</button>
@@ -276,9 +287,8 @@
   <div class="sheet-body">
    <div id="hk-main">
     <label class="row"><span><b>Wanderwege anzeigen</b><small>Gestrichelt, Farbe nach Schwierigkeit, ab Zoomstufe 11</small></span><input type="checkbox" class="switch" id="hk-on"></label>
-    <label class="row"><span><b>Feld- und Fahrwege</b><small>Pisten und Feldwege, die oft Teil von Wanderungen sind (ab Zoomstufe 12)</small></span><input type="checkbox" class="switch" id="hk-tracks"></label>
 
-    <h2>Biwaks, Hütten und Wasser</h2>
+    <h2>Biwaks und Hütten</h2>
     <div class="hk-chips" id="hk-pts" role="group" aria-label="Punkte auf der Karte"></div>
     <h2>Sehenswertes</h2>
     <div class="hk-chips" id="hk-see" role="group" aria-label="Sehenswertes auf der Karte"></div>

@@ -1416,6 +1416,10 @@ function setupUI() {
   Hike.setup();
   Tours.setup();
   Poi.setup();
+  for (const [id, key, def] of [['#t-water', 'waterOn', true], ['#t-service', 'serviceOn', true], ['#t-tracks', 'hikeTracks', true]]) {
+    $(id).checked = store.get(key, def);
+    $(id).onchange = () => { store.set(key, $(id).checked); refreshStyle(); };
+  }
   $('#t-oev').checked = store.get('oevOn', false);
   $('#t-oev').onchange = () => { store.set('oevOn', $('#t-oev').checked); refreshStyle(); };
   document.querySelectorAll('[data-maptype]').forEach((b) => {

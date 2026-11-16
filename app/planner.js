@@ -68,6 +68,23 @@ const Planner = {
       b.onclick = () => { Nav.travel = b.dataset.travel; store.set('navTravel', Nav.travel); this.render(); };
     });
     $('#planner .pl-seg').hidden = Nav.travel !== 'car';
+    // Bus & Bahn: jetzt, Abfahrt um … oder Ankunft um …
+    $('#pl-when').hidden = Nav.travel !== 'transit';
+    const tw = Nav.when;
+    document.querySelectorAll('#pl-when [data-when]').forEach((b) => {
+      b.setAttribute('aria-checked', String(b.dataset.when === tw.mode));
+      b.onclick = () => {
+        Nav.when.mode = b.dataset.when;
+        if (b.dataset.when !== 'now' && !$('#pl-time').value) {
+          const d = new Date(Date.now() + 15 * 60000); d.setSeconds(0, 0);
+          $('#pl-time').value = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        }
+        Nav.when.at = $('#pl-time').value;
+        this.render();
+      };
+    });
+    $('#pl-time').hidden = tw.mode === 'now';
+    $('#pl-time').onchange = () => { Nav.when.at = $('#pl-time').value; };
     $('#pl-go').textContent = Nav.travel === 'transit' ? 'Verbindung suchen' : Nav.travel === 'foot' ? 'Weg berechnen' : 'Route berechnen';
     document.querySelectorAll('#planner [data-profile]').forEach((b) => {
       b.setAttribute('aria-checked', String(b.dataset.profile === Nav.profile));

@@ -18,6 +18,8 @@ const ROUTE_COLORS = { red: '#D62828', blue: '#1C6DD0', yellow: '#E3A700', green
 const HK_PTS = {
   biwak: { label: 'Biwak', long: 'Biwak oder unbewirtschaftete Hütte', color: '#B5482A', d: 'M3 19 12 5l9 14ZM9.5 19l2.5-4 2.5 4' },
   huette: { label: 'Hütte', long: 'Bewirtschaftete Hütte', color: '#C92A2A', d: 'M4 20v-9l8-6 8 6v9M3 20h18M10 20v-5h4v5' },
+  wc: { label: 'Toilette', long: 'Öffentliche Toilette', color: '#495057', g: 'service', txt: 'WC' },
+  dusche: { label: 'Dusche', long: 'Dusche', color: '#0C8599', g: 'service', d: 'M5 20V9a5 5 0 0 1 10 0M15 9h4M17 9v2M13 13v1M16 13v1M19 13v1M14.5 16.5v1M17.5 16.5v1' },
   tank: { label: 'Wasser tanken', long: 'Wasserstelle zum Befüllen von Fahrzeug- oder Wohnmobiltanks', color: '#1864AB', g: 'water', d: 'M5 9h11v11H5ZM8 9V6h5v3M16 12h2l2 2v6h-4M10.5 12s2 2.2 2 3.6a2 2 0 0 1-4 0c0-1.4 2-3.6 2-3.6Z' },
   wasser: { label: 'Trinkwasser', long: 'Trinkwasser', color: '#1C7ED6', g: 'water', d: 'M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z' },
   quelle: { label: 'Quelle', long: 'Quelle', color: '#0B7285', g: 'water', d: 'M12 4s5 5.5 5 9.2a5 5 0 0 1-10 0C7 9.5 12 4 12 4ZM4 21c2-1.3 4-1.3 6 0s4 1.3 6 0 3-1 4-.5' },
@@ -30,6 +32,9 @@ const HK_PTS = {
   denkmal: { label: 'Denkmäler', long: 'Denkmal', color: '#6C757D', g: 'see', d: 'M10 20l1-13 1-3 1 3 1 13ZM7 20h10' },
   sehenswert: { label: 'Sehenswürdigkeiten', long: 'Sehenswürdigkeit', color: '#D6336C', g: 'see', d: 'M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.5 6.7 19.4l1.2-6L3.4 9.3l6-.7Z' }
 };
+// Beschriftung der Punkte: Name oder Art; Toiletten/Duschen: kostenlos oder Preis
+const HK_NAME = ['coalesce', ['get', 'n'], ['match', ['get', 'k'], 'tank', 'Wasser tanken', 'ruine', 'Ruine', 'hoehle', 'Höhle', 'wasserfall', 'Wasserfall', 'aussicht', 'Aussicht', 'archaeologie', 'Ausgrabung', '']];
+const HK_FEE = ['case', ['==', ['get', 'fee'], 'no'], 'kostenlos', ['==', ['get', 'fee'], 'yes'], ['coalesce', ['get', 'chg'], '€'], ''];
 const HK_SHELTER = { basic_hut: 'einfache Hütte', lean_to: 'offener Unterstand', rock_shelter: 'Felsunterstand', weather_shelter: 'Wetterschutz' };
 
 function hikePointImage(k) {
@@ -50,6 +55,11 @@ function hikePointImage(k) {
   g.lineWidth = 2.5;
   g.strokeStyle = '#FFFFFF';
   g.stroke();
+  if (c.txt) {
+    g.fillStyle = '#FFFFFF'; g.font = '800 11px -apple-system, Helvetica, Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(c.txt, size / 2, size / 2 + 0.5);
+    return { image: g.getImageData(0, 0, size * ratio, size * ratio), ratio };
+  }
   g.translate(size / 2 - 8.4, size / 2 - 8.4);
   g.scale(0.7, 0.7);
   g.strokeStyle = '#FFFFFF';
@@ -175,6 +185,7 @@ const Hike = {
   /* Kartenebenen; werden in buildStyle eingefügt */
   oev() { return store.get('oevOn', false); },
   water() { return store.get('waterOn', true); },
+  services() { return store.get('serviceOn', true); },
   tracks() { return store.get('hikeTracks', true); },
 
   /* Bus und Bahn (aus denselben Länderdateien, Ebenen „oev“ und „halt“) */
@@ -218,7 +229,9 @@ const Hike = {
     const routeColor = ['match', ['coalesce', ['get', 'c'], ''], ...Object.entries(ROUTE_COLORS).flat(), '#C2255C'];
     const w = (a, b) => ['interpolate', ['linear'], ['zoom'], 11, a, 16, b];
     // Punkte: Wasser unabhängig von den Wanderwegen, Biwaks/Hütten/Sehenswertes nur mit Wanderwegen
-    const kinds = [...(hikeOn ? this.pts().filter((k) => HK_PTS[k].g !== 'water') : []), ...(this.water() ? Object.keys(HK_PTS).filter((k) => HK_PTS[k].g === 'water') : [])];
+    const kinds = [...(hikeOn ? this.pts().filter((k) => !['water', 'service'].includes(HK_PTS[k].g)) : []),
+      ...(this.water() ? Object.keys(HK_PTS).filter((k) => HK_PTS[k].g === 'water') : []),
+      ...(this.services() ? Object.keys(HK_PTS).filter((k) => HK_PTS[k].g === 'service') : [])];
     const trackLayer = { id: 'hike-track', type: 'line', source: 'hike', 'source-layer': 'wege', filter: ft, layout: { 'line-join': 'round' },
       paint: { 'line-color': dark || sat ? '#B89A78' : '#9C7B57', 'line-opacity': 0.85, 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 1, 16, 2.4], 'line-dasharray': [4, 2] } };
     const hitLayer = { id: 'hike-hit', type: 'line', source: 'hike', 'source-layer': 'wege', filter: hit, minzoom: 11, paint: { 'line-color': '#000', 'line-opacity': 0, 'line-width': 18 } };
@@ -249,7 +262,7 @@ const Hike = {
         ...(kinds.length ? [{ id: 'hike-pts', type: 'symbol', source: 'hike', 'source-layer': 'punkte', filter: ['in', ['get', 'k'], ['literal', kinds]],
           layout: { 'icon-image': ['concat', 'hkpt-', ['get', 'k']], 'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.7, 14, 1],
             'icon-allow-overlap': ['step', ['zoom'], false, 13, true], 'symbol-sort-key': ['match', ['get', 'k'], 'tank', 0, 'biwak', 1, 'huette', 2, 'ruine', 3, 'burg', 3, 'wasser', 4, 5],
-            'text-field': ['step', ['zoom'], '', 12, ['coalesce', ['get', 'n'], ['match', ['get', 'k'], 'tank', 'Wasser tanken', 'ruine', 'Ruine', 'hoehle', 'Höhle', 'wasserfall', 'Wasserfall', 'aussicht', 'Aussicht', 'archaeologie', 'Ausgrabung', '']]], 'text-font': ['Noto Sans Medium'], 'text-size': 11,
+            'text-field': ['step', ['zoom'], '', 12, ['match', ['get', 'k'], ['wc', 'dusche'], '', HK_NAME], 15, ['match', ['get', 'k'], ['wc', 'dusche'], HK_FEE, HK_NAME]], 'text-font': ['Noto Sans Medium'], 'text-size': 11,
             'text-offset': [0, 1.3], 'text-anchor': 'top', 'text-optional': true, 'text-max-width': 9 },
           paint: { 'text-color': dark || sat ? '#E9EEF1' : '#3B2A1A', 'text-halo-color': dark || sat ? '#0B0F12' : '#FFFFFF', 'text-halo-width': 1.5 } }] : [])
       ]
@@ -290,7 +303,10 @@ const Hike = {
       ['Abgeschlossen', p.lk ? yn(p.lk) : ''],
       ['Trinkbar', p.dw ? yn(p.dw) : ''],
       ['Reservierung', p.res ? yn(p.res) : ''],
-      ['Gebühr', p.fee ? yn(p.fee) : ''],
+      ['Gebühr', p.fee === 'no' ? 'kostenlos' : p.fee === 'yes' ? 'kostenpflichtig' + (p.chg ? ' (' + p.chg + ')' : '') : p.chg || ''],
+      ['Dusche', p.k === 'dusche' ? (p.sh ? { hot: 'warm', cold: 'kalt', yes: 'ja' }[p.sh] || p.sh : p.hw === 'yes' ? 'warm' : 'ja') : ''],
+      ['Zugang', p.acc ? { customers: 'nur für Kunden/Gäste', permissive: 'geduldet', limited: 'eingeschränkt', yes: 'öffentlich' }[p.acc] || p.acc : ''],
+      ['Rollstuhl', p.rw ? yn(p.rw) : ''],
       ['Geöffnet', p.oh || ''],
       ['Betreiber', p.op || ''],
       ['Typ', p.ty ? String(p.ty).replace(/_/g, ' ') : ''],
@@ -339,7 +355,7 @@ const Hike = {
     for (const [box, grp] of [[$('#hk-pts'), undefined], [$('#hk-see'), 'see']]) {
       box.innerHTML = '';
       for (const [k, c] of Object.entries(HK_PTS)) {
-        if (c.g !== grp || c.g === 'water') continue;
+        if (c.g !== grp || c.g === 'water' || c.g === 'service') continue;
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'hk-chip';

@@ -119,6 +119,7 @@ const Nav = {
   active: null,
   profile: store.get('navProfile2', 'road'),
   travel: store.get('navTravel', 'car'),     // car | foot | transit
+  when: { mode: 'now', at: '' },              // Bus & Bahn: jetzt | dep (Abfahrt um) | arr (Ankunft um)
   pending: null,
   voice: store.get('navVoice', true),
   busy: false,
@@ -235,7 +236,12 @@ const Nav = {
   async transit(pts) {
     if (pts.length > 2) toast('Bei Bus & Bahn zählen nur Start und Ziel, Zwischenstopps werden übergangen.', 4000);
     const a = pts[0], b = pts[pts.length - 1];
-    const url = `${TRANSIT}/api/v5/plan?fromPlace=${a.lat.toFixed(6)},${a.lon.toFixed(6)}&toPlace=${b.lat.toFixed(6)},${b.lon.toFixed(6)}&numItineraries=5&language=de`;
+    let when = '';
+    if (this.when.mode !== 'now' && this.when.at) {
+      const t = new Date(this.when.at);   // Eingabe ist Ortszeit des Geräts
+      if (!isNaN(t)) when = `&time=${encodeURIComponent(t.toISOString())}${this.when.mode === 'arr' ? '&arriveBy=true' : ''}`;
+    }
+    const url = `${TRANSIT}/api/v5/plan?fromPlace=${a.lat.toFixed(6)},${a.lon.toFixed(6)}&toPlace=${b.lat.toFixed(6)},${b.lon.toFixed(6)}&numItineraries=5&language=de${when}`;
     const r = await fetch(url);
     if (!r.ok) throw new Error('Fahrplanauskunft nicht erreichbar (' + r.status + ')');
     const j = await r.json();
