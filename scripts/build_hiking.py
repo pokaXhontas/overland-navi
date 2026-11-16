@@ -38,6 +38,10 @@ MEMORIAL_SMALL = {"plaque", "stolperstein", "blue_plaque", "bench", "ghost_bike"
 
 def point_kind(t):
     tour, am = t.get("tourism"), t.get("amenity")
+    if (tour in ("wilderness_hut", "alpine_hut") or am == "shelter") and (
+            t.get("access") in ("private", "no") or t.get("leisure") == "bird_hide" or t.get("historic")
+            or t.get("abandoned") == "yes" or t.get("disused") == "yes" or any(k.startswith("disused:") for k in t)):
+        return None      # Vogelbeobachtung, Ruine, verfallen, privat: kein Biwak
     if tour == "wilderness_hut":
         return "biwak"
     if tour == "alpine_hut":
