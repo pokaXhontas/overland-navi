@@ -481,12 +481,28 @@ const Nav = {
   parseOsrm(route) {
     const coords = route.geometry.coordinates, man = [], ferries = [], tolls = [];
     let idx = 0;
-    const typeOf = (s) => {
-      const t = s.maneuver.type, m = s.maneuver.modifier || '';
-      if (t === 'arrive') return 4;
-      if (t === 'roundabout' || t === 'rotary') return 26;
-      return { left: 15, right: 10, 'slight left': 16, 'slight right': 9, 'sharp left': 14, 'sharp right': 11, uturn: 13 }[m] || 8;
+    // OSRM misst den Knick nur am allerersten Stück nach der Kreuzung; bei getrennten Fahrbahnen und kurzen
+    // Verbindungsstücken (in Städten häufig) kommt so „geradeaus“ statt „links“ heraus. Darum den Knick
+    // selbst an der Linie messen: etwa 25 m vor und nach dem Punkt.
+    const pt = (c) => ({ lon: c[0], lat: c[1] });
+    const walk = (i, m, dir) => {
+      let d = 0, k = i;
+      while (k + dir >= 0 && k + dir < coords.length && d < m) { d += distance(pt(coords[k]), pt(coords[k + dir])); k += dir; }
+      return k;
     };
+    const angleAt = (i) => {
+      const a = walk(i, 25, -1), b = walk(i, 25, 1);
+      if (a === i || b === i) return null;
+      let x = bearingDeg(pt(coords[i]), pt(coords[b])) - bearingDeg(pt(coords[a]), pt(coords[i]));
+      while (x > 180) x -= 360;
+      while (x <= -180) x += 360;
+      return x;
+    };
+    const MOD = { straight: 0, 'slight right': 30, right: 90, 'sharp right': 150, uturn: 180, 'sharp left': -150, left: -90, 'slight left': -30 };
+    const TXT = { 9: 'Leicht rechts abbiegen', 10: 'Rechts abbiegen', 11: 'Scharf rechts abbiegen', 12: 'Wenden', 13: 'Wenden', 14: 'Scharf links abbiegen',
+      15: 'Links abbiegen', 16: 'Leicht links abbiegen', 17: 'Auffahrt nehmen', 18: 'Auffahrt rechts nehmen', 19: 'Auffahrt links nehmen',
+      20: 'Ausfahrt rechts nehmen', 21: 'Ausfahrt links nehmen', 23: 'Rechts halten', 24: 'Links halten', 25: 'Auffahren', 27: 'Kreisverkehr verlassen' };
+    const turnType = (a) => { const x = Math.abs(a); return x >= 170 ? 13 : x >= 135 ? (a > 0 ? 11 : 14) : x >= 45 ? (a > 0 ? 10 : 15) : x >= 20 ? (a > 0 ? 9 : 16) : 0; };
     for (const leg of route.legs) {
       for (const s of leg.steps) {
         const [lon, lat] = s.maneuver.location;
@@ -500,11 +516,28 @@ const Nav = {
         const ferry = s.mode === 'ferry';
         if (ferry) ferries.push({ idx, name: s.name || '', km: s.distance / 1000, time: s.duration });
         if ((s.intersections || []).some((x) => (x.classes || []).includes('toll'))) tolls.push({ idx, name: s.name || s.ref || '', km: s.distance / 1000 });
-        const text = ferry ? 'Fähre nehmen' + (s.name ? ': ' + s.name : '') : this.osrmText(s);
+        const t = s.maneuver.type;
+        let ang = angleAt(idx);
+        if (ang === null) ang = MOD[s.maneuver.modifier || 'straight'] || 0;
+        let type;
+        if (ferry) type = 28;
+        else if (t === 'depart') type = 1;
+        else if (t === 'arrive') type = 4;
+        else if (t === 'roundabout' || t === 'rotary') type = 26;
+        else if (t === 'exit roundabout' || t === 'exit rotary') type = 27;
+        else if (t === 'off ramp') type = ang >= 0 ? 20 : 21;
+        else if (t === 'on ramp') type = Math.abs(ang) < 15 ? 17 : ang > 0 ? 18 : 19;
+        else if (t === 'merge') type = 25;
+        else if (t === 'fork') type = ang >= 0 ? 23 : 24;
+        else if (t === 'end of road') type = ang >= 0 ? 10 : 15;
+        else type = turnType(ang);
+        if (!type) continue;                 // es geht einfach geradeaus weiter: kein Hinweis
+        const on = s.name ? ' auf ' + s.name : '';
+        const text = ferry ? 'Fähre nehmen' + (s.name ? ': ' + s.name : '') : TXT[type] ? TXT[type] + on : this.osrmText(s);
         // Fahrspuren vor der Kreuzung (aus OpenStreetMap, wenn eingetragen)
         const ix = s.intersections && s.intersections[0];
         const lanes = ix && ix.lanes && ix.lanes.length > 1 ? ix.lanes.map((l) => ({ ind: l.indications || ['none'], ok: !!l.valid })) : null;
-        man.push({ idx, type: ferry ? 28 : typeOf(s), text, alert: text, verbal: text, street: s.name || '', exit: s.maneuver.exit || 0, lanes });
+        man.push({ idx, type, text, alert: text, verbal: text, street: s.name || '', exit: s.maneuver.exit || 0, lanes });
       }
     }
     return { coords, maneuvers: man, time: route.duration, source: 'OSRM', ferries: this.mergeFerries(ferries), tolls };
@@ -615,7 +648,8 @@ const Nav = {
     const uniq = [];
     for (const r of list) {
       r.len = lenOf(r);
-      if (!uniq.some((u) => Math.abs(u.len - r.len) < Math.max(80, u.len * 0.02) && Math.abs(u.time - r.time) < 90)) uniq.push(r);
+      // gleiche Strecke von beiden Rechnern: nur einmal, und zwar die zuerst gerechnete (Valhalla, genauere Abbiegehinweise)
+      if (!uniq.some((u) => Math.abs(u.len - r.len) < Math.max(80, u.len * 0.02) && (u.source !== r.source || Math.abs(u.time - r.time) < 90))) uniq.push(r);
     }
     uniq.sort(this.profile === 'short' ? (a, b) => a.len - b.len : (a, b) => a.time - b.time);
     const top = uniq.slice(0, 4);

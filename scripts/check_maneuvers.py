@@ -52,14 +52,53 @@ b = place(sys.argv[2])
 print("Start:", a, "\nZiel: ", b)
 
 print("\n=== OSRM ===")
-o = get(f"https://routing.openstreetmap.de/routed-car/route/v1/driving/{a[1]},{a[0]};{b[1]},{b[0]}?overview=false&steps=true&alternatives=true")
+o = get(f"https://routing.openstreetmap.de/routed-car/route/v1/driving/{a[1]},{a[0]};{b[1]},{b[0]}?overview=full&geometries=geojson&steps=true&alternatives=true")
+def hav(a, b):
+    la1, la2 = math.radians(a[1]), math.radians(b[1])
+    x = math.sin((la2 - la1) / 2) ** 2 + math.cos(la1) * math.cos(la2) * math.sin(math.radians(b[0] - a[0]) / 2) ** 2
+    return 12742017.6 * math.asin(math.sqrt(x))
+
+
+def brg(a, b):
+    la1, la2, dl = math.radians(a[1]), math.radians(b[1]), math.radians(b[0] - a[0])
+    return math.degrees(math.atan2(math.sin(dl) * math.cos(la2), math.cos(la1) * math.sin(la2) - math.sin(la1) * math.cos(la2) * math.cos(dl))) % 360
+
+
+def geo_type(c, i, s):
+    def walk(m, d):
+        k, dd = i, 0.0
+        while 0 <= k + d < len(c) and dd < m:
+            dd += hav(c[k], c[k + d]); k += d
+        return k
+    a, b = walk(25, -1), walk(25, 1)
+    t = s["maneuver"]["type"]
+    ang = turn(brg(c[a], c[i]), brg(c[i], c[b])) if a != i and b != i else 0
+    x = abs(ang)
+    if t == "depart": return 1, ang
+    if t == "arrive": return 4, ang
+    if t in ("roundabout", "rotary"): return 26, ang
+    if t in ("exit roundabout", "exit rotary"): return 27, ang
+    if t == "fork": return (23 if ang >= 0 else 24), ang
+    if t == "end of road": return (10 if ang >= 0 else 15), ang
+    if x >= 170: return 13, ang
+    if x >= 135: return (11 if ang > 0 else 14), ang
+    if x >= 45: return (10 if ang > 0 else 15), ang
+    if x >= 20: return (9 if ang > 0 else 16), ang
+    return 0, ang
+
+
 for ri, route in enumerate(o["routes"]):
     print(f"-- Vorschlag {ri + 1}: {route['distance'] / 1000:.1f} km, {route['duration'] / 60:.0f} min")
+    c = route["geometry"]["coordinates"]
+    idx = 0
     for s in route["legs"][0]["steps"]:
         mv = s["maneuver"]
+        lon, lat = mv["location"]
+        idx = min(range(idx, len(c)), key=lambda k: abs(c[k][0] - lon) + abs(c[k][1] - lat))
         ang = turn(mv.get("bearing_before", 0), mv.get("bearing_after", 0))
         t = osrm_type(s)
-        print(f"  {mv['type']:<12} {mv.get('modifier', ''):<12} Knick {ang:+5.0f}°  → App Typ {t:<2} Ansage '{act(t, mv.get('exit', 0))}'  {s.get('name', '')}  ({s['distance']:.0f} m)")
+        nt, gang = geo_type(c, idx, s)
+        print(f"  {mv['type']:<12} {mv.get('modifier', ''):<12} OSRM-Knick {ang:+5.0f}° alt '{act(t, mv.get('exit', 0))}' | gemessen {gang:+5.0f}° neu '{act(nt) if nt else '(kein Hinweis)'}'  {s.get('name', '')}  ({s['distance']:.0f} m)")
 
 print("\n=== Valhalla ===")
 q = {"locations": [{"lat": a[0], "lon": a[1]}, {"lat": b[0], "lon": b[1]}], "costing": "auto",
