@@ -94,6 +94,28 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await shot('4-luftlinie');
   await page.evaluate(() => Nav.stop(true));
 
+  // Offline-Routing: Rechner auf dem Gerät (Straßennetz Kirgistan direkt aus der Länderdatei)
+  for (const tv of ['car', 'foot']) {
+    console.log('Offline-Routing ' + tv + ':', await page.evaluate(async (tv) => {
+      await RouteData.loadIndex();
+      if (!RouteData.index.kyrgyzstan) return 'kein Straßennetz für Kirgistan im Index';
+      const t0 = Date.now(), old = Nav.travel;
+      Nav.travel = tv;
+      try {
+        const pts = tv === 'car' ? [{ lat: 42.8746, lon: 74.6040, name: 'Bischkek' }, { lat: 42.4907, lon: 78.3936, name: 'Karakol' }]
+          : [{ lat: 42.5644, lon: 74.4815, name: 'Ala-Artscha' }, { lat: 42.5269, lon: 74.5253, name: 'Ratsek' }];
+        const [r] = await Nav.offline(pts, true);
+        return `${Math.round(r.len / 1000)} km, ${Math.round(r.time / 60)} min, ${r.maneuvers.length} Hinweise, ${Date.now() - t0} ms · ${r.maneuvers.slice(1, 4).map((m) => m.text).join(' | ')}`;
+      } catch (e) { return 'Fehler: ' + e.message; } finally { Nav.travel = old; }
+    }, tv));
+  }
+  // Route offline auswählen und losfahren (wie ohne Netz, nur mit den Online-Dateien)
+  await page.evaluate(async () => { gps.pos = { lat: 42.8746, lon: 74.6040 }; const list = await Nav.offline([{ lat: 42.8746, lon: 74.6040, gps: true }, { lat: 42.6, lon: 74.4815, name: 'Ala-Artscha' }], true); Nav.pickRoute({ lat: 42.6, lon: 74.4815, name: 'Ala-Artscha' }, list.map((r) => Nav.prepare({ lat: 42.6, lon: 74.4815, name: 'Ala-Artscha' }, r, 'route', { vias: [], joined: true }))); });
+  await sleep(1500);
+  console.log('Offline-Vorschlag:', await page.evaluate(() => $('#na-list').textContent.replace(/\s+/g, ' ').trim()));
+  await shot('4b-offline-route');
+  await page.evaluate(() => { $('#na-cancel').click(); Nav.stop(true); });
+
   // Wanderwege (Kirgistan, Ala-Artscha)
   await page.evaluate(() => { map.jumpTo({ center: [74.49, 42.57], zoom: 13.2, bearing: 0, pitch: 0 }); });
   await sleep(6000);
