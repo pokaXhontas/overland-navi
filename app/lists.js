@@ -779,7 +779,7 @@ const Lists = {
           const f = (j.features || [])[0];
           cc = f ? (f.properties.countrycode || '').toLowerCase() : '';
         }
-        if (p.lat === null) { fails++; p.pend = false; return; }
+        if (p.lat === null) { fails++; p.pend = false; n++; return; }
         p.cc = cc;
         if (wantCat) { const c = this.osmCat(key, val); if (c && CAT[c]) p.cat = c; }
         p.pend = false;
@@ -792,7 +792,8 @@ const Lists = {
     await Promise.all(Array.from({ length: 3 }, async () => {
       while (k < todo.length && navigator.onLine) { const p = todo[k++]; await work(p); await new Promise((r) => setTimeout(r, 110)); }
     }));
-    places = places.filter((p) => p.lat !== null && p.lat !== undefined);
+    const lost = places.filter((p) => (p.lat === null || p.lat === undefined) && !p.pend);
+    if (lost.length) { places = places.filter((p) => !lost.includes(p)); toast(`${lost.length} Orte ohne Position waren nicht zu finden und wurden weggelassen: ${lost.slice(0, 3).map((p) => p.name).join(', ')}${lost.length > 3 ? ' …' : ''}`, 7000); }
     this.running = false;
     this.refresh();
     renderDataCats();
