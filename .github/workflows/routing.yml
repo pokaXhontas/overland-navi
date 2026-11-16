@@ -1,0 +1,111 @@
+name: Offline-Straßennetz bauen
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Nur diese Länder (Geofabrik-Kennungen, z. B. germany,sweden). Leer = alle.'
+        required: false
+        default: ''
+  schedule:
+    # alle drei Monate, eine Woche nach den Wanderwegen
+    - cron: '41 3 12 1,4,7,10 *'
+
+permissions:
+  contents: write
+  actions: write
+
+# gleiche Gruppe wie die Wanderwege: nie gleichzeitig (gleicher Download-Bereich, Geofabrik schonen)
+concurrency:
+  group: hiking
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      list: ${{ steps.p.outputs.list }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: p
+        run: |
+          L=$(python3 scripts/hiking_plan.py "${{ github.event.inputs.only }}")
+          echo "list=$L" >> "$GITHUB_OUTPUT"
+          echo "$L" | python3 -c "import json,sys; l=json.load(sys.stdin); print(len(l), 'Länder')"
+
+  land:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.list) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Größe prüfen
+        id: size
+        run: |
+          ALT=$(echo "${{ matrix.url }}" | sed 's#https://download.geofabrik.de/#https://download.openstreetmap.fr/extracts/#')
+          S=$( (curl -sfIL --connect-timeout 20 "$ALT" || curl -sfIL --connect-timeout 20 "${{ matrix.url }}") | grep -i '^content-length' | tail -1 | tr -dc '0-9' || true)
+          echo "Größe: $((S/1000000)) MB"
+          if [ "${S:-0}" -gt 9000000000 ]; then echo "zu groß, übersprungen"; echo "skip=1" >> "$GITHUB_OUTPUT"; fi
+          if [ "${S:-0}" -gt 1500000000 ]; then sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL; df -h / | tail -1; fi
+
+      - name: Werkzeuge
+        if: steps.size.outputs.skip != '1'
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq osmium-tool > /dev/null
+          pip install --quiet osmium numpy
+
+      - name: OpenStreetMap-Daten laden
+        if: steps.size.outputs.skip != '1'
+        run: |
+          ALT=$(echo "${{ matrix.url }}" | sed 's#https://download.geofabrik.de/#https://download.openstreetmap.fr/extracts/#')
+          for u in "${{ matrix.url }}" "$ALT" "${{ matrix.url }}" "$ALT" "${{ matrix.url }}"; do
+            echo "lade $u"
+            if curl -sfL --retry 3 --retry-delay 30 --retry-all-errors --connect-timeout 30 -o land.osm.pbf "$u"; then ls -lh land.osm.pbf; exit 0; fi
+            sleep 120
+          done
+          exit 1
+
+      - name: Straßennetz bauen
+        if: steps.size.outputs.skip != '1'
+        run: |
+          osmium tags-filter land.osm.pbf w/highway w/route=ferry -o wege.osm.pbf --overwrite
+          rm land.osm.pbf
+          ls -lh wege.osm.pbf
+          set -o pipefail
+          T=""; [ -x /usr/bin/time ] && T="/usr/bin/time -v"
+          $T python3 scripts/build_routing.py wege.osm.pbf ${{ matrix.id }}-route.pmtiles "${{ matrix.name }}" 2>&1 | tee log.txt
+          grep -E "Maximum resident|Elapsed" log.txt || true
+          ls -lh ${{ matrix.id }}-route.pmtiles
+
+      - name: Probefahrten
+        if: steps.size.outputs.skip != '1'
+        run: |
+          P=$(python3 -c "import json; print(json.dumps(json.load(open('scripts/routing-checks.json')).get('${{ matrix.id }}', [])))")
+          if [ "$P" != "[]" ]; then node scripts/check_routing.js ${{ matrix.id }}-route.pmtiles "$P" || echo "::warning::Probefahrt mit Fehlern"; fi
+
+      - name: In die Downloads legen
+        if: steps.size.outputs.skip != '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for i in 1 2 3; do gh release upload wanderwege ${{ matrix.id }}-route.pmtiles --clobber && break; sleep 20; done
+
+  liste:
+    needs: [plan, land]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Übersicht der Straßennetz-Dateien
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/hiking_plan.py > alle.json
+          python3 scripts/routing_index.py ${{ github.repository }} alle.json
+          gh release upload wanderwege route-index.json --clobber -R ${{ github.repository }}

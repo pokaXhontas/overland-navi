@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+"""Baut route-index.json der Offline-Straßennetz-Dateien (<land>-route.pmtiles im Download-Bereich „wanderwege“)."""
+import json
+import struct
+import subprocess
+import sys
+import urllib.request
+
+repo = sys.argv[1]
+meta = {x["id"]: x for x in json.load(open(sys.argv[2]))} if len(sys.argv) > 2 else {}
+rel = json.loads(subprocess.check_output(["gh", "api", f"repos/{repo}/releases/tags/wanderwege"]))
+index = {}
+for a in rel["assets"]:
+    if not a["name"].endswith("-route.pmtiles"):
+        continue
+    key = a["name"][:-14]
+    if meta and key not in meta:
+        subprocess.run(["gh", "api", "-X", "DELETE", f"repos/{repo}/releases/assets/{a['id']}"], check=False)
+        print("entfernt:", a["name"])
+        continue
+    req = urllib.request.Request(a["browser_download_url"], headers={"Range": "bytes=0-126"})
+    h = urllib.request.urlopen(req, timeout=60).read()
+    w, s, e, n = (v / 1e7 for v in struct.unpack_from("<iiii", h, 102))
+    m = meta.get(key, {})
+    index[key] = {"size": a["size"], "date": a["updated_at"][:10], "ts": a["updated_at"],
+                  "bbox": [round(w, 4), round(s, 4), round(e, 4), round(n, 4)], "name": m.get("name", key)}
+json.dump(index, open("route-index.json", "w"), ensure_ascii=False, separators=(",", ":"))
+print(len(index), "Straßennetz-Dateien")

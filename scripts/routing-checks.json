@@ -1,0 +1,23 @@
+{
+  "kyrgyzstan": [
+    [74.5745, 42.8747, 74.6040, 42.8765, "car", "Bischkek Osch-Basar → Ala-Too-Platz"],
+    [74.6040, 42.8746, 78.3936, 42.4907, "car", "Bischkek → Karakol"],
+    [74.6040, 42.8746, 74.4815, 42.5644, "car", "Bischkek → Ala-Artscha"],
+    [74.4815, 42.5644, 74.5253, 42.5269, "foot", "Ala-Artscha → Ratsek-Hütte"],
+    [72.7985, 40.5283, 74.6040, 42.8746, "car", "Osch → Bischkek"]
+  ],
+  "germany": [
+    [13.4132, 52.5219, 13.0645, 52.3906, "car", "Berlin Alexanderplatz → Potsdam"],
+    [13.4132, 52.5219, 12.1060, 54.1530, "car", "Berlin → Rostock Überseehafen"],
+    [13.4132, 52.5219, 11.5755, 48.1374, "car", "Berlin → München"],
+    [13.4132, 52.5219, 13.3777, 52.5163, "foot", "Alexanderplatz → Brandenburger Tor"],
+    [9.2886, 48.4876, 9.2046, 48.4914, "foot", "Bad Urach → Reutlingen"]
+  ],
+  "sweden": [
+    [13.1567, 55.3725, 18.0686, 59.3293, "car", "Trelleborg → Stockholm"],
+    [18.0686, 59.3293, 19.1153, 65.5883, "car", "Stockholm → Arvidsjaur"]
+  ],
+  "switzerland": [
+    [8.5417, 47.3769, 7.4474, 46.9480, "car", "Zürich → Bern"]
+  ]
+}

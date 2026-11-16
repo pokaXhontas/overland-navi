@@ -12,8 +12,8 @@ rel = json.loads(subprocess.check_output(["gh", "api", f"repos/{repo}/releases/t
 index = {}
 tours = {a["name"][:-12]: a for a in rel["assets"] if a["name"].endswith("-touren.json")}
 for a in rel["assets"]:
-    if not a["name"].endswith(".pmtiles"):
-        continue
+    if not a["name"].endswith(".pmtiles") or a["name"].endswith("-route.pmtiles"):
+        continue   # Straßennetz für das Offline-Routing hat einen eigenen Index
     key = a["name"][:-8]
     if meta and key not in meta:
         # alte Dateien aus früheren Fassungen entfernen
