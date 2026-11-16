@@ -129,7 +129,7 @@ const BKK = { lat: 42.8746, lon: 74.5698 };
         if (i > 20 && m && m.at - Nav.active.along < 300 && [9, 10, 15, 16, 26].includes(m.type)) break;
       }
     });
-    await marks([['#nb-dist', 1, 'below'], ['#nb-voice', 2, 'below'], ['#nf-edit', 3, 'top'], ['#nf-overview', 4, 'top'], ['#nf-stop', 5, 'top']]);
+    await marks([['#nb-icon', 1, 'below'], ['#nb-voice', 2, 'below'], ['#nf-edit', 3, 'top'], ['#nf-overview', 4, 'top'], ['#nf-stop', 5, 'top']]);
     await shot('12-navigation', 3000);
   });
 
@@ -159,7 +159,7 @@ const BKK = { lat: 42.8746, lon: 74.5698 };
   });
 
   await scene('16-ort-speichern', async () => {
-    await ev(() => { map.jumpTo({ center: [77.005, 42.155], zoom: 14, bearing: 0 }); });
+    await ev(() => { map.jumpTo({ center: [74.488, 42.572], zoom: 14, bearing: 0 }); });
     await sleep(2500);
     await ev(() => newPlaceHere());
     await shot('16-ort-position', 2000);
@@ -168,7 +168,7 @@ const BKK = { lat: 42.8746, lon: 74.5698 };
     await ev(() => {
       const c = [...document.querySelectorAll('#spot-cats button, #spot-cats .chip')].find((x) => /Wildcamping/.test(x.textContent));
       if (c) c.click();
-      $('#spot-name').value = 'Seeufer am Issyk-Kul';
+      $('#spot-name').value = 'Wiese am Ala-Artscha-Fluss';
       const s = document.querySelectorAll('#spot-stars button, #spot-stars span');
       if (s[3]) s[3].click();
       for (const f of ['Eben', 'Ruhig']) { const b = [...document.querySelectorAll('#spot-feats button, #spot-feats .chip')].find((x) => x.textContent.includes(f)); if (b) b.click(); }
