@@ -742,10 +742,10 @@ body.drawing .fab, body.drawing .hud { display: none; }
 .pick-bar b { font-size: 17px; }
 .pick-bar small { color: var(--muted); font-size: 13px; }
 .pick-bar .pick-coords { font-variant-numeric: tabular-nums; }
-.pick-btns { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 8px; margin-top: 10px; }
-.pick-btns .btn { height: 50px; font-size: 15px; padding: 0 8px; }
+.pick-btns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr); gap: 8px; margin-top: 10px; }
+.pick-btns .btn { height: 50px; font-size: 15px; line-height: 1.15; padding: 0 6px; min-width: 0; white-space: normal; }
 .pick-btns .btn[hidden] { display: none; }
-.pick-bar:has(#pick-gps[hidden]) .pick-btns { grid-template-columns: 1fr 1.6fr; }
+.pick-bar:has(#pick-gps[hidden]) .pick-btns { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); }
 #spot.picking { display: none; }
 .edit-pin svg { width: 48px; height: 48px; filter: drop-shadow(0 3px 5px rgba(0,0,0,.35)); }
 .edit-pin path { fill: var(--accent); stroke: #0B0F12; stroke-width: 1; }
