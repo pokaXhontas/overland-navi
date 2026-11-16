@@ -585,8 +585,10 @@ const OvlRouter = (() => {
         const inB = arrive(at, ai, a.dir), outB = depart(bt, bi, b.dir);
         const ang = turnAngle(inB, outB), abs = Math.abs(ang);
         const alts = b.from === null ? [] : altAngles(net, prof, b.from, inB, a, b);
-        if (!alts.length) continue;            // keine Wahl an dieser Stelle: kein Hinweis
         const aLink = (at.fl[ai] & 8) !== 0, bLink = (bt.fl[bi] & 8) !== 0;
+        // von der Auffahrt auf die Autobahn/Schnellstraße
+        if (!prof.foot && aLink && !bLink && bt.cls[bi] <= 1) { push(25, 'Auffahren' + on); continue; }
+        if (!alts.length) continue;            // keine Wahl an dieser Stelle: kein Hinweis
         const side = ang >= 0 ? 'rechts' : 'links';
         if (!prof.foot && bLink && !aLink) {
           const dest = bt.names[bt.dest[bi]] || bt.names[bt.ref[bi]];
@@ -594,7 +596,6 @@ const OvlRouter = (() => {
           else push(abs < 15 ? 17 : ang > 0 ? 18 : 19, (abs < 15 ? 'Auffahrt nehmen' : `Auffahrt ${side} nehmen`) + (dest ? ' Richtung ' + dest : ''));
           continue;
         }
-        if (!prof.foot && aLink && !bLink && bt.cls[bi] <= 1) { push(25, 'Auffahren' + on); continue; }
         // die Straße geht einfach weiter (gleicher Name, keine andere Straße mit dem Namen): kein Hinweis bei leichten Knicken
         const aName = streetOf(at, ai);
         if (abs < 50 && street && street === aName && !alts.some((x) => !x.link && x.name === street && Math.abs(x.ang) < 60)) continue;

@@ -110,11 +110,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     }, tv));
   }
   // Route offline auswählen und losfahren (wie ohne Netz, nur mit den Online-Dateien)
-  await page.evaluate(async () => { gps.pos = { lat: 42.8746, lon: 74.6040 }; const list = await Nav.offline([{ lat: 42.8746, lon: 74.6040, gps: true }, { lat: 42.6, lon: 74.4815, name: 'Ala-Artscha' }], true); Nav.pickRoute({ lat: 42.6, lon: 74.4815, name: 'Ala-Artscha' }, list.map((r) => Nav.prepare({ lat: 42.6, lon: 74.4815, name: 'Ala-Artscha' }, r, 'route', { vias: [], joined: true }))); });
+  await page.evaluate(async () => { gps.pos = { lat: 42.8746, lon: 74.6040 }; let list; try { list = await Nav.offline([{ lat: 42.8746, lon: 74.6040, gps: true }, { lat: 42.6, lon: 74.4815, name: 'Ala-Artscha' }], true); } catch (e) { return; } Nav.pickRoute({ lat: 42.6, lon: 74.4815, name: 'Ala-Artscha' }, list.map((r) => Nav.prepare({ lat: 42.6, lon: 74.4815, name: 'Ala-Artscha' }, r, 'route', { vias: [], joined: true }))); });
   await sleep(1500);
   console.log('Offline-Vorschlag:', await page.evaluate(() => $('#na-list').textContent.replace(/\s+/g, ' ').trim()));
   await shot('4b-offline-route');
-  await page.evaluate(() => { $('#na-cancel').click(); Nav.stop(true); });
+  await page.evaluate(() => { if (Nav.pending) $('#na-cancel').click(); Nav.stop(true); });
 
   // Wanderwege (Kirgistan, Ala-Artscha)
   await page.evaluate(() => { map.jumpTo({ center: [74.49, 42.57], zoom: 13.2, bearing: 0, pitch: 0 }); });
