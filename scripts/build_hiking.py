@@ -30,7 +30,7 @@ member = defaultdict(list)
 
 # ---------- Punkte: Biwaks, Hütten, Unterstände, Wasser ----------
 BIWAK_RE = re.compile(r"biwak|bivacc|bivouac|bivak|bivac|biwakschachtel|refuge non gard|abri", re.I)
-PT_MINZOOM = {"biwak": 9, "huette": 9, "wasser": 12, "quelle": 12, "ruine": 11, "burg": 11, "archaeologie": 11,
+PT_MINZOOM = {"biwak": 9, "huette": 9, "tank": 10, "wasser": 12, "quelle": 12, "ruine": 11, "burg": 11, "archaeologie": 11,
               "denkmal": 13, "hoehle": 12, "wasserfall": 12, "aussicht": 12, "sehenswert": 12}
 MEMORIAL_SMALL = {"plaque", "stolperstein", "blue_plaque", "bench", "ghost_bike", "stone", "cross", "tree"}
 
@@ -44,7 +44,9 @@ def point_kind(t):
     if am == "shelter":
         # nur geschlossene Hütten zum Übernachten, keine Unterstände, Wartehäuschen oder Pavillons
         return "biwak" if t.get("shelter_type") == "basic_hut" and not t.get("public_transport") else None
-    if am in ("drinking_water", "water_point"):
+    if am == "water_point" or (am == "drinking_water" and (t.get("motorcar") == "yes" or t.get("motorhome") == "yes" or t.get("caravan") == "yes")):
+        return "tank"        # zum Befüllen von Fahrzeug- oder Wohnmobiltanks
+    if am == "drinking_water" or (t.get("man_made") == "water_tap" and t.get("drinking_water") == "yes"):
         return "wasser"
     if t.get("natural") == "spring":
         return "quelle"
