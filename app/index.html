@@ -110,15 +110,22 @@
   </div>
   <div class="sheet-body">
     <h2 class="first">Meine Daten</h2>
-    <p class="muted small hint-line">Schalter blendet eine ganze Kategorie aus. Antippen zeigt, was darin ist.</p>
+    <p class="muted small hint-line">Schalter blendet auf der Karte aus. Antippen zeigt, was drin ist.</p>
+    <p class="sub-head"><b>Listen</b></p>
+    <div class="cat-list" id="list-list"></div>
+    <button type="button" class="add-line" id="btn-new-list"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Neue Liste</span></button>
+    <p class="sub-head"><b>Kategorien</b><small class="muted">gelten für alle Listen</small></p>
     <div class="cat-list" id="cat-list"></div>
-    <div class="row static"><span><b id="places-count">0 Orte</b><small>Neuer Ort: „Ort speichern“ oder lange auf die Karte drücken</small></span><button class="btn" id="btn-gpx">Als GPX teilen</button></div>
+    <button type="button" class="add-line" id="btn-new-cat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Neue Kategorie</span></button>
+    <p class="sub-head"><b>Tracks</b></p>
+    <div class="cat-list" id="track-list"></div>
+    <div class="row static"><span><b id="places-count">0 Orte</b><small>Neuer Ort: „Ort speichern“ oder lange auf die Karte drücken</small></span><button class="btn" id="btn-gpx">Alles teilen</button></div>
 
     <h2>Importieren</h2>
     <label class="import-btn">
       <input type="file" id="import-file" multiple>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V9M7 14l5-5 5 5M5 4h14"/></svg>
-      <span><b>GPX, KML oder ZIP öffnen</b><small>Tracks und Orte aus MapOut, iOverlander und anderen Apps</small></span>
+      <span><b>GPX, KML oder ZIP öffnen</b><small>Tracks und Orte aus MapOut, iOverlander und anderen Apps – auch Google-Maps-Listen (Takeout-ZIP oder CSV)</small></span>
     </label>
 
     <h2>Navigation &amp; Ansagen</h2>
@@ -174,7 +181,36 @@
     <div class="sheet-body">
       <div class="cat-title"><span class="pi-icon" id="cat-icon"></span><h1 id="cat-name"></h1></div>
       <label class="row"><span><b>Auf der Karte zeigen</b><small id="cat-count"></small></span><input type="checkbox" class="switch" id="cat-toggle"></label>
+      <div class="page-tools" id="cat-tools"><button type="button" class="btn" id="cat-share">Teilen</button><button type="button" class="btn" id="cat-sel">Auswählen</button><button type="button" class="btn" id="cat-edit">Bearbeiten</button></div>
       <div class="place-list" id="cat-items"></div>
+    </div>
+  </div>
+
+  <div class="sheet-page" id="list-page" hidden>
+    <div class="sheet-head page-head">
+      <button class="back" id="list-back" aria-label="Zurück"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Zurück</span></button>
+      <button class="round" id="list-close" aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <div class="cat-title"><span class="pi-icon" id="list-icon"></span><h1 id="list-name"></h1></div>
+      <label class="row"><span><b>Auf der Karte zeigen</b><small id="list-count"></small></span><input type="checkbox" class="switch" id="list-toggle"></label>
+      <div class="page-tools"><button type="button" class="btn" id="list-share">Teilen</button><button type="button" class="btn" id="list-sel">Auswählen</button><button type="button" class="btn" id="list-edit">Bearbeiten</button></div>
+      <p class="muted small" id="list-pend" hidden></p>
+      <h2>Länder</h2>
+      <p class="muted small hint-line">Schalter blendet ein Land aus, Antippen klappt die Orte auf.</p>
+      <div class="cat-list" id="list-countries"></div>
+    </div>
+  </div>
+
+  <div class="sheet-page" id="imp-page" hidden>
+    <div class="sheet-head page-head">
+      <button class="back" id="imp-back" aria-label="Abbrechen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Zurück</span></button>
+    </div>
+    <div class="sheet-body">
+      <div class="cat-title"><h1>Google-Listen übernehmen</h1></div>
+      <p class="muted small">Wähle, welche Listen in die App kommen. Den Namen kannst du ändern – gleiche Namen werden zu einer Liste zusammengelegt, doppelte Orte nur einmal übernommen. Kategorie und Land ordnet die App danach selbst zu (braucht Internet).</p>
+      <div class="imp-list" id="imp-lists"></div>
+      <button type="button" class="btn primary wide" id="imp-ok">Übernehmen</button>
     </div>
   </div>
 
@@ -197,6 +233,46 @@
   </div>
 </aside>
 
+<aside class="sheet dlg" id="dlg" aria-label="Auswahl" hidden>
+  <div class="sheet-page" id="choose-page" hidden>
+    <div class="sheet-head page-head">
+      <button class="back" id="choose-back" aria-label="Abbrechen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Zurück</span></button>
+    </div>
+    <div class="sheet-body">
+      <div class="cat-title"><h1 id="choose-title"></h1></div>
+      <div class="place-list" id="choose-items"></div>
+    </div>
+  </div>
+  <div class="sheet-page" id="thing-page" hidden>
+    <div class="sheet-head page-head">
+      <button class="back" id="thing-back" aria-label="Abbrechen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Zurück</span></button>
+    </div>
+    <div class="sheet-body">
+      <div class="cat-title"><h1 id="thing-title"></h1></div>
+      <label class="field"><span>Name</span><input id="thing-name" type="text" autocomplete="off" enterkeyhint="done" placeholder="z. B. Drohnen-Spots"></label>
+      <h2>Farbe</h2>
+      <div class="swatches" id="thing-colors"></div>
+      <h2 id="thing-sym-h">Symbol</h2>
+      <div class="syms" id="thing-syms"></div>
+      <h2>Vorschau</h2>
+      <div class="thing-preview" id="thing-preview"></div>
+      <button type="button" class="btn primary wide" id="thing-save">Speichern</button>
+      <button type="button" class="btn danger wide" id="thing-del" hidden>Löschen</button>
+    </div>
+  </div>
+</aside>
+
+<div class="sel-bar panel" id="sel-bar" hidden>
+  <div class="sel-top"><b id="sel-count"></b><button type="button" class="link-btn" id="sel-cancel">Fertig</button></div>
+  <div class="sel-btns">
+    <button type="button" class="btn" data-act="cat">Kategorie</button>
+    <button type="button" class="btn" data-act="list">Liste</button>
+    <button type="button" class="btn" data-act="share">Teilen</button>
+    <button type="button" class="btn danger" data-act="del" id="sel-del">Löschen</button>
+  </div>
+</div>
+
+<div class="list-chips" id="list-chips" hidden></div>
 
 <section class="planner panel" id="planner" aria-label="Route planen" hidden>
   <div class="pl-head">
@@ -254,7 +330,9 @@
     <button class="round" id="spot-close" aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
   </div>
   <div class="sheet-body">
-    <h2 class="first">Was ist hier?</h2>
+    <h2 class="first">Liste</h2>
+    <div class="chips" id="spot-lists"></div>
+    <h2>Was ist hier?</h2>
     <div class="chips" id="spot-cats"></div>
     <h2>Fotos</h2>
     <div class="photos" id="spot-photos">
@@ -428,6 +506,7 @@
 <script src="extract.js"></script>
 <script src="vehicles.js"></script>
 <script src="app.js"></script>
+<script src="lists.js"></script>
 <script src="nav.js"></script>
 <script src="planner.js"></script>
 <script src="draw.js"></script>

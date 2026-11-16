@@ -372,11 +372,14 @@ function buildStyle() {
   layers.push(
     {
       id: 'places-icon', type: 'symbol', source: 'places',
-      layout: { 'icon-image': ['concat', 'cat-', ['get', 'cat']], 'icon-allow-overlap': true, 'icon-ignore-placement': true }
+      // eigene Orte immer, Merklisten (oft Hunderte) etwas kleiner, solange man weit weg ist
+      layout: { 'icon-image': ['get', 'icon'], 'icon-allow-overlap': true, 'icon-ignore-placement': true,
+        'icon-size': ['case', ['==', ['get', 'own'], 1], 1, ['interpolate', ['linear'], ['zoom'], 3, 0.6, 8, 0.8, 12, 0.95]],
+        'symbol-sort-key': ['get', 'own'] }
     },
     {
       id: 'places-label', type: 'symbol', source: 'places',
-      layout: { 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Medium'], 'text-size': 13, 'text-offset': [0, 1.5], 'text-anchor': 'top', 'text-optional': true },
+      layout: { 'text-field': ['case', ['==', ['get', 'own'], 1], ['get', 'name'], ['step', ['zoom'], '', 9, ['get', 'name']]], 'text-font': ['Noto Sans Medium'], 'text-size': ['case', ['==', ['get', 'own'], 1], 13, 12], 'text-offset': [0, 1.5], 'text-anchor': 'top', 'text-optional': true, 'text-max-width': 9 },
       paint: { 'text-color': dark ? '#EEF2F4' : '#15191D', 'text-halo-color': dark ? '#0B0F12' : '#FFFFFF', 'text-halo-width': 1.5 }
     }
   );
@@ -615,17 +618,70 @@ const CATS = [
   { id: 'warn', label: 'Warnung', color: '#F59F00', ink: '#2A1E00', d: 'M12 4 2.5 20h19ZM12 10v4M12 17h.01' },
   { id: 'other', label: 'Sonstiges', color: '#868E96', ink: '#FFFFFF', d: 'M12 21s6-5.4 6-10.5a6 6 0 0 0-12 0C6 15.6 12 21 12 21ZM12 10.5h.01' }
 ];
-const CAT = Object.fromEntries(CATS.map((c) => [c.id, c]));
+// weitere feste Kategorien (vor „Sonstiges“), vor allem für Merklisten
+CATS.splice(CATS.length - 1, 0,
+  { id: 'natur', label: 'Natur & Aussicht', color: '#2B8A3E', ink: '#FFFFFF', d: 'M3 20 9.5 8l3.5 6 2.5-4L21 20ZM9.5 8l1.6 2.9' },
+  { id: 'gewaesser', label: 'See, Fluss & Wasserfall', color: '#1971C2', ink: '#FFFFFF', d: 'M3 16c2-2 4-2 6 0s4 2 6 0 4-2 6 0M3 10.5c2-2 4-2 6 0s4 2 6 0 4-2 6 0' },
+  { id: 'strand', label: 'Strand & Küste', color: '#0B7285', ink: '#FFFFFF', d: 'M12 3v2M5.2 8.2l1.4 1.4M18.8 8.2l-1.4 1.4M7.5 13a4.5 4.5 0 0 1 9 0M3 18c2-1.5 4-1.5 6 0s4 1.5 6 0 4-1.5 6 0' },
+  { id: 'kultur', label: 'Sehenswürdigkeit', color: '#9C4F00', ink: '#FFFFFF', d: 'M3 9h18L12 4ZM5.5 9v9M10 9v9M14 9v9M18.5 9v9M3 20.5h18' },
+  { id: 'ort', label: 'Stadt & Ort', color: '#5F3DC4', ink: '#FFFFFF', d: 'M3 21V10l6-3v14M9 21V4l9 4.5V21M3 21h18M12.5 11h2M12.5 15h2' },
+  { id: 'unterkunft', label: 'Unterkunft', color: '#087F5B', ink: '#FFFFFF', d: 'M3 19V6M3 15h18v4M3 11h7v4M10 11h8a3 3 0 0 1 3 3v1' },
+  { id: 'essen', label: 'Essen & Trinken', color: '#C2255C', ink: '#FFFFFF', d: 'M7 3v8M5 3v4a2 2 0 0 0 4 0V3M7 11v10M17 3c-2.2 2-2.2 6.5 0 8.5V21' },
+  { id: 'einkauf', label: 'Einkauf & Service', color: '#5C677D', ink: '#FFFFFF', d: 'M3 4h2l2.4 11h11L21 7H6.2M9 20h.01M17 20h.01' }
+);
+const CAT = {};
+const BUILTIN_COLORS = Object.fromEntries(CATS.map((c) => [c.id, c.color]));
+function customCats() { return store.get('customCats', []); }
+function rebuildCats() {
+  for (let i = CATS.length - 1; i >= 0; i--) if (CATS[i].custom) CATS.splice(i, 1);
+  const at = CATS.findIndex((c) => c.id === 'other');
+  CATS.splice(at < 0 ? CATS.length : at, 0, ...customCats().map((c) => ({ ...c, custom: true })));
+  for (const k of Object.keys(CAT)) delete CAT[k];
+  for (const c of CATS) CAT[c.id] = c;
+}
+function setCustomCats(list) { store.set('customCats', list); rebuildCats(); }
+// eigene Farben für feste Kategorien
+function applyCatColors() {
+  const over = store.get('catColors', {});
+  for (const c of CATS) if (!c.custom) { c.color = over[c.id] || BUILTIN_COLORS[c.id]; if (typeof Lists !== 'undefined') c.ink = Lists.inkFor(c.color); }
+}
+rebuildCats();
+applyCatColors();
+// Kategorie aus dem Namen raten (für Importe ohne Kategorie)
+function guessFromName(name) {
+  const s = norm(name || '');
+  const has = (re) => re.test(s);
+  if (!s) return '';
+  if (has(/wasserfall|waterfall|cascad|cascata|cascada|водопад|vodopad|\bsee\b|lake|\blac\b|lago|jezero|ozero|озеро|\bkul\b|-kul\b|reservoir|stausee|river|fluss|\bfoss\b|\bfoss$|thermal|geotherm|hot ?spring|piscina/)) return 'gewaesser';
+  if (has(/strand|beach|plage|playa|praia|spiaggia|plaz|bucht|\bcala\b|\bbay\b|küste|coast|cove|insel|island\b|isola/)) return 'strand';
+  if (has(/campingplatz|camping|campground|caravan|stellplatz|zeltplatz/)) return 'camp';
+  if (has(/\bpass\b|pass$|перевал|pereval|canyon|schlucht|gorge|tal\b|valley|peak|gipfel|\bpik\b|gora|mount|monte|berg\b|\btau\b|\bdag\b|glacier|gletscher|jökull|national ?park|nationalpark|reserve|view ?point|mirador|aussicht|panorama|wald|forest|dune|düne|cave|höhle|grotta|cueva|wüste|desert|steppe|plateau|crater|krater|vulkan|volcan|trail|wanderweg/)) return 'natur';
+  if (has(/hotel|hostel|guest ?house|pension|jugendherberge|hütte|rifugio|bivacco|refuge|refugio|yurt|jurte|lodge|apartment|cabin/)) return 'unterkunft';
+  if (has(/restaurant|cafe|café|bistro|\bbar\b|\bpub\b|brau|brew|bakery|bäckerei|croissant|pizza|kebab|chaikhana|trattoria|taverna/)) return 'essen';
+  if (has(/werkstatt|garage|autoservice|car service|repair|reifen|\btire|\btyre|mechanic/)) return 'mech';
+  if (has(/tankstelle|\bshell\b|\bfuel\b|petrol|diesel/)) return 'fuel';
+  if (has(/shop|laden|markt|market|store|mall|filiale|gmbh|apotheke|lavanderia|laundry|wäscherei/)) return 'einkauf';
+  if (has(/burg|castle|castello|schloss|\bfort\b|festung|kale|kalesi|ruine|ruins|nuraghe|kloster|monastery|church|kirche|chiesa|moschee|mosque|mausoleum|minaret|medrese|madrasa|tempel|temple|museum|denkmal|monument|observ|tower|turm|altstadt|old town|bazaar|basar|palace|palast|palazzo|petroglyph|ancient|antik|bridge|brücke|lighthouse|leuchtturm/)) return 'kultur';
+  if (has(/\bstadt\b|\bcity\b|\btown\b|village|\bdorf\b/)) return 'ort';
+  return '';
+}
 const FEATS = [
   ['eben', 'Eben'], ['wind', 'Windgeschützt'], ['wasser', 'Wasser in der Nähe'],
   ['netz', 'Handynetz'], ['ruhig', 'Ruhig'], ['allrad', 'Nur mit Allrad'], ['schatten', 'Schatten']
 ];
 
-// ältere Einträge auf das neue Format bringen
+// ältere Einträge auf das neue Format bringen (vorher einmal sichern)
+if (places.length && !store.get('placesBackup1', null)) store.set('placesBackup1', places);
 places = places.map((p, i) => ({
   id: p.id || Date.now() + i,
   name: p.name || 'Platz ' + (i + 1),
-  cat: CAT[p.cat] ? p.cat : 'wild',
+  cat: CAT[p.cat] ? p.cat : (p.cat ? 'other' : 'wild'),
+  list: p.list || 'mine',
+  cc: p.cc || '',
+  url: p.url || '',
+  auto: !!p.auto,
+  pend: !!p.pend,
+  source: p.source || '',
   rating: p.rating || 0,
   feats: Array.isArray(p.feats) ? p.feats : [],
   note: p.note || '',
@@ -639,10 +695,10 @@ places = places.map((p, i) => ({
 function placesGeoJSON() {
   return {
     type: 'FeatureCollection',
-    features: places.filter((p) => !settings.hidden.includes(p.cat)).map((p) => ({
+    features: places.filter((p) => p.lat !== null && Lists.visible(p)).map((p) => ({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
-      properties: { id: p.id, name: p.name, cat: p.cat }
+      properties: { id: p.id, name: p.name, cat: p.cat, icon: Lists.icon(p), own: Lists.isOwn(p) ? 1 : 0 }
     }))
   };
 }
@@ -743,6 +799,28 @@ function setMoving(on) {
 }
 
 function renderChips() {
+  // Liste
+  const lists = $('#spot-lists');
+  lists.innerHTML = '';
+  for (const l of Lists.all) {
+    const on = (editor.draft.list || 'mine') === l.id;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip-btn' + (on ? ' on' : '');
+    if (on) { b.style.background = l.color; b.style.borderColor = l.color; b.style.color = Lists.inkFor(l.color); }
+    b.setAttribute('aria-pressed', String(on));
+    b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${l.id === 'mine' ? SYMBOLS.pin : SYMBOLS.bookmark}"/></svg><span></span>`;
+    b.querySelector('span').textContent = l.name;
+    b.onclick = () => { editor.draft.list = l.id; renderChips(); };
+    lists.appendChild(b);
+  }
+  const nl = document.createElement('button');
+  nl.type = 'button';
+  nl.className = 'chip-btn add';
+  nl.textContent = '+ Neue Liste';
+  nl.onclick = async () => { const id = await Lists.editList(null); if (id) { editor.draft.list = id; renderChips(); } };
+  lists.appendChild(nl);
+  // Kategorie
   const cats = $('#spot-cats');
   cats.innerHTML = '';
   for (const c of CATS) {
@@ -750,11 +828,18 @@ function renderChips() {
     b.type = 'button';
     b.className = 'chip-btn' + (editor.draft.cat === c.id ? ' on' : '');
     b.setAttribute('aria-pressed', String(editor.draft.cat === c.id));
+    if (editor.draft.cat === c.id && c.custom) { b.style.background = c.color; b.style.borderColor = c.color; b.style.color = c.ink; }
     b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${c.d}"/></svg><span></span>`;
     b.querySelector('span').textContent = c.label;
-    b.onclick = () => { editor.draft.cat = c.id; renderChips(); };
+    b.onclick = () => { editor.draft.cat = c.id; editor.draft.auto = false; renderChips(); };
     cats.appendChild(b);
   }
+  const nc = document.createElement('button');
+  nc.type = 'button';
+  nc.className = 'chip-btn add';
+  nc.textContent = '+ Neue Kategorie';
+  nc.onclick = async () => { const id = await Lists.editCat(null); if (id) { editor.draft.cat = id; editor.draft.auto = false; renderChips(); } };
+  cats.appendChild(nc);
   const feats = $('#spot-feats');
   feats.innerHTML = '';
   for (const [id, label] of FEATS) {
@@ -824,8 +909,9 @@ function openEditor(place, at, opts = {}) {
   editor.open = true;
   editor.id = isNew ? null : place.id;
   editor.draft = isNew
-    ? { name: '', cat: null, rating: 0, feats: [], note: '', photos: [], lat: at.lat, lon: at.lon, ele }
+    ? { name: '', cat: null, list: opts.list || 'mine', rating: 0, feats: [], note: '', photos: [], lat: at.lat, lon: at.lon, ele, cc: '', url: '', pend: true }
     : JSON.parse(JSON.stringify(place));
+  if (!editor.draft.list) editor.draft.list = 'mine';
   editor.newPhotos = [];
   editor.removedPhotos = [];
   editor.confirmDelete = false;
@@ -944,6 +1030,8 @@ async function saveEditor() {
   }
   d.updated = now;
   if (editor.id) {
+    const old = places.find((p) => p.id === editor.id);
+    if (old && (Math.abs(old.lat - d.lat) > 0.01 || Math.abs(old.lon - d.lon) > 0.01)) { d.cc = ''; d.pend = true; }   // weit verschoben: Land neu bestimmen
     places = places.map((p) => (p.id === editor.id ? d : p));
   } else {
     d.id = Date.now();
@@ -951,8 +1039,11 @@ async function saveEditor() {
     places.push(d);
   }
   savePlaces();
-  toast(settings.hidden.includes(d.cat) ? `„${d.name}“ gespeichert. ${CAT[d.cat].label} ist gerade ausgeblendet.` : `„${d.name}“ gespeichert`);
+  const l = Lists.get(d.list);
+  toast(settings.hidden.includes(d.cat) ? `„${d.name}“ gespeichert. ${CAT[d.cat].label} ist gerade ausgeblendet.` : !l.on ? `„${d.name}“ gespeichert. Die Liste „${l.name}“ ist gerade ausgeblendet.` : `„${d.name}“ gespeichert`);
   closeEditor();
+  Lists.renderChips();
+  Lists.enrich();
 }
 
 async function deleteEditorPlace() {
@@ -978,24 +1069,7 @@ function newPlaceHere() {
 function renderPlaceList() { renderDataCats(); refreshCatPage(); }
 function exportGPX() {
   if (!places.length && !tracks.length) { toast('Noch keine Orte oder Tracks gespeichert.'); return; }
-  const esc = (s) => String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
-  const wpts = places.map((p) => {
-    const feats = p.feats.map((f) => (FEATS.find((x) => x[0] === f) || [f, f])[1]);
-    const desc = [p.rating ? p.rating + '/5 Sterne' : '', feats.join(', '), p.note].filter(Boolean).join('\n');
-    return `  <wpt lat="${p.lat}" lon="${p.lon}">${p.ele ? `<ele>${p.ele}</ele>` : ''}<time>${p.time}</time><name>${esc(p.name)}</name>${desc ? `<desc>${esc(desc)}</desc>` : ''}<type>${esc((CAT[p.cat] || CAT.other).label)}</type></wpt>`;
-  }).join('\n');
-  const trks = tracks.map((t) => `  <trk><name>${esc(t.name)}</name>${t.note ? `<desc>${esc(t.note)}</desc>` : ''}${t.segments.map((seg) => '<trkseg>' + seg.map((c) => `<trkpt lat="${c[1]}" lon="${c[0]}">${typeof c[2] === 'number' ? `<ele>${Math.round(c[2])}</ele>` : ''}</trkpt>`).join('') + '</trkseg>').join('')}</trk>`).join('\n');
-  const gpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Overland-Navi" xmlns="http://www.topografix.com/GPX/1/1">\n${wpts}\n${trks}\n</gpx>\n`;
-  const file = new File([gpx], 'overland-daten.gpx', { type: 'application/gpx+xml' });
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    navigator.share({ files: [file], title: 'Overland-Orte' }).catch(() => {});
-  } else {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(file);
-    a.download = file.name;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-  }
+  Lists.share(places, 'overland-daten', tracks);
 }
 
 function setupEditorUI() {
@@ -1443,6 +1517,7 @@ function setupUI() {
   Draw.setup();
   Swipe.setup();
   Hike.setup();
+  Lists.setup();
   Tours.setup();
   Poi.setup();
   for (const [id, key, def] of [['#t-water', 'waterOn', true], ['#t-service', 'serviceOn', true], ['#t-tracks', 'hikeTracks', true]]) {
@@ -1626,7 +1701,7 @@ const Search = {
     };
     for (const p of places) {
       const s = score([norm(p.name), norm(p.note)]);
-      if (s) results.push({ name: p.name, type: 'own', lat: p.lat, lon: p.lon, place: p, score: s + 40, sub: 'Mein Ort · ' + (CAT[p.cat] || CAT.other).label });
+      if (s) results.push({ name: p.name, type: 'own', lat: p.lat, lon: p.lon, place: p, score: s + 40, sub: (Lists.isOwn(p) ? 'Mein Ort' : Lists.get(p.list).name) + ' · ' + (CAT[p.cat] || CAT.other).label });
     }
     const hits = [];
     for (const it of this.items) {
@@ -1904,22 +1979,27 @@ function setCatHidden(id, hidden) {
 function renderDataCats() {
   const box = $('#cat-list');
   if (!box) return;
-  $('#places-count').textContent = places.length + (places.length === 1 ? ' Ort' : ' Orte') + ' · ' + tracks.length + (tracks.length === 1 ? ' Track' : ' Tracks');
+  const nOwn = places.filter((p) => Lists.isOwn(p)).length;
+  $('#places-count').textContent = places.length + (places.length === 1 ? ' Ort' : ' Orte') + (places.length !== nOwn ? ` (${nOwn} eigene)` : '') + ' · ' + tracks.length + (tracks.length === 1 ? ' Track' : ' Tracks');
+  Lists.renderLists();
   box.innerHTML = '';
+  const tbox = $('#track-list');
+  if (tbox) tbox.innerHTML = '';
   for (const c of [TRACK_CAT, ...CATS]) {
     const n = catItems(c.id).length;
+    if (!n && !c.custom && c.id !== 'tracks' && ['natur', 'gewaesser', 'strand', 'kultur', 'ort', 'unterkunft', 'essen', 'einkauf'].includes(c.id)) continue;   // neue feste Kategorien erst zeigen, wenn etwas drin ist
     const row = document.createElement('div');
     row.className = 'cat-row' + (n ? '' : ' empty');
     row.innerHTML = `<button type="button" class="cat-open"><span class="pi-icon" style="background:${c.color};color:${c.ink}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${c.d}"/></svg></span><span class="pi-txt"><b></b><small></small></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button><input type="checkbox" class="switch">`;
     row.querySelector('b').textContent = c.label;
     const hidden = settings.hidden.includes(c.id);
-    row.querySelector('small').textContent = (n === 0 ? 'leer' : n + (c.id === 'tracks' ? (n === 1 ? ' Track' : ' Tracks') : (n === 1 ? ' Ort' : ' Orte'))) + (hidden ? ' · ausgeblendet' : '');
+    row.querySelector('small').textContent = (n === 0 ? 'leer' : n + (c.id === 'tracks' ? (n === 1 ? ' Track' : ' Tracks') : (n === 1 ? ' Ort' : ' Orte'))) + (c.custom ? ' · eigene' : '') + (hidden ? ' · ausgeblendet' : '');
     row.querySelector('.cat-open').onclick = () => openCatPage(c.id);
     const sw = row.querySelector('.switch');
     sw.checked = !hidden;
     sw.setAttribute('aria-label', c.label + ' auf der Karte zeigen');
     sw.onchange = () => setCatHidden(c.id, !sw.checked);
-    box.appendChild(row);
+    (c.id === 'tracks' && tbox ? tbox : box).appendChild(row);
   }
 }
 
@@ -1930,8 +2010,8 @@ function openCatPage(id) {
   page.hidden = false;
   page.querySelector('.sheet-body').scrollTop = 0;
 }
-function closeCatPage() { openCat = null; $('#cat-page').hidden = true; }
-function closeSheet() { closeCatPage(); $('#add-page').hidden = true; $('#sheet').hidden = true; }
+function closeCatPage() { openCat = null; Lists.endSel(true); $('#cat-page').hidden = true; }
+function closeSheet() { closeCatPage(); if (typeof Lists !== 'undefined') Lists.closeList(); $('#add-page').hidden = true; $('#sheet').hidden = true; for (const id of ['#choose-page', '#thing-page', '#imp-page']) { const e = $(id); if (e) e.hidden = true; } }
 
 function refreshCatPage() {
   if (!openCat) return;
@@ -1946,24 +2026,38 @@ function refreshCatPage() {
   const tg = $('#cat-toggle');
   tg.checked = !settings.hidden.includes(openCat);
   tg.onchange = () => setCatHidden(openCat, !tg.checked);
+  const isTracks = openCat === 'tracks';
+  $('#cat-tools').hidden = isTracks;
+  if (!isTracks) {
+    $('#cat-share').onclick = () => Lists.share(items, c.label);
+    $('#cat-share').disabled = !items.length;
+    $('#cat-sel').textContent = Lists.sel.active ? 'Fertig' : 'Auswählen';
+    $('#cat-sel').disabled = !items.length && !Lists.sel.active;
+    $('#cat-sel').onclick = () => (Lists.sel.active ? Lists.endSel() : Lists.startSel('cat'));
+    $('#cat-edit').textContent = c.custom ? 'Bearbeiten' : 'Farbe';
+    $('#cat-edit').onclick = () => Lists.editCat(openCat);
+  }
   const box = $('#cat-items');
   box.innerHTML = '';
-  if (openCat === 'tracks') {
+  if (isTracks) {
     for (const t of tracks) box.appendChild(buildTrackRow(t));
     return;
   }
   const ref = gps.pos || (map ? { lat: map.getCenter().lat, lon: map.getCenter().lng } : null);
-  const list = items.map((p) => ({ p, d: ref ? distance(ref, p) : null })).sort((a, b) => (a.d || 0) - (b.d || 0));
-  for (const { p, d } of list) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'place-item';
-    b.innerHTML = `<span class="pi-icon" style="background:${c.color};color:${c.ink}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${c.d}"/></svg></span><span class="pi-txt"><b></b><small></small></span><span class="pi-dist"></span>`;
-    b.querySelector('b').textContent = p.name;
-    b.querySelector('small').textContent = [p.rating ? '★'.repeat(p.rating) : '', p.note ? p.note.slice(0, 60) : '', p.source ? 'aus ' + p.source : ''].filter(Boolean).join(' · ') || ' ';
-    b.querySelector('.pi-dist').textContent = fmtDist(d);
-    b.onclick = () => { closeSheet(); openEditor(p); };
-    box.appendChild(b);
+  const list = items.map((p) => ({ p, d: ref && p.lat !== null ? distance(ref, p) : null })).sort((a, b) => (a.d || 0) - (b.d || 0));
+  for (const { p, d } of list.slice(0, 400)) {
+    const row = Lists.itemRow(p);
+    const dist = document.createElement('span');
+    dist.className = 'pi-dist';
+    dist.textContent = fmtDist(d);
+    row.appendChild(dist);
+    box.appendChild(row);
+  }
+  if (list.length > 400) {
+    const more = document.createElement('p');
+    more.className = 'muted small';
+    more.textContent = `… und ${list.length - 400} weitere (die nächsten 400 werden gezeigt).`;
+    box.appendChild(more);
   }
 }
 
@@ -2240,7 +2334,9 @@ function parseGPX(text, source) {
   if (doc.getElementsByTagName('parsererror').length) throw new Error('GPX-Datei ist fehlerhaft');
   const wpts = [], trks = [];
   for (const w of doc.getElementsByTagName('wpt')) {
-    wpts.push({ lat: +w.getAttribute('lat'), lon: +w.getAttribute('lon'), name: xmlText(w, 'name'), desc: xmlText(w, 'desc') || xmlText(w, 'cmt'), type: xmlText(w, 'type') + ' ' + xmlText(w, 'sym'), ele: parseFloat(xmlText(w, 'ele')) || null });
+    const link = w.getElementsByTagName('link')[0];
+    wpts.push({ lat: +w.getAttribute('lat'), lon: +w.getAttribute('lon'), name: xmlText(w, 'name'), desc: xmlText(w, 'desc') || xmlText(w, 'cmt'), type: xmlText(w, 'type') + ' ' + xmlText(w, 'sym'), ele: parseFloat(xmlText(w, 'ele')) || null,
+      time: xmlText(w, 'time'), url: link ? link.getAttribute('href') || '' : '', ext: Lists.readExt(w) });
   }
   const lines = (el, ptTag) => [...el.getElementsByTagName(ptTag)].map((p) => [+p.getAttribute('lon'), +p.getAttribute('lat'), parseFloat(xmlText(p, 'ele')) || null]);
   for (const t of doc.getElementsByTagName('trk')) {
@@ -2296,7 +2392,7 @@ function guessCategory(w) {
 }
 
 async function importFiles(fileList) {
-  const jobs = [];
+  const jobs = [], takeout = [];
   for (const f of fileList) {
     const lower = f.name.toLowerCase();
     if (lower.endsWith('.zip') || lower.endsWith('.kmz')) {
@@ -2304,8 +2400,11 @@ async function importFiles(fileList) {
         for (const e of await unzip(await f.arrayBuffer())) {
           const n = e.name.toLowerCase();
           if (n.endsWith('.gpx') || n.endsWith('.kml')) jobs.push({ name: e.name.split('/').pop(), kind: n.endsWith('.gpx') ? 'gpx' : 'kml', text: () => e.text(), source: f.name });
+          else if (n.endsWith('.csv') || /gespeicherte orte\.json$|saved places\.json$/.test(n)) takeout.push({ name: e.name, text: () => e.text() });
         }
       } catch (err) { toast(f.name + ': ' + err.message, 5000); }
+    } else if (lower.endsWith('.csv') || lower.endsWith('.json')) {
+      takeout.push({ name: f.name, text: () => f.text() });
     } else if (lower.endsWith('.kml')) {
       jobs.push({ name: f.name, kind: 'kml', text: () => f.text(), source: f.name });
     } else {
@@ -2323,14 +2422,24 @@ async function importFiles(fileList) {
     } catch (err) { errors++; continue; }
     for (const w of res.wpts) {
       if (!isFinite(w.lat) || !isFinite(w.lon)) continue;
+      if (w.ext) {
+        // aus dieser App geteilt: Liste, Kategorie, Land und Notiz übernehmen
+        const x = w.ext;
+        const r = { added: 0, dupes: 0 };
+        const list = x.list ? Lists.ensure(x.list, x.listColor) : 'mine';
+        Lists.addPlace({ name: w.name, note: x.note || w.desc || '', lat: +w.lat.toFixed(6), lon: +w.lon.toFixed(6), ele: w.ele ? Math.round(w.ele) : null, time: w.time || '',
+          list, cat: Lists.catFromExt(x) || guessCategory(w), cc: x.cc, url: x.url || w.url, rating: x.rating, feats: x.feats, auto: x.auto, pend: !x.cc || (x.auto && x.pend), source: j.source }, r);
+        if (r.added) { nPlaces++; bounds.extend([w.lon, w.lat]); } else skipped++;
+        continue;
+      }
       const dupe = places.some((p) => distance(p, w) < 25 && (!w.name || norm(p.name) === norm(w.name)));
       if (dupe) { skipped++; continue; }
       const cat = guessCategory(w);
       const now = new Date().toISOString();
       places.push({
-        id: Date.now() + Math.floor(Math.random() * 100000), name: w.name || `${CAT[cat].label} ${places.length + 1}`, cat,
+        id: Date.now() * 1000 + Math.floor(Math.random() * 1000), name: w.name || `${CAT[cat].label} ${places.length + 1}`, cat, list: 'mine',
         rating: 0, feats: [], note: w.desc || '', photos: [], lat: +w.lat.toFixed(6), lon: +w.lon.toFixed(6),
-        ele: w.ele ? Math.round(w.ele) : null, time: now, updated: now, source: j.source
+        ele: w.ele ? Math.round(w.ele) : null, time: now, updated: now, source: j.source, cc: '', url: w.url || '', pend: true
       });
       bounds.extend([w.lon, w.lat]);
       nPlaces++;
@@ -2350,6 +2459,10 @@ async function importFiles(fileList) {
   }
   savePlaces();
   updateTracksSource();
+  Lists.renderChips();
+  if (nPlaces) Lists.enrich();
+  const offered = takeout.length ? await Lists.offerTakeout(takeout) : false;
+  if (offered && !nPlaces && !nTracks) return;
   const parts = [];
   if (nTracks) parts.push(nTracks + (nTracks === 1 ? ' Track' : ' Tracks'));
   if (nPlaces) parts.push(nPlaces + (nPlaces === 1 ? ' Ort' : ' Orte'));
@@ -2357,7 +2470,7 @@ async function importFiles(fileList) {
   if (skipped) msg += ` · ${skipped} doppelt übersprungen`;
   if (errors) msg += ` · ${errors} Datei(en) fehlerhaft`;
   toast(msg, 5000);
-  if (!bounds.isEmpty()) {
+  if (!bounds.isEmpty() && !offered) {
     closeSheet();
     gps.follow = false; $('#btn-locate').classList.remove('active');
     map.fitBounds(bounds, { padding: 80, maxZoom: 14 });
@@ -2403,6 +2516,8 @@ async function main() {
   registerServiceWorker();
   try {
     await loadScript('vendor/maplibre-contour.js');
+    Lists.init();
+    applyCatColors();
   } catch (e) {
     fatal('Das Höhenlinien-Modul fehlt. Öffne die App einmal mit Internetverbindung.');
     return;
@@ -2459,7 +2574,7 @@ async function main() {
     if (editor.moving || (typeof Draw !== 'undefined' && Draw.active)) return;
     const f = e.features && e.features[0];
     const p = f && places.find((x) => x.id === f.properties.id);
-    if (p) openEditor(p);
+    if (p) { if (Lists.isOwn(p)) openEditor(p); else Lists.showCard(p); }
   });
   map.on('click', 'tracks-hit', (e) => {
     if (editor.moving || editor.open || (typeof Draw !== 'undefined' && Draw.active)) return;

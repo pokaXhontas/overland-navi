@@ -159,7 +159,7 @@ const Planner = {
       quick.push({ name: 'Mein Standort', sub: 'Aktuelle GPS-Position', type: 'quick-gps' });
       quick.push({ name: 'Auf der Karte wählen', sub: 'Karte verschieben und Punkt übernehmen', type: 'quick-map' });
       for (const p of places.slice().sort((a, b) => (b.updated || 0) - (a.updated || 0)).slice(0, 6)) {
-        quick.push({ name: p.name, type: 'own', lat: p.lat, lon: p.lon, place: p, sub: 'Mein Ort · ' + (CAT[p.cat] || CAT.other).label, dist: gps.pos ? distance(gps.pos, p) : null });
+        quick.push({ name: p.name, type: 'own', lat: p.lat, lon: p.lon, place: p, sub: (Lists.isOwn(p) ? 'Mein Ort' : Lists.get(p.list).name) + ' · ' + (CAT[p.cat] || CAT.other).label, dist: gps.pos ? distance(gps.pos, p) : null });
       }
       renderResultList(box, quick, '', (r) => this.pick(r));
       return;

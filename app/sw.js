@@ -11,6 +11,7 @@ const SHELL = [
   'index.html',
   'style.css',
   'app.js',
+  'lists.js',
   'dl-worker.js',
   'extract.js',
   'vehicles.js',
