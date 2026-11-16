@@ -84,11 +84,20 @@ const Draw = {
     return [a, ...coords, b];
   },
 
+  /* ohne Internet: eigener Routenrechner aus dem offline gespeicherten Straßennetz */
+  async routedOffline(a, b) {
+    const pts = [{ lon: a[0], lat: a[1] }, { lon: b[0], lat: b[1] }];
+    const sources = RouteData.sources(pts, navigator.onLine);
+    if (!sources.length) throw new Error('keine Offline-Straßendaten');
+    const r = await Nav.routerCall({ pts, travel: 'car', profile: 'tracks', sac: 0, sources });
+    return [a, ...r.coords, b];
+  },
+
   async makeLeg(i) {
     const leg = { mode: this.mode, coords: this.straight(this.pts[i], this.pts[i + 1]), busy: this.mode === 'road' };
     this.legs[i] = leg;
     if (this.mode !== 'road') return;
-    if (!navigator.onLine) {
+    if (!navigator.onLine && !RouteData.local.size) {
       leg.mode = 'line'; leg.busy = false;
       toast('Ohne Internet als gerade Linie verbunden.', 2500);
       return;
@@ -97,7 +106,8 @@ const Draw = {
     this.renderBar();
     const a = this.pts[i], b = this.pts[i + 1];
     try {
-      const c = await this.routed(a, b);
+      let c;
+      try { c = navigator.onLine ? await this.routed(a, b) : await this.routedOffline(a, b); } catch (e) { c = await this.routedOffline(a, b); }
       if (this.legs.includes(leg)) leg.coords = c;
     } catch (e) {
       if (this.legs.includes(leg)) { leg.mode = 'line'; toast('Hier kein Weg gefunden, gerade Linie gesetzt.', 2500); }

@@ -712,7 +712,7 @@ if (typeof importScripts === 'function') {
     try {
       const key = JSON.stringify(m.sources);
       // Kachelspeicher behalten, solange dieselben Dateien gelten (schnellere Neuberechnung unterwegs)
-      if (!net || key !== netKey || net.loaded > 1500) { net = new OvlRouter.Net(await openSources(m.sources)); netKey = key; }
+      if (!net || key !== netKey || net.loaded > 250) { net = new OvlRouter.Net(await openSources(m.sources)); netKey = key; }
       if (!net.sources.length) throw new Error('Keine Offline-Straßendaten für dieses Gebiet');
       const t0 = Date.now();
       const r = await OvlRouter.route(net, m);

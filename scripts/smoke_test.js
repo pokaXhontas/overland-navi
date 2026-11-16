@@ -294,6 +294,35 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   console.log('Punkte-Arten:', await page.evaluate(() => JSON.stringify(map.getLayer('hike-pts') ? map.getFilter('hike-pts')[2][1] : 'keine Ebene')));
   await page.evaluate(() => { if (Nav.pending) $('#na-cancel').click(); Nav.travel = 'car'; });
 
+  // Ganz ohne Netz: kleines Gebiet (Bischkek) mit Straßennetz laden, dann offline eine Route rechnen
+  console.log('Testgebiet laden:', await page.evaluate(async () => {
+    await RouteData.loadIndex();
+    const r = { id: 'test-bkk', name: 'Testgebiet Bischkek', boxes: [[74.55, 42.83, 74.66, 42.90]], maxzoom: 11, demMaxzoom: 8, search: 'kein-index.json' };
+    Tiles.regions.push({ ...r, group: 'Hinzugefügt', custom: true });
+    startDownload(Tiles.regions[Tiles.regions.length - 1]);
+    const t0 = Date.now();
+    while (downloads.has('test-bkk') && Date.now() - t0 < 240000) await new Promise((res) => setTimeout(res, 1000));
+    await RouteData.scan();
+    return (RouteData.local.get('test-bkk') ? [...RouteData.local.get('test-bkk')].join(',') : 'kein Straßennetz') + ' · ' + (downloadErrors.get('test-bkk') || 'ohne Fehler') + ' · ' + Math.round((Date.now() - t0) / 1000) + ' s';
+  }));
+  await page.setOfflineMode(true);
+  await page.evaluate(() => { gps.pos = { lat: 42.8746, lon: 74.5698 }; Nav.travel = 'car'; Nav.plan([{ gps: true }, { name: 'Ala-Too-Platz', lat: 42.8765, lon: 74.6040 }], 'route'); });
+  await page.waitForFunction(() => Nav.pending && Nav.pending.list[0].target.name === 'Ala-Too-Platz', { timeout: 60000 }).catch(() => {});
+  console.log('Ohne Netz:', await page.evaluate(() => (navigator.onLine ? 'online!? ' : 'offline · ') + (Nav.pending ? Nav.pending.list.map((r) => Math.round(r.time / 60) + ' min/' + (r.total / 1000).toFixed(1) + ' km ' + r.source + ' · ' + r.maneuvers.length + ' Hinweise').join(' | ') : 'keine Route: ' + $('#toast').textContent)));
+  await shot('12g-ohne-netz');
+  await page.evaluate(() => { if (Nav.pending) $('#na-go').click(); });
+  await sleep(800);
+  // vom Weg abkommen: Neuberechnung ohne Netz
+  console.log('Neuberechnung ohne Netz:', await page.evaluate(async () => {
+    if (!Nav.active || Nav.active.mode !== 'route') return 'keine aktive Route';
+    const before = Nav.active.created;
+    await Nav.reroute({ lat: 42.8800, lon: 74.5800 });
+    return Nav.active.created !== before ? 'neu berechnet, ' + (Nav.active.total / 1000).toFixed(1) + ' km ' + Nav.active.source : 'nicht neu berechnet';
+  }));
+  await page.evaluate(() => Nav.stop(true));
+  await page.setOfflineMode(false);
+  await page.evaluate(async () => { const r = Tiles.regions.find((x) => x.id === 'test-bkk'); if (r) await deleteRegion(r, true); });
+
   // Route zeichnen: echte Taps auf die Karte
   await page.evaluate(() => { map.jumpTo({ center: [74.60, 42.87], zoom: 13, bearing: 0 }); Draw.start(); });
   await sleep(1500);
