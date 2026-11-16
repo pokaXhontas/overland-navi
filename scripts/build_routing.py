@@ -22,7 +22,7 @@ Kachelformat (alles varint, zz = zigzag):
                                                           256 Tunnel, 512 Brücke
     grade + 8 * sac + 64 * maxspeed                       Track-Güte 0-5, SAC 0-6, Tempo km/h (Fähre: Reisetempo)
     Länge in Dezimetern
-    name, ref                                             Index in die Namen
+    name, ref, dest                                       Index in die Namen (dest: Ziel-Beschilderung an Zubringern)
     geom_len, dann geom_len Bytes:                         zz(xA - origin), zz(yA - origin), zz(xB - xA), zz(yB - yA),
                                                           n_mid, je zz(dx), zz(dy) (ab A)
 """
@@ -161,6 +161,7 @@ def classify(t):
             ms = 7
     return {'cls': cls, 'flags': flags, 'grade': grade, 'sac': sac, 'ms': ms,
             'name': (get('name') or '')[:80], 'ref': (get('ref') or '')[:40],
+            'dest': ((get('destination') or get('destination:ref') or '').replace(';', ', ')[:60]) if flags & 8 else '',
             'duration': get('duration') if cls == FERRY else None}
 
 
@@ -280,6 +281,7 @@ class Tile:
         put(b, e[3])
         put(b, self.name(a['name']))
         put(b, self.name(a['ref']))
+        put(b, self.name(a['dest']))
         g = bytearray()
         x0, y0 = geom[0]
         x1, y1 = geom[-1]

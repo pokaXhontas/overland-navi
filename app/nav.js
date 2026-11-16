@@ -115,6 +115,75 @@ const Pack = {
 };
 for (const ev of ['touchend', 'click', 'keydown']) document.addEventListener(ev, () => Pack.unlock(), { capture: true, passive: true });
 
+/* Straßennetz-Dateien für das Offline-Routing (eine pro Land, im gleichen Download-Bereich wie die Wanderwege) */
+const RouteData = {
+  index: store.get('routeIndex', {}),   // Kennung → { size, date, ts, bbox, name }
+  local: new Map(),                      // Gebiet → Set der offline gespeicherten Kennungen
+  localDate: new Map(),
+
+  keys() { return Object.keys(this.index); },
+  url(key) { return Tiles.sources.hike ? Tiles.sources.hike.replace('{id}', key + '-route') : null; },
+  dlUrl(key) { const u = this.url(key), m = this.index[key]; return u && m && m.date ? u + '?v=' + m.date : u; },
+  async loadIndex() {
+    if (!Tiles.sources.hike || !navigator.onLine) return;
+    try {
+      const r = await originalFetch(Tiles.sources.hike.replace('{id}', 'route-index').replace('.pmtiles', '.json'), { cache: 'no-cache' });
+      if (r.ok) { this.index = await r.json(); store.set('routeIndex', this.index); }
+    } catch (e) { /* alte Liste behalten */ }
+  },
+  keysFor(boxes) {
+    return this.keys().filter((k) => {
+      const b = this.index[k].bbox;
+      return b && boxes.some((x) => x[0] <= b[2] && x[2] >= b[0] && x[1] <= b[3] && x[3] >= b[1]);
+    });
+  },
+  stale(rid, key) {
+    const d = this.localDate.get(rid + '/' + key), m = this.index[key];
+    return !!(d && m && m.date && d < Date.parse(m.ts || m.date + 'T00:00:00Z'));
+  },
+  regionDone(r) {
+    const ks = this.keysFor(r.boxes), have = this.local.get(r.id);
+    return ks.length > 0 && !!have && ks.every((k) => have.has(k) && !this.stale(r.id, k));
+  },
+  regionStale(r) { const have = this.local.get(r.id); return !!have && this.keysFor(r.boxes).some((k) => have.has(k) && this.stale(r.id, k)); },
+  async scan() {
+    this.local.clear();
+    this.localDate.clear();
+    const root = await Tiles.opfs();
+    if (!root || !root.keys) return;
+    for await (const name of root.keys()) {
+      const m = name.match(/^(.+)-rt-([a-z0-9-]+)\.idx\.ok$/);
+      if (!m) continue;
+      if (!this.local.has(m[1])) this.local.set(m[1], new Set());
+      this.local.get(m[1]).add(m[2]);
+      try { this.localDate.set(m[1] + '/' + m[2], (await (await root.getFileHandle(`${m[1]}-rt-${m[2]}.dat`)).getFile()).lastModified); } catch (e) { /* ohne Datum */ }
+    }
+  },
+  /* Dateien für eine Route: zuerst die offline gespeicherten, mit Internet auch die Länderdateien selbst */
+  sources(pts, online) {
+    const out = [];
+    const lo = Math.min(...pts.map((p) => p.lon)), hi = Math.max(...pts.map((p) => p.lon));
+    const la = Math.min(...pts.map((p) => p.lat)), ha = Math.max(...pts.map((p) => p.lat));
+    for (const r of Tiles.regions) {
+      const have = this.local.get(r.id);
+      if (!have) continue;
+      for (const key of have) {
+        const b = (this.index[key] && this.index[key].bbox) || null;
+        out.push({ local: `${r.id}-rt-${key}`, bbox: b });
+      }
+    }
+    if (online) {
+      for (const key of this.keys()) {
+        const b = this.index[key].bbox;
+        if (!b || b[0] > hi + 1 || b[2] < lo - 1 || b[1] > ha + 1 || b[3] < la - 1) continue;
+        if (out.some((o) => o.local && o.local.endsWith('-rt-' + key))) continue;
+        out.push({ url: this.url(key), bbox: b });
+      }
+    }
+    return out;
+  }
+};
+
 const Nav = {
   active: null,
   profile: store.get('navProfile2', 'road'),
@@ -474,6 +543,51 @@ const Nav = {
       along: 0, seg: 0, off: 0, offCount: 0, lastReroute: Date.now(), spoken: {}, created: Date.now() };
   },
 
+  /* ---------- Offline-Routing (auf dem Gerät, aus dem gespeicherten Straßennetz) ---------- */
+  routerCall(msg) {
+    if (!this.router) {
+      this.router = new Worker('router-worker.js');
+      this.routerJobs = new Map();
+      this.router.onmessage = (e) => {
+        const job = this.routerJobs.get(e.data.id);
+        if (!job) return;
+        this.routerJobs.delete(e.data.id);
+        clearTimeout(job.timer);
+        if (e.data.ok) job.resolve(e.data.route); else job.reject(new Error(e.data.error));
+      };
+      this.router.onerror = (e) => {
+        for (const j of this.routerJobs.values()) { clearTimeout(j.timer); j.reject(new Error('Routenrechner abgestürzt (zu wenig Arbeitsspeicher?)')); }
+        this.routerJobs.clear();
+        this.router.terminate(); this.router = null;
+      };
+    }
+    const id = (this.routerSeq = (this.routerSeq || 0) + 1);
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => { this.routerJobs.delete(id); reject(new Error('Berechnung dauert zu lange')); if (this.router) { this.router.terminate(); this.router = null; } }, 120000);
+      this.routerJobs.set(id, { resolve, reject, timer });
+      this.router.postMessage({ ...msg, id });
+    });
+  },
+  async offline(pts, online) {
+    if (this.travel === 'transit') throw new Error('Bus & Bahn geht nur mit Internet');
+    const sources = RouteData.sources(pts, online);
+    if (!sources.length) throw new Error('Für dieses Gebiet ist kein Straßennetz offline gespeichert (Menü → Offline-Karten → „Offline-Routen laden“)');
+    const r = await this.routerCall({
+      pts: pts.map((p) => ({ lat: p.lat, lon: p.lon, name: p.name || '' })),
+      travel: this.travel === 'foot' ? 'foot' : 'car', profile: this.profile,
+      sac: typeof Hike !== 'undefined' ? Hike.max() : 3, sources
+    });
+    return [r];
+  },
+  /* online die Server, ohne Netz (oder wenn die Server nicht antworten) der eigene Rechner */
+  async calcAny(pts) {
+    if (!navigator.onLine) return this.offline(pts, false);
+    try { return await this.calc(pts); } catch (e) {
+      if (this.travel === 'transit' || !RouteData.keys().length) throw e;
+      try { return await this.offline(pts, true); } catch (e2) { throw e; }
+    }
+  },
+
   /* Zwei unabhängige Routenrechner fragen und die Vorschläge zusammenlegen.
      Für Straßen kommen so mehr echte Alternativen zusammen; auf Pisten zählt nur Valhalla. */
   async calc(pts) {
@@ -548,20 +662,20 @@ const Nav = {
       if (mode === 'line') {
         this.active = this.prepare(target, null, 'line', extra);
       } else {
-        if (!navigator.onLine) {
-          toast('Ohne Internet keine Routenberechnung. Ich zeige dir die Luftlinie.', 4500);
+        if (!navigator.onLine && this.travel === 'transit') {
+          toast('Bus & Bahn geht nur mit Internet. Ich zeige dir die Luftlinie.', 4500);
           this.active = this.prepare(target, null, 'line', extra);
         } else {
-          toast('Route wird berechnet …', 8000);
+          toast(navigator.onLine ? 'Route wird berechnet …' : 'Ohne Internet: Route wird auf dem Gerät berechnet …', 30000);
           try {
-            const list = (await this.calc(pts)).map((r) => this.prepare(target, r, 'route', extra));
+            const list = (await this.calcAny(pts)).map((r) => this.prepare(target, r, 'route', extra));
             $('#toast').classList.remove('show');
             this.pickRoute(target, list);
             return;
             this.active = list[0];
             toast(`Route: ${fmtDist(this.active.total)} · ${this.fmtTime(this.active.time)}`, 3000);
           } catch (e) {
-            toast('Keine Route gefunden (' + e.message + '). Ich zeige dir die Luftlinie.', 5000);
+            toast((navigator.onLine ? 'Keine Route gefunden (' : 'Offline keine Route (') + e.message + '). Ich zeige dir die Luftlinie.', 6000);
             this.active = this.prepare(target, null, 'line', extra);
           }
         }
@@ -600,6 +714,7 @@ const Nav = {
           if (r.walk.sac) info.push(`<span class="na-tag">bis ${SAC_INFO[r.walk.sac].t}</span>`);
           if (r.up) info.push(`<span class="na-tag">↗ ${r.up.toLocaleString('de-DE')} Hm</span>`);
         } else if (r.travel === 'foot') info.push('<span class="na-tag">beliebige Fußwege und Straßen</span>');
+        if (r.source === 'Offline') info.push('<span class="na-tag">📴 auf dem Gerät berechnet</span>');
         // OSRM erkennt Maut auf langen Brücken nicht zuverlässig: dann lieber nichts behaupten
         if (r.transit) {
           const t = r.transit;
@@ -682,12 +797,13 @@ const Nav = {
 
   async reroute(pos) {
     const a = this.active;
-    if (!a || a.mode !== 'route' || a.track || a.travel === 'transit' || this.busy || !navigator.onLine) return;
+    if (!a || a.mode !== 'route' || a.track || a.travel === 'transit' || this.busy) return;
+    if (!navigator.onLine && !RouteData.local.size) return;
     this.busy = true;
     a.lastReroute = Date.now();
     try {
       const rest = a.vias.filter((v) => v.at > a.along + 30);
-      const res = await this.calc([{ ...pos, gps: true }, ...rest, a.target]);
+      const res = await this.calcAny([{ ...pos, gps: true }, ...rest, a.target]);
       if (this.active !== a) return;
       this.active = this.prepare(a.target, res[0], 'route', { stops: a.stops, vias: rest, joined: true, startPt: a.startPt });
       this.save();
@@ -891,7 +1007,7 @@ const Nav = {
       const back = distance(pos, { lon: a.proj[0], lat: a.proj[1] });
       icon.innerHTML = `<svg viewBox="0 0 24 24" style="transform:rotate(${bearingDeg(pos, { lon: a.proj[0], lat: a.proj[1] }) - map.getBearing()}deg)"><path d="M12 21V4M6 10l6-6 6 6"/></svg>`;
       dist.textContent = fmtDist(back);
-      text.textContent = a.track ? 'Abseits des Tracks · zurück zur Linie' : navigator.onLine ? 'Abseits der Route · wird neu berechnet …' : 'Abseits der Route · zurück zur Linie';
+      text.textContent = a.track ? 'Abseits des Tracks · zurück zur Linie' : (navigator.onLine || RouteData.local.size) && a.travel !== 'transit' ? 'Abseits der Route · wird neu berechnet …' : 'Abseits der Route · zurück zur Linie';
     } else {
       const m = this.next();
       icon.innerHTML = this.icon(m ? m.type : 4, m && m.exit);
@@ -1169,6 +1285,7 @@ const Nav = {
       if (this.voice) this.say('Sprachansagen an.', false, ['voice_on']);
     };
     this.restore();
+    Promise.all([RouteData.scan(), RouteData.loadIndex()]).then(() => { if (typeof renderRegions === 'function') renderRegions(); });
   },
 
   /* Auswahl im Ziel-Kärtchen: Route oder Luftlinie */

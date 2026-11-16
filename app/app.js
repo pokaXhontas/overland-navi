@@ -1078,11 +1078,11 @@ function startDownload(region) {
   const finish = () => { worker.terminate(); downloads.delete(region.id); settings.wake = keepAwake; updateWakeLock(); };
   worker.onmessage = async (e) => {
     const m = e.data;
-    if (m.type === 'scan') { job.phase = 'scan'; job.note = `Bereite vor … ${m.layer === 'dem' ? 'Höhen' : 'Karte'}: ${m.tiles.toLocaleString('de-DE')} Kacheln gefunden`; updateProgress(region.id); }
+    if (m.type === 'scan') { job.phase = 'scan'; job.note = `Bereite vor … ${m.layer === 'dem' ? 'Höhen' : /^rt-/.test(m.layer) ? 'Straßennetz' : /^hk-/.test(m.layer) ? 'Wanderwege' : 'Karte'}: ${m.tiles.toLocaleString('de-DE')} Kacheln gefunden`; updateProgress(region.id); }
     if (m.type === 'progress') { job.phase = 'download'; job.loaded = m.loaded; job.total = m.total; updateProgress(region.id); }
     if (m.type === 'tiles-done') {
       job.phase = 'search'; job.note = 'Karte fertig · Suchindex wird vorbereitet …';
-      await Tiles.scanLocal(); Tiles.reset(); await Hike.scan();
+      await Tiles.scanLocal(); Tiles.reset(); await Hike.scan(); await RouteData.scan();
       renderRegions(); updateChip(); refreshStyle();
     }
     if (m.type === 'hike') { job.phase = 'search'; job.note = `Wanderwege: ${fmtBytes(m.loaded)} von ${fmtBytes(m.total)}`; updateProgress(region.id); }
@@ -1092,7 +1092,7 @@ function startDownload(region) {
     if (m.type === 'done') {
       finish();
       await cacheAssets();
-      await Tiles.scanLocal(); Tiles.reset();
+      await Tiles.scanLocal(); Tiles.reset(); await RouteData.scan();
       Search.loaded.delete(region.id);
       Search.items = Search.items.filter((it) => it.regionId !== region.id);
       toast(region.name + ' ist jetzt offline verfügbar');
@@ -1116,7 +1116,8 @@ function startDownload(region) {
   worker.postMessage({
     id: region.id, boxes: region.boxes, maxzoom: region.maxzoom, demMaxzoom: region.demMaxzoom,
     sources: Tiles.sources, searchUrl: region.search ? BASE + region.search : null, buildSearchIndex: !region.search,
-    hikeLayers: Hike.keysFor(region.boxes).map((k) => ({ key: k, url: Hike.dlUrl(k) })).filter((l) => l.url)
+    hikeLayers: Hike.keysFor(region.boxes).map((k) => ({ key: k, url: Hike.dlUrl(k) })).filter((l) => l.url),
+    routeLayers: RouteData.keysFor(region.boxes).map((k) => ({ key: k, url: RouteData.dlUrl(k) })).filter((l) => l.url)
   });
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 }
@@ -1125,7 +1126,7 @@ async function deleteRegion(region, forget) {
   const root = await Tiles.opfs();
   if (!root) return;
   const names = [`${region.id}-search.json`];
-  if (root.keys) for await (const n of root.keys()) if (n.startsWith(`${region.id}-hk-`)) names.push(n);
+  if (root.keys) for await (const n of root.keys()) if (n.startsWith(`${region.id}-hk-`) || n.startsWith(`${region.id}-rt-`)) names.push(n);
   for (const layer of ['base', 'dem']) {
     for (const suffix of ['.idx.ok', '.idx', '.dat', '.state', '.pmtiles.ok', '.pmtiles']) names.push(`${region.id}-${layer}${suffix}`);
   }
@@ -1139,7 +1140,7 @@ async function deleteRegion(region, forget) {
     delete region.searchState; saveAdded();
   }
   await Tiles.scanLocal(); Tiles.reset();
-  await Hike.scan(); refreshStyle();
+  await Hike.scan(); await RouteData.scan(); refreshStyle();
   toast(region.name + (forget ? ' aus der Liste entfernt' : ' gelöscht'));
   renderRegions(); updateStorage(); updateChip(); refreshStyle();
 }
@@ -1204,13 +1205,21 @@ function renderRegions() {
         if (!btn.dataset.sure) { btn.dataset.sure = '1'; btn.textContent = 'Wirklich löschen?'; return; }
         deleteRegion(r);
       };
-      if (Hike.keysFor(r.boxes).length && !Hike.regionDone(r)) {
+      // Ergänzungen aus den Länderdateien: Wanderwege und Straßennetz fürs Offline-Routing
+      const needHike = Hike.keysFor(r.boxes).length && !Hike.regionDone(r);
+      const needRoute = RouteData.keysFor(r.boxes).length && !RouteData.regionDone(r);
+      if (needHike || needRoute) {
         const hb = document.createElement('button');
         hb.className = 'btn small-btn';
-        hb.textContent = Hike.regionStale(r) ? 'Wanderwege aktualisieren' : 'Wanderwege laden';
+        const upd = (needHike && Hike.regionStale(r)) || (needRoute && RouteData.regionStale(r));
+        hb.textContent = needHike && needRoute ? (upd ? 'Wanderwege & Routen aktualisieren' : 'Wanderwege & Offline-Routen laden')
+          : needHike ? (Hike.regionStale(r) ? 'Wanderwege aktualisieren' : 'Wanderwege laden')
+          : (RouteData.regionStale(r) ? 'Offline-Routen aktualisieren' : 'Offline-Routen laden');
         hb.onclick = () => { if (!navigator.onLine) { toast('Dafür brauchst du Internet.'); return; } startDownload(r); };
         div.querySelector('.region-top').insertBefore(hb, btn);
-      } else if (Hike.regionDone(r)) state.append(' · mit Wanderwegen');
+      }
+      if (Hike.regionDone(r)) state.append(' · mit Wanderwegen');
+      if (RouteData.regionDone(r)) state.append(' · mit Offline-Routen');
       const ss = r.searchState;
       if (ss && !ss.complete) {
         state.append(` · Suche ${ss.done} von ${ss.total} Abschnitten`);

@@ -15,6 +15,7 @@ const SHELL = [
   'extract.js',
   'vehicles.js',
   'nav.js',
+  'router-worker.js',
   'planner.js',
   'draw.js',
   'swipe.js',

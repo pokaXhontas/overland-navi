@@ -90,7 +90,7 @@ const OvlRouter = (() => {
       hA: new Uint8Array(n), hB: new Uint8Array(n),           // Endpunkt hat hier seine Heimat
       tax: new Int32Array(n), tay: new Int32Array(n), tbx: new Int32Array(n), tby: new Int32Array(n),
       cls: new Uint8Array(n), fl: new Uint16Array(n), grade: new Uint8Array(n), sac: new Uint8Array(n), ms: new Uint8Array(n),
-      len: new Float32Array(n), name: new Uint32Array(n), ref: new Uint32Array(n),
+      len: new Float32Array(n), name: new Uint32Array(n), ref: new Uint32Array(n), dest: new Uint32Array(n),
       xa: new Int32Array(n), ya: new Int32Array(n), xb: new Int32Array(n), yb: new Int32Array(n), g: new Uint32Array(n)
     };
     let last = 0;
@@ -102,7 +102,7 @@ const OvlRouter = (() => {
       const cf = rv(); t.cls[i] = cf % 16; t.fl[i] = Math.floor(cf / 16);
       const ex = rv(); t.grade[i] = ex % 8; t.sac[i] = Math.floor(ex / 8) % 8; t.ms[i] = Math.floor(ex / 64);
       t.len[i] = rv() / 10;
-      t.name[i] = rv(); t.ref[i] = rv();
+      t.name[i] = rv(); t.ref[i] = rv(); t.dest[i] = rv();
       const gl = rv(), end = p + gl;
       t.g[i] = p;
       t.xa[i] = ox + rz(); t.ya[i] = oy + rz(); t.xb[i] = t.xa[i] + rz(); t.yb[i] = t.ya[i] + rz();
@@ -191,7 +191,7 @@ const OvlRouter = (() => {
       const max = o.sac || 3;
       const F = [0, 2, 1.6, 1.35, 1.15, 1.05, 1, 1, 1, 1, 1, 1, 1, 1.25];
       return {
-        foot: true, hv: 1.25 * 1.15, w: 1.2,
+        foot: true, hv: 1.25 * 1.15, w: 1.1,
         ok: (t, i, dir) => (t.fl[i] & 4) !== 0 && t.sac[i] <= max,
         time(t, i) {
           const c = t.cls[i];
@@ -206,7 +206,7 @@ const OvlRouter = (() => {
     }
     const prof = o.profile || 'road';
     return {
-      foot: false, w: 1.25, hv: prof === 'short' ? 0 : 36,
+      foot: false, w: 1.1, hv: prof === 'short' ? 0 : 36,
       ok: (t, i, dir) => (t.fl[i] & (dir ? 1 : 2)) !== 0,
       time(t, i) {
         const c = t.cls[i], f = t.fl[i], ms = t.ms[i];
@@ -433,7 +433,7 @@ const OvlRouter = (() => {
       if (same(t, i, a) || same(t, i, b) || !prof.ok(t, i, dir) || t.cls[i] === FERRY) continue;
       let c = geom(t, i);
       if (!dir) c = c.reverse();
-      out.push({ ang: turnAngle(inB, headBearing(c)), minor: !prof.foot && (t.cls[i] >= 8) });
+      out.push({ ang: turnAngle(inB, headBearing(c)), minor: !prof.foot && (t.cls[i] >= 8), name: streetOf(t, i) });
     }
     return out;
   }
@@ -445,6 +445,15 @@ const OvlRouter = (() => {
       if (!(t.fl[i] & 16) && prof.ok(t, i, dir) && t.cls[i] !== FERRY) return true;
     }
     return false;
+  }
+
+  function turnMan(ang, on) {
+    const abs = Math.abs(ang), side = ang >= 0 ? 'rechts' : 'links';
+    if (abs >= 165) return [ang > 0 ? 12 : 13, 'Wenden' + on];
+    if (abs >= 125) return [ang > 0 ? 11 : 14, `Scharf ${side} abbiegen${on}`];
+    if (abs >= 50) return [ang > 0 ? 10 : 15, `${ang >= 0 ? 'Rechts' : 'Links'} abbiegen${on}`];
+    if (abs >= 18) return [ang > 0 ? 9 : 16, `Leicht ${side} abbiegen${on}`];
+    return null;
   }
 
   function build(net, prof, legs, travel) {
@@ -516,24 +525,26 @@ const OvlRouter = (() => {
         const aLink = (at.fl[ai] & 8) !== 0, bLink = (bt.fl[bi] & 8) !== 0;
         const side = ang >= 0 ? 'rechts' : 'links';
         if (!prof.foot && bLink && !aLink) {
-          const dest = bt.names[bt.ref[bi]];
+          const dest = bt.names[bt.dest[bi]] || bt.names[bt.ref[bi]];
           if (at.cls[ai] <= 1) push(ang >= 0 ? 20 : 21, `Ausfahrt ${side} nehmen${dest ? ' Richtung ' + dest : ''}`);
-          else push(abs < 15 ? 17 : ang > 0 ? 18 : 19, abs < 15 ? 'Auffahrt nehmen' : `Auffahrt ${side} nehmen`);
+          else push(abs < 15 ? 17 : ang > 0 ? 18 : 19, (abs < 15 ? 'Auffahrt nehmen' : `Auffahrt ${side} nehmen`) + (dest ? ' Richtung ' + dest : ''));
           continue;
         }
         if (!prof.foot && aLink && !bLink && bt.cls[bi] <= 1) { push(25, 'Auffahren' + on); continue; }
+        // die Straße geht einfach weiter (gleicher Name, keine andere Straße mit dem Namen): kein Hinweis bei leichten Knicken
+        const aName = streetOf(at, ai);
+        if (abs < 50 && street && street === aName && !alts.some((x) => x.name === street && Math.abs(x.ang) < 60)) continue;
         const straightest = alts.every((x) => Math.abs(x.ang) > abs);
         const fork = alts.filter((x) => !x.minor && Math.abs(x.ang) < 45);
         if (abs < 35 && straightest) {
-          // Gabelung: zwei fast gleich gerade Wege
-          if (fork.length) push(fork.every((x) => x.ang < ang) ? 23 : fork.every((x) => x.ang > ang) ? 24 : 22,
-            fork.every((x) => x.ang < ang) ? 'Rechts halten' + on : fork.every((x) => x.ang > ang) ? 'Links halten' + on : 'Geradeaus weiter' + on);
+          if (fork.length) {
+            const right = fork.every((x) => x.ang < ang), left = fork.every((x) => x.ang > ang);
+            push(right ? 23 : left ? 24 : 22, (right ? 'Rechts halten' : left ? 'Links halten' : 'Geradeaus weiter') + on, { _in: inB, _out: outB });
+          }
           continue;
         }
-        if (abs >= 165) push(ang > 0 ? 12 : 13, 'Wenden' + on);
-        else if (abs >= 125) push(ang > 0 ? 11 : 14, `Scharf ${side} abbiegen${on}`);
-        else if (abs >= 50) push(ang > 0 ? 10 : 15, `${side === 'rechts' ? 'Rechts' : 'Links'} abbiegen${on}`);
-        else if (abs >= 15) push(ang > 0 ? 9 : 16, `Leicht ${side} abbiegen${on}`);
+        const tm = turnMan(ang, on);
+        if (tm) push(tm[0], tm[1], { _in: inB, _out: outB });
       }
       const lastLeg = li === legs.length - 1;
       man.push({ idx: coords.length - 1, type: 4, text: lastLeg ? 'Ziel erreicht' : 'Zwischenziel erreicht',
@@ -553,6 +564,18 @@ const OvlRouter = (() => {
     const cum = [0];
     for (let k = 1; k < coords.length; k++) cum.push(cum[k - 1] + dist(coords[k - 1][0], coords[k - 1][1], coords[k][0], coords[k][1]));
     const total = cum[cum.length - 1] || 0;
+    // zwei Abbiegungen direkt hintereinander (Kreuzung mit getrennten Fahrbahnen) zu einer zusammenfassen
+    const close = prof.foot ? 12 : 35;
+    for (let k = 0; k + 1 < man.length; k++) {
+      const m = man[k], n = man[k + 1];
+      if (m._in === undefined || n._in === undefined || cum[n.idx] - cum[m.idx] > close) continue;
+      const tm = turnMan(turnAngle(m._in, n._out), n.street ? ' auf ' + n.street : '');
+      if (tm) { man.splice(k, 2, { ...n, idx: m.idx, type: tm[0], text: tm[1], alert: tm[1], verbal: tm[1], _in: m._in }); }
+      else { man.splice(k, 2); }
+      k--;
+      if (k < -1) k = -1;
+    }
+    for (const m of man) { delete m._in; delete m._out; }
     for (let k = 0; k < man.length; k++) {
       const next = man[k + 1];
       const d = (next ? cum[next.idx] : total) - cum[man[k].idx];

@@ -175,7 +175,7 @@ async function downloadFile(root, name, url, size, post) {
 }
 
 self.onmessage = async (e) => {
-  const { id, boxes, maxzoom, demMaxzoom, sources, searchUrl, buildSearchIndex, mode, hikeLayers } = e.data;
+  const { id, boxes, maxzoom, demMaxzoom, sources, searchUrl, buildSearchIndex, mode, hikeLayers, routeLayers } = e.data;
   const post = (m) => self.postMessage(m);
   try {
     if (mode === 'estimate') {
@@ -195,6 +195,8 @@ self.onmessage = async (e) => {
     const layers = [['base', sources.base, maxzoom], ['dem', sources.dem, demMaxzoom]];
     // Wanderwege: aus jeder berührten Länderdatei genau das Gebiet ausschneiden
     for (const h of hikeLayers || []) layers.push(['hk-' + h.key, h.url, 14]);
+    // Straßennetz fürs Offline-Routing: große Straßen (z7) und alle Wege (z10) des Gebiets
+    for (const h of routeLayers || []) layers.push(['rt-' + h.key, h.url, 10]);
     const jobs = [];
     let doneBytes = 0;
     for (const [layer, url, mz] of layers) {
