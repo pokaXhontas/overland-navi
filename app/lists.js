@@ -121,7 +121,7 @@ const Lists = {
     for (const l of used) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'lchip panel' + (l.on ? ' on' : '');
+      b.className = 'lchip' + (l.on ? ' on' : '');
       b.setAttribute('aria-pressed', String(!!l.on));
       if (l.on) { b.style.background = l.color; b.style.color = this.inkFor(l.color); b.style.borderColor = l.color; }
       b.textContent = l.name;

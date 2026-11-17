@@ -844,10 +844,10 @@ html.dark .na-tag.ferry { color: #74C0FC; } html.dark .na-tag.toll { color: #FFC
 .imp-name { border-radius: 10px; border: 1px solid var(--line); background: var(--faint); padding: 8px 10px; font: inherit; font-size: 16px; font-weight: 650; color: var(--text); outline: none; }
 .imp-txt small { font-size: 12px; color: var(--muted); }
 .chip-btn.add { border-style: dashed; background: transparent; color: var(--accent-text); }
-.list-chips { position: fixed; z-index: 5; left: 50%; transform: translateX(-50%); top: calc(var(--safe-t) + var(--gap) + 56px); display: flex; gap: 6px; max-width: calc(100vw - 2 * var(--gap) - 140px); overflow-x: auto; scrollbar-width: none; padding: 2px; }
+.list-chips { position: fixed; z-index: 5; left: 50%; transform: translateX(-50%); top: calc(var(--safe-t) + var(--gap) + 56px); display: flex; gap: 6px; max-width: calc(100vw - 2 * var(--gap) - 140px); overflow-x: auto; scrollbar-width: none; padding: 4px 4px 8px; }
 .list-chips::-webkit-scrollbar { display: none; }
 .list-chips[hidden] { display: none; }
-.lchip { height: 34px; padding: 0 13px; border-radius: 17px; font: inherit; font-size: 13px; font-weight: 650; color: var(--muted); white-space: nowrap; flex-shrink: 0; border: 1px solid var(--line); }
+.lchip { height: 34px; padding: 0 13px; border-radius: 17px; font: inherit; font-size: 13px; font-weight: 650; color: var(--muted); white-space: nowrap; flex-shrink: 0; border: 1px solid var(--line); background: var(--panel-solid); box-shadow: 0 2px 8px rgba(0,0,0,.18); }
 .lchip.on { font-weight: 700; }
 .pin-card { position: fixed; z-index: 13; left: calc(var(--safe-l) + 12px); bottom: calc(var(--safe-b) + 12px); width: min(400px, calc(100vw - 24px)); padding: 14px; border-radius: 22px; display: flex; flex-direction: column; gap: 12px; }
 .pc-top { display: flex; gap: 12px; align-items: flex-start; }
