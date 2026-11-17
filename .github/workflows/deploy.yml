@@ -32,7 +32,7 @@ jobs:
           mkdir -p vendor-tmp
           cd vendor-tmp
           npm init -y > /dev/null
-          npm install --no-audit --no-fund maplibre-gl@5 pmtiles@4 @protomaps/basemaps@5 maplibre-contour@0.1
+          npm install --no-audit --no-fund maplibre-gl@5 pmtiles@4 @protomaps/basemaps@5 maplibre-contour@0.1 qrcode-generator@1 jsqr@1
 
       - name: pmtiles-Werkzeug installieren
         env:
@@ -146,6 +146,8 @@ jobs:
           pick site/vendor/pmtiles.js      $N/pmtiles/dist/pmtiles.js $N/pmtiles/dist/index.js
           pick site/vendor/basemaps.js     $N/@protomaps/basemaps/dist/basemaps.js $N/@protomaps/basemaps/dist/index.js
           pick site/vendor/maplibre-contour.js $N/maplibre-contour/dist/index.min.js $N/maplibre-contour/dist/index.js
+          pick site/vendor/qrcode.js       $N/qrcode-generator/dist/qrcode.js $N/qrcode-generator/qrcode.js
+          pick site/vendor/jsqr.js         $N/jsqr/dist/jsQR.js
           cp -r assets-tmp/fonts site/fonts
           cp -r assets-tmp/sprites site/sprites
           python3 - << 'PY'
@@ -173,7 +175,8 @@ jobs:
               'sources': {
                   'base': f'{proxy}/{build}.pmtiles' if proxy else f'https://build.protomaps.com/{build}.pmtiles',
                   'dem': 'https://download.mapterhorn.com/planet.pmtiles',
-                  'hike': f'{proxy}/wander/{{id}}.pmtiles' if proxy else ''
+                  'hike': f'{proxy}/wander/{{id}}.pmtiles' if proxy else '',
+                  'sync': f'{proxy}/sync/' if proxy else ''
               },
               'regions': regions
           }

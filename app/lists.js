@@ -145,7 +145,7 @@ const Lists = {
     el.querySelector('.pc-x').onclick = () => this.closeCard();
     el.querySelector('.pc-route').onclick = () => { this.closeCard(); closeSheet(); Nav.choose({ name: p.name, lat: p.lat, lon: p.lon }); };
     el.querySelector('.pc-edit').onclick = () => { this.closeCard(); openEditor(p); };
-    el.querySelector('.pc-share').onclick = () => this.share([p], p.name);
+    el.querySelector('.pc-share').onclick = () => Sync.shareMenu([p], p.name, { type: 'items', ids: [p.id] });
     const g = el.querySelector('.pc-google');
     if (p.url) g.href = p.url; else g.href = `https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lon}`;
     document.body.appendChild(el);
@@ -208,7 +208,7 @@ const Lists = {
     const tg = $('#list-toggle');
     tg.checked = !!l.on;
     tg.onchange = () => { l.on = tg.checked; this.saveMeta(); this.refresh(); };
-    $('#list-share').onclick = () => this.share(items, l.name);
+    $('#list-share').onclick = () => Sync.shareMenu(items, l.name, { type: 'lists', lists: [l.id] });
     $('#list-share').disabled = !items.length;
     $('#list-sel').textContent = this.sel.active ? 'Fertig' : 'Auswählen';
     $('#list-sel').onclick = () => (this.sel.active ? this.endSel() : this.startSel('list'));
@@ -245,7 +245,7 @@ const Lists = {
         bar.className = 'cc-tools';
         bar.innerHTML = '<button type="button" class="link-btn cc-share"></button><button type="button" class="link-btn cc-all"></button>';
         bar.querySelector('.cc-share').textContent = this.countryName(cc) + ' teilen';
-        bar.querySelector('.cc-share').onclick = () => this.share(inCC, `${l.name} – ${this.countryName(cc)}`);
+        bar.querySelector('.cc-share').onclick = () => Sync.shareMenu(inCC, `${l.name} – ${this.countryName(cc)}`, { type: 'countries', countries: [[l.id, cc]] });
         const allBtn = bar.querySelector('.cc-all');
         if (this.sel.active) {
           allBtn.textContent = 'Alle hier auswählen';
@@ -312,7 +312,7 @@ const Lists = {
   async selAction(act) {
     const items = this.selected();
     if (!items.length) return;
-    if (act === 'share') { this.share(items, `${items.length} Orte`); return; }
+    if (act === 'share') { Sync.shareMenu(items, `${items.length} Orte`, { type: 'items', ids: items.map((p) => p.id) }); return; }
     if (act === 'cat') {
       const id = await this.choose('Kategorie ändern', [...CATS.map((c) => ({ id: c.id, label: c.label, color: c.color, ink: c.ink, d: c.d })), { id: '+', label: 'Neue Kategorie …', d: 'M12 5v14M5 12h14' }]);
       if (!id) return;

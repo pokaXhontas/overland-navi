@@ -12,6 +12,7 @@ const SHELL = [
   'style.css',
   'app.js',
   'lists.js',
+  'sync.js',
   'dl-worker.js',
   'extract.js',
   'vehicles.js',
@@ -32,7 +33,9 @@ const SHELL = [
   'vendor/maplibre-gl.css',
   'vendor/pmtiles.js',
   'vendor/basemaps.js',
-  'vendor/maplibre-contour.js'
+  'vendor/maplibre-contour.js',
+  'vendor/qrcode.js',
+  'vendor/jsqr.js'
 ];
 
 self.addEventListener('install', (event) => {

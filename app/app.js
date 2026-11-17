@@ -729,6 +729,7 @@ function placeIconImage(cat) {
 
 function savePlaces() {
   store.set('places', places);
+  if (typeof Sync !== 'undefined') Sync.soon();
   const src = map && map.getSource('places');
   if (src) src.setData(placesGeoJSON());
   $('#places-count').textContent = places.length + (places.length === 1 ? ' Ort' : ' Orte');
@@ -1069,7 +1070,7 @@ function newPlaceHere() {
 function renderPlaceList() { renderDataCats(); refreshCatPage(); }
 function exportGPX() {
   if (!places.length && !tracks.length) { toast('Noch keine Orte oder Tracks gespeichert.'); return; }
-  Lists.share(places, 'overland-daten', tracks);
+  Sync.shareMenu(places, 'Alles', { type: 'all' }, tracks);
 }
 
 function setupEditorUI() {
@@ -1518,6 +1519,7 @@ function setupUI() {
   Swipe.setup();
   Hike.setup();
   Lists.setup();
+  Sync.setup();
   Tours.setup();
   Poi.setup();
   for (const [id, key, def] of [['#t-water', 'waterOn', true], ['#t-service', 'serviceOn', true], ['#t-tracks', 'hikeTracks', true]]) {
@@ -1925,7 +1927,7 @@ function updateTracksSource() {
   if (src) src.setData(tracksGeoJSON());
   renderTrackList();
 }
-async function saveTrack(t) { await DB.run('tracks', 'readwrite', (s) => s.put(t)); }
+async function saveTrack(t) { t.updated = new Date().toISOString(); await DB.run('tracks', 'readwrite', (s) => s.put(t)); if (typeof Sync !== 'undefined') Sync.soon(); }
 
 function trackBounds(t) {
   const b = new maplibregl.LngLatBounds();
@@ -1950,6 +1952,7 @@ function buildTrackRow(t) {
   del.onclick = async () => {
     if (!del.classList.contains('confirm')) { del.classList.add('confirm'); toast('Zum Löschen nochmal tippen'); setTimeout(() => del.classList.remove('confirm'), 3000); return; }
     await DB.run('tracks', 'readwrite', (st) => st.delete(t.id));
+    if (typeof Sync !== 'undefined') Sync.soon();
     tracks = tracks.filter((x) => x !== t);
     updateTracksSource();
     toast('Track gelöscht');
@@ -2011,7 +2014,7 @@ function openCatPage(id) {
   page.querySelector('.sheet-body').scrollTop = 0;
 }
 function closeCatPage() { openCat = null; Lists.endSel(true); $('#cat-page').hidden = true; }
-function closeSheet() { closeCatPage(); if (typeof Lists !== 'undefined') Lists.closeList(); $('#add-page').hidden = true; $('#sheet').hidden = true; for (const id of ['#choose-page', '#thing-page', '#imp-page']) { const e = $(id); if (e) e.hidden = true; } }
+function closeSheet() { closeCatPage(); if (typeof Lists !== 'undefined') Lists.closeList(); $('#add-page').hidden = true; $('#sheet').hidden = true; for (const id of ['#choose-page', '#thing-page', '#imp-page', '#sync-new-page', '#sync-code-page', '#sync-join-page', '#sync-conn-page']) { const e = $(id); if (e) e.hidden = true; } $('#dlg').hidden = true; }
 
 function refreshCatPage() {
   if (!openCat) return;
@@ -2029,7 +2032,7 @@ function refreshCatPage() {
   const isTracks = openCat === 'tracks';
   $('#cat-tools').hidden = isTracks;
   if (!isTracks) {
-    $('#cat-share').onclick = () => Lists.share(items, c.label);
+    $('#cat-share').onclick = () => Sync.shareMenu(items, c.label, { type: 'cats', cats: [c.id] });
     $('#cat-share').disabled = !items.length;
     $('#cat-sel').textContent = Lists.sel.active ? 'Fertig' : 'Auswählen';
     $('#cat-sel').disabled = !items.length && !Lists.sel.active;
@@ -2276,6 +2279,7 @@ function setupTrackInfoUI() {
     if (!t) return;
     if (!trackInfo.confirmDelete) { trackInfo.confirmDelete = true; $('#ti-delete').textContent = 'Wirklich löschen? Nochmal tippen'; return; }
     await DB.run('tracks', 'readwrite', (st) => st.delete(t.id));
+    if (typeof Sync !== 'undefined') Sync.soon();
     tracks = tracks.filter((x) => x !== t);
     trackInfo.open = false; trackInfo.track = null;
     $('#trackinfo').hidden = true;

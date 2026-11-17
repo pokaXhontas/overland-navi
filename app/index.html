@@ -121,6 +121,11 @@
     <div class="cat-list" id="track-list"></div>
     <div class="row static"><span><b id="places-count">0 Orte</b><small>Neuer Ort: „Ort speichern“ oder lange auf die Karte drücken</small></span><button class="btn" id="btn-gpx">Alles teilen</button></div>
 
+    <h2>Verbindungen</h2>
+    <p class="muted small hint-line">Orte live mit anderen teilen und gemeinsam pflegen – per Sync-Code oder QR.</p>
+    <div class="place-list" id="sync-list"></div>
+    <div class="two-btns"><button type="button" class="btn" id="btn-sync-new">Neue Verbindung</button><button type="button" class="btn" id="btn-sync-join">Code eingeben</button></div>
+
     <h2>Importieren</h2>
     <label class="import-btn">
       <input type="file" id="import-file" multiple>
@@ -199,6 +204,76 @@
       <h2>Länder</h2>
       <p class="muted small hint-line">Schalter blendet ein Land aus, Antippen klappt die Orte auf.</p>
       <div class="cat-list" id="list-countries"></div>
+    </div>
+  </div>
+
+  <div class="sheet-page" id="sync-new-page" hidden>
+    <div class="sheet-head page-head">
+      <button class="back" id="sn-back" aria-label="Zurück"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Zurück</span></button>
+    </div>
+    <div class="sheet-body">
+      <div class="cat-title"><h1>Neue Verbindung</h1></div>
+      <label class="field"><span>Name</span><input id="sn-name" type="text" autocomplete="off" enterkeyhint="done" placeholder="z. B. Island mit Anne"></label>
+      <h2>Was wird geteilt?</h2>
+      <div class="seg" role="radiogroup" aria-label="Umfang" id="sn-scope">
+        <button role="radio" data-scope="all">Alles</button>
+        <button role="radio" data-scope="lists">Listen</button>
+        <button role="radio" data-scope="cats">Kategorien</button>
+      </div>
+      <div id="sn-pick" class="sn-pick"></div>
+      <p class="muted small">Einzelne Länder oder ausgewählte Orte teilst du direkt in der Liste: Land aufklappen → „teilen“ oder „Auswählen“ → „Teilen“.</p>
+      <h2>Was dürfen die anderen?</h2>
+      <div class="seg two" role="radiogroup" aria-label="Rechte" id="sn-rights">
+        <button role="radio" data-w="1">Gemeinsam bearbeiten</button>
+        <button role="radio" data-w="0">Nur ansehen</button>
+      </div>
+      <p class="muted small" id="sn-rights-hint"></p>
+      <button type="button" class="btn primary wide" id="sn-create">Verbindung anlegen</button>
+    </div>
+  </div>
+
+  <div class="sheet-page" id="sync-code-page" hidden>
+    <div class="sheet-head page-head">
+      <button class="back" id="sc-back" aria-label="Zurück"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Zurück</span></button>
+    </div>
+    <div class="sheet-body">
+      <div class="cat-title"><h1 id="sc-name"></h1></div>
+      <p class="muted small"><b id="sc-rights"></b> · Den QR-Code mit dem anderen Handy scannen oder den Link schicken. Wer den Code hat, bekommt die Orte – nur an Leute geben, denen du vertraust.</p>
+      <div class="sc-qr" id="sc-qr"></div>
+      <code class="sc-code" id="sc-code"></code>
+      <div class="two-btns"><button type="button" class="btn primary" id="sc-share">Link senden</button><button type="button" class="btn" id="sc-copy">Code kopieren</button></div>
+    </div>
+  </div>
+
+  <div class="sheet-page" id="sync-join-page" hidden>
+    <div class="sheet-head page-head">
+      <button class="back" id="sj-back" aria-label="Zurück"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Zurück</span></button>
+    </div>
+    <div class="sheet-body">
+      <div class="cat-title"><h1>Verbindung beitreten</h1></div>
+      <label class="field"><span>Sync-Code oder Link</span><textarea id="sj-code" rows="3" placeholder="OVL1.…" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea></label>
+      <div class="two-btns"><button type="button" class="btn" id="sj-paste">Einfügen</button><button type="button" class="btn" id="sj-scan">QR scannen</button></div>
+      <div class="sj-cam" id="sj-cam" hidden></div>
+      <div class="sj-browser" id="sj-browser" hidden>
+        <p class="small"><b>App vom Home-Bildschirm?</b> Die hat ihren eigenen Speicher. Dann den Code kopieren, die App öffnen und dort unter Karten &amp; Ebenen → Verbindungen → „Code eingeben“ einfügen.</p>
+        <button type="button" class="btn wide" id="sj-copy">Code kopieren</button>
+      </div>
+      <button type="button" class="btn primary wide" id="sj-go">Verbinden</button>
+    </div>
+  </div>
+
+  <div class="sheet-page" id="sync-conn-page" hidden>
+    <div class="sheet-head page-head">
+      <button class="back" id="scn-back" aria-label="Zurück"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Zurück</span></button>
+    </div>
+    <div class="sheet-body">
+      <div class="cat-title"><span class="pi-icon sync-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10l-3-3M17 17H7l3 3"/></svg></span><h1 id="scn-name"></h1></div>
+      <div class="row static"><span><b id="scn-what"></b><small id="scn-rights"></small></span></div>
+      <div class="row static"><span><b>Abgleich</b><small id="scn-status"></small></span><button type="button" class="btn" id="scn-sync">Jetzt</button></div>
+      <h2>Weitere Leute einladen</h2>
+      <div class="two-btns"><button type="button" class="btn" id="scn-code-edit">Code: bearbeiten</button><button type="button" class="btn" id="scn-code-view">Code: nur ansehen</button></div>
+      <p class="muted small">Fotos bleiben auf dem Gerät. Abgeglichen wird automatisch, sobald die App offen ist und Internet hat.</p>
+      <button type="button" class="btn danger wide" id="scn-del">Verbindung trennen</button>
     </div>
   </div>
 
@@ -507,6 +582,7 @@
 <script src="vehicles.js"></script>
 <script src="app.js"></script>
 <script src="lists.js"></script>
+<script src="sync.js"></script>
 <script src="nav.js"></script>
 <script src="planner.js"></script>
 <script src="draw.js"></script>
