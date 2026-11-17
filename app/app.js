@@ -374,12 +374,12 @@ function buildStyle() {
       id: 'places-icon', type: 'symbol', source: 'places',
       // eigene Orte immer, Merklisten (oft Hunderte) etwas kleiner, solange man weit weg ist
       layout: { 'icon-image': ['get', 'icon'], 'icon-allow-overlap': true, 'icon-ignore-placement': true,
-        'icon-size': ['case', ['==', ['get', 'own'], 1], 1, ['interpolate', ['linear'], ['zoom'], 3, 0.6, 8, 0.8, 12, 0.95]],
+        'icon-size': ['interpolate', ['linear'], ['zoom'], 3, ['case', ['==', ['get', 'own'], 1], 1, 0.6], 8, ['case', ['==', ['get', 'own'], 1], 1, 0.8], 12, ['case', ['==', ['get', 'own'], 1], 1, 0.95]],
         'symbol-sort-key': ['get', 'own'] }
     },
     {
       id: 'places-label', type: 'symbol', source: 'places',
-      layout: { 'text-field': ['case', ['==', ['get', 'own'], 1], ['get', 'name'], ['step', ['zoom'], '', 9, ['get', 'name']]], 'text-font': ['Noto Sans Medium'], 'text-size': ['case', ['==', ['get', 'own'], 1], 13, 12], 'text-offset': [0, 1.5], 'text-anchor': 'top', 'text-optional': true, 'text-max-width': 9 },
+      layout: { 'text-field': ['step', ['zoom'], ['case', ['==', ['get', 'own'], 1], ['get', 'name'], ''], 9, ['get', 'name']], 'text-font': ['Noto Sans Medium'], 'text-size': ['case', ['==', ['get', 'own'], 1], 13, 12], 'text-offset': [0, 1.5], 'text-anchor': 'top', 'text-optional': true, 'text-max-width': 9 },
       paint: { 'text-color': dark ? '#EEF2F4' : '#15191D', 'text-halo-color': dark ? '#0B0F12' : '#FFFFFF', 'text-halo-width': 1.5 }
     }
   );
