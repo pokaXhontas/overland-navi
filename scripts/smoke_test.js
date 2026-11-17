@@ -367,6 +367,36 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   console.log('Länder in der Liste:', n);
   await shot('7-gebiet-hinzufuegen');
 
+  // Listen, Import, Teilen, Sync
+  console.log('Listen & Sync:', await page.evaluate(async () => {
+    const out = [];
+    const n0 = places.length;
+    const csv = 'Titel,Notiz,URL,Tags,Kommentar\nProbe-See,,"https://www.google.com/maps/search/42.1,77.2",,\nProbe-Platz,,https://www.google.com/maps/place/X/data=!4m2!3m1!1s0x47a827f3eee9b7a9:0xca5fe03eddbd1931,,\n';
+    const lists = await Lists.readTakeout([new File([csv], 'Wunschziele.csv')]);
+    out.push('Takeout ' + Object.keys(lists).join('/') + ' ' + lists.Reiseplanung.length + ' Orte, S2 ' + (lists.Reiseplanung[1].lat ? lists.Reiseplanung[1].lat.toFixed(2) : '-'));
+    const lid = Lists.ensure('Probeliste', '#7048E8');
+    const res = { added: 0, dupes: 0 };
+    for (const it of lists.Reiseplanung) Lists.addPlace({ ...it, list: lid, cat: guessFromName(it.name) || 'other', auto: true, pend: false, cc: 'kg' }, res);
+    const mine = places.filter((p) => p.list === lid);
+    const g = Lists.gpx(mine);
+    places = places.filter((p) => p.list !== lid);
+    await importFiles([new File([g], 'probe.gpx')]);
+    const back = places.filter((p) => Lists.get(p.list).name === 'Probeliste');
+    out.push('GPX hin und zurück ' + back.length + '/' + mine.length + ' · Kategorie ' + back.map((p) => p.cat).join(','));
+    const c = { id: Sync.hex(Sync.rand(16)), key: Sync.b64u(Sync.rand(32)) };
+    const box = await Sync.seal(c, { items: { 1: { name: 'ä' } } });
+    out.push('Verschlüsselung ' + ((await Sync.unseal(c, box.buffer)).items[1].name === 'ä' ? 'ok' : 'FEHLER') + ' (' + box.length + ' Bytes)');
+    out.push('Code ' + (Sync.parse(Sync.link(Sync.code({ ...c, w: Sync.b64u(Sync.rand(16)) }, true))) ? 'ok' : 'FEHLER') + ' · Ablage ' + Sync.url());
+    try { await loadScript('vendor/qrcode.js'); const q = qrcode(0, 'M'); q.addData('test'); q.make(); out.push('QR ok'); } catch (e) { out.push('QR FEHLER ' + e.message); }
+    try { await loadScript('vendor/jsqr.js'); out.push('Scanner ' + (typeof jsQR)); } catch (e) { out.push('Scanner FEHLER'); }
+    try { const r = await fetch(Sync.url()); out.push('Sync-Server ' + r.status + ' ' + (await r.text()).slice(0, 40)); } catch (e) { out.push('Sync-Server nicht erreichbar'); }
+    places = places.filter((p) => Lists.get(p.list).name !== 'Probeliste');
+    Lists.all = Lists.all.filter((l) => l.name !== 'Probeliste');
+    Lists.saveMeta(); savePlaces();
+    out.push('Orte vorher/nachher ' + n0 + '/' + places.length);
+    return out.join(' | ');
+  }));
+
   // iPhone-Größe mit Navigation
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   await page.evaluate(() => { closeSheet(); return Nav.start({ lat: 42.4901, lon: 78.3936, name: 'Karakol' }, 'route'); });
