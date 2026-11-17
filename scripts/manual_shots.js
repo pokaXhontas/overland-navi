@@ -56,6 +56,7 @@ const BKK = { lat: 42.8746, lon: 74.5698 };
     try { if (Draw.active) Draw.exit(); } catch (e) { /* zu */ }
     try { Poi.clear(); if (Poi.popup) Poi.popup.remove(); } catch (e) { /* zu */ }
     try { closeTrackInfo(); } catch (e) { /* zu */ }
+    try { Lists.closeCard(); Lists.endSel(true); } catch (e) { /* zu */ }
     document.querySelectorAll('.maplibregl-popup').forEach((p) => p.remove());
     $('#toast').classList.remove('show');
   });
@@ -215,6 +216,69 @@ const BKK = { lat: 42.8746, lon: 74.5698 };
   await scene('24-wasser-toiletten', async () => {
     await ev(() => { store.set('waterOn', true); store.set('serviceOn', true); refreshStyle(); map.jumpTo({ center: [8.5417, 47.3769], zoom: 15.5, bearing: 0 }); });
     await shot('24-wasser-toiletten', 7000);
+  });
+
+  // ---------- Listen, Kategorien, Teilen, Verbindungen (Beispieldaten) ----------
+  await ev(() => {
+    const now = new Date().toISOString();
+    const L = Lists.ensure('Reiseplanung', '#7048E8');
+    const F = Lists.ensure('Favoriten', '#F2B705');
+    const P = (name, lat, lon, cat, list, cc, note = '') => places.push({ id: Date.now() * 1000 + Math.floor(Math.random() * 1000), name, lat, lon, cat, list, cc, note, rating: 0, feats: [], photos: [], time: now, updated: now });
+    P('Song-Köl Nordufer', 41.88, 75.12, 'gewaesser', L, 'kg', 'Jurtencamps am Ufer, Piste von Kochkor');
+    P('Skazka-Canyon', 42.16, 77.36, 'natur', L, 'kg');
+    P('Tash Rabat', 40.82, 75.29, 'kultur', L, 'kg', 'Karawanserei, Zufahrt gut');
+    P('Barskoon-Wasserfall', 42.08, 77.6, 'gewaesser', L, 'kg');
+    P('Kel-Suu', 40.98, 76.1, 'gewaesser', L, 'kg');
+    P('Scharyn-Canyon', 43.35, 79.08, 'natur', L, 'kz');
+    P('Kolsai-Seen', 42.94, 78.32, 'gewaesser', L, 'kz');
+    P('Bergbäckerei Karakol', 42.49, 78.39, 'essen', F, 'kg');
+    P('Strand Bosteri', 42.64, 77.17, 'strand', F, 'kg');
+    savePlaces();
+    Lists.refresh();
+  });
+
+  await scene('25-listen', async () => {
+    await ev(() => { map.jumpTo({ center: [76.6, 42.1], zoom: 6.3, bearing: 0 }); });
+    await sleep(3000);
+    await shot('25-karte-listen', 2500);
+    await ev(() => Lists.showCard(places.find((p) => p.name === 'Tash Rabat')));
+    await shot('26-kaertchen', 1200);
+    await ev(() => { Lists.closeCard(); $('#sheet').hidden = false; renderDataCats(); $('#sheet .sheet-body').scrollTop = 0; });
+    await shot('27-menue-listen', 1200);
+    await ev(() => { Lists.openList(Lists.all.find((l) => l.name === 'Reiseplanung').id); Lists.openCC = 'kg'; Lists.renderListPage(); });
+    await shot('28-liste-laender', 1200);
+    await ev(() => { Lists.startSel('list'); const it = [...document.querySelectorAll('#list-countries .place-item')]; it[0].click(); it[2].click(); });
+    await shot('29-auswahl', 1200);
+    await ev(() => { Lists.endSel(); Lists.closeList(); Lists.editCat(null); $('#thing-name').value = 'Drohnen-Spots'; document.querySelectorAll('#thing-syms .sym')[1].click(); });
+    await shot('30-neue-kategorie', 1200);
+    await ev(() => { $('#thing-back').click(); });
+  });
+
+  await scene('31-teilen', async () => {
+    await ev(() => { $('#sheet').hidden = false; const l = Lists.all.find((x) => x.name === 'Reiseplanung'); Sync.shareMenu(places.filter((p) => p.list === l.id), l.name, { type: 'lists', lists: [l.id] }); });
+    await shot('31-teilen', 1200);
+    await ev(() => { $('#choose-back').click(); const l = Lists.all.find((x) => x.name === 'Reiseplanung'); Sync.openNew({ name: 'Kirgistan mit Freunden', scope: { type: 'lists', lists: [l.id] } }); $('#sn-name').value = 'Kirgistan mit Freunden'; });
+    await shot('32-neue-verbindung', 1200);
+    await ev(async () => {
+      Sync.syncAll = async () => {};
+      const c = { id: Sync.hex(Sync.rand(16)), key: Sync.b64u(Sync.rand(32)), w: Sync.b64u(Sync.rand(16)), name: 'Kirgistan mit Freunden', role: 'owner', scope: { type: 'lists', lists: [Lists.all.find((x) => x.name === 'Reiseplanung').id] }, at: new Date().toISOString() };
+      Sync.conns.push(c);
+      await Sync.showCode(c, true);
+    });
+    await shot('33-sync-code', 2000);
+    await ev(() => { Sync.openConn(Sync.conns[0].id); });
+    await shot('34-verbindung', 1200);
+    await ev(() => { Sync.openJoin(''); });
+    await shot('35-beitreten', 1200);
+  });
+
+  await scene('36-google', async () => {
+    await ev(async () => {
+      const csv = 'Titel,Notiz,URL,Tags,Kommentar\nAla-Kul,,"https://www.google.com/maps/search/42.34,78.53",,\nJeti-Ögüz,,"https://www.google.com/maps/search/42.33,78.23",,\nAltyn-Arashan,,"https://www.google.com/maps/search/42.38,78.6",,\n';
+      await Lists.offerTakeout([new File([csv], 'Wunschziele.csv'), new File([csv.split('\n').slice(0, 3).join('\n')], 'Gespeicherte Orte.csv'), new File([csv], 'Restaurants.csv')]);
+    });
+    await shot('36-google-import', 1200);
+    await ev(() => { $('#imp-back').click(); });
   });
 
   await browser.close();
