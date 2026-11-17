@@ -1,0 +1,19 @@
+name: Sync prüfen
+on: workflow_dispatch
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ablage im Worker schreiben, lesen und löschen
+        run: |
+          set -e
+          P=https://ovl-karte.y3m.workers.dev/sync/
+          echo "== Status"; curl -s "$P"; echo
+          R=$(openssl rand -hex 16); W=$(openssl rand -hex 16)
+          echo "== Schreiben";      curl -s -o /dev/null -w "%{http_code}\n" -X PUT -H "X-Write: $W" -H "Origin: https://pokaxhontas.github.io" --data-binary "test" "$P$R"
+          echo "== Lesen";          curl -s -D - "$P$R" -H "Origin: https://pokaxhontas.github.io" | grep -iE "^HTTP|etag|access-control-allow-origin|^test"
+          echo "== Ohne Schlüssel"; curl -s -o /dev/null -w "%{http_code}\n" -X PUT --data-binary "x" "$P$R"
+          echo "== Falscher";       curl -s -o /dev/null -w "%{http_code}\n" -X PUT -H "X-Write: $(openssl rand -hex 16)" --data-binary "x" "$P$R"
+          echo "== Vorabanfrage";   curl -s -D - -o /dev/null -X OPTIONS -H "Origin: https://pokaxhontas.github.io" -H "Access-Control-Request-Method: PUT" -H "Access-Control-Request-Headers: x-write" "$P$R" | grep -iE "^HTTP|access-control-allow-(methods|headers)"
+          echo "== Löschen";        curl -s -o /dev/null -w "%{http_code}\n" -X DELETE -H "X-Write: $W" "$P$R"
+          echo "== Danach";         curl -s -o /dev/null -w "%{http_code}\n" "$P$R"
