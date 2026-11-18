@@ -22,14 +22,15 @@ for attempt in range(3):
             p = f["properties"]
             if "pbf" not in p.get("urls", {}):
                 continue
-            if p.get("parent") in SPLIT:
+            par = p.get("parent") if p.get("parent") in SPLIT else next((k for k in SPLIT if p["id"].startswith(k + "/")), None)
+            if par:
                 # Teilgebiet eines zu großen Landes: eigene Datei, in der App über die Suche zu finden
                 pid = p["id"].replace("/", "-")
                 nm = p.get("name") or ""
                 if not nm or "/" in nm:
                     nm = p["id"].split("/")[-1].replace("-", " ").title()
-                allc.append({"id": pid, "url": p["urls"]["pbf"], "name": nm, "iso": p.get("iso3166-1:alpha2") or [p["parent"].upper()],
-                             "label": f"{nm} ({SPLIT[p['parent']]})", "region": True})
+                allc.append({"id": pid, "url": p["urls"]["pbf"], "name": nm, "iso": p.get("iso3166-1:alpha2") or [par.upper()],
+                             "label": f"{nm} ({SPLIT[par]})", "region": True})
             elif p.get("iso3166-1:alpha2") and p["id"] not in SPLIT:
                 allc.append({"id": p["id"], "url": p["urls"]["pbf"], "name": p.get("name", p["id"]), "iso": p["iso3166-1:alpha2"]})
         allc.sort(key=lambda x: x["id"])
