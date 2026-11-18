@@ -20,6 +20,7 @@ const settings = {
   wake: store.get('wake', true),
   vehicle: store.get('vehicle', 'arrow'),
   mapType: store.get('mapType', 'topo'),
+  satSrc: store.get('satSrc', 'esri'),
   vehicleColor: store.get('vehicleColor', '#e9e5da'),
   hidden: store.get('hiddenCats', [])
 };
@@ -250,6 +251,68 @@ function applyThemeClass() {
 let demSource = null;
 let map = null;
 
+/* Luftbild-Quelle: Esri (Standard) oder Google (eigener Schlüssel, nur online, nie gespeichert) */
+const GSat = {
+  ESRI: { type: 'raster', tileSize: 256, maxzoom: 19,
+    // blankTile=false: wo Esri kein Bild hat, kommt kein grauer Platzhalter, die Karte vergrößert das letzte vorhandene Bild
+    tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?blankTile=false'],
+    attribution: 'Luftbilder © Esri, Maxar, Earthstar Geographics' },
+  key() { return (Tiles.sources && Tiles.sources.gkey) || ''; },
+  on() { return settings.satSrc === 'google' && !!this.key() && (settings.mapType === 'sat' || settings.mapType === 'hybrid'); },
+  session() { const s = store.get('gsatSession', null); return s && s.until > Date.now() + 3600e3 ? s.id : null; },
+  source() {
+    const sid = this.on() && this.session();
+    if (!sid) { if (this.on()) this.start(); return this.ESRI; }
+    return { type: 'raster', tileSize: 256, maxzoom: 21,
+      tiles: [`https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=${sid}&key=${this.key()}`],
+      attribution: 'Luftbilder © Google' };
+  },
+  async start() {
+    if (this.busy || !navigator.onLine) return;
+    this.busy = true;
+    try {
+      const r = await fetch('https://tile.googleapis.com/v1/createSession?key=' + this.key(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mapType: 'satellite', language: 'de-DE', region: 'DE' }) });
+      const j = await r.json();
+      if (!r.ok || !j.session) throw new Error((j.error && j.error.message) || 'Fehler ' + r.status);
+      store.set('gsatSession', { id: j.session, until: Number(j.expiry) * 1000 });
+      refreshStyle();
+    } catch (e) {
+      toast('Google-Luftbilder gehen gerade nicht (' + e.message + '). Es bleibt bei Esri.', 6000);
+    } finally { this.busy = false; }
+  },
+  /* Google verlangt Logo und die Bildquellen des sichtbaren Ausschnitts */
+  async credit() {
+    const box = $('#gsat-credit');
+    if (!box) return;
+    const sid = this.on() && this.session();
+    box.hidden = !sid;
+    if (!sid || !map) return;
+    const b = map.getBounds();
+    try {
+      const r = await fetch(`https://tile.googleapis.com/tile/v1/viewport?session=${sid}&key=${this.key()}&zoom=${Math.round(map.getZoom())}&north=${b.getNorth()}&south=${b.getSouth()}&east=${b.getEast()}&west=${b.getWest()}`);
+      const j = await r.json();
+      box.querySelector('small').textContent = j.copyright || '';
+    } catch (e) { /* bleibt beim letzten Stand */ }
+  },
+  setupUI() {
+    const seg = $('#sat-src');
+    if (!seg) return;
+    seg.hidden = !this.key() || settings.mapType === 'topo';
+    for (const b of seg.querySelectorAll('button')) {
+      b.setAttribute('aria-checked', String(b.dataset.src === settings.satSrc));
+      b.onclick = () => {
+        settings.satSrc = b.dataset.src;
+        store.set('satSrc', settings.satSrc);
+        this.setupUI();
+        refreshStyle();
+        this.credit();
+      };
+    }
+    if (map && !this._wired) { this._wired = true; let t; map.on('moveend', () => { clearTimeout(t); t = setTimeout(() => this.credit(), 1200); }); }
+    this.credit();
+  }
+};
+
 function buildStyle() {
   const dark = isDark();
   const flavorName = dark ? 'dark' : 'light';
@@ -411,11 +474,7 @@ function buildStyle() {
       ...(hk.lines.length || hk.top.length ? { hike: Hike.source() } : {}),
       draw: { type: 'geojson', data: typeof Draw !== 'undefined' ? Draw.geojson() : { type: 'FeatureCollection', features: [] } },
       route: { type: 'geojson', data: typeof Nav !== 'undefined' ? Nav.geojson() : { type: 'FeatureCollection', features: [] } },
-      sat: {
-        type: 'raster', tileSize: 256, maxzoom: 19,
-        tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
-        attribution: 'Luftbilder © Esri, Maxar, Earthstar Geographics'
-      },
+      sat: GSat.source(),
       tracks: { type: 'geojson', data: tracksGeoJSON() }
     },
     layers
@@ -1530,12 +1589,14 @@ function setupUI() {
   }
   $('#t-oev').checked = store.get('oevOn', false);
   $('#t-oev').onchange = () => { store.set('oevOn', $('#t-oev').checked); refreshStyle(); };
+  GSat.setupUI();
   document.querySelectorAll('[data-maptype]').forEach((b) => {
     b.setAttribute('aria-checked', String(b.dataset.maptype === settings.mapType));
     b.onclick = () => {
       settings.mapType = b.dataset.maptype; store.set('mapType', settings.mapType);
       document.querySelectorAll('[data-maptype]').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
       if (settings.mapType !== 'topo' && !navigator.onLine) toast('Luftbilder gibt es nur mit Internet. Offline siehst du die normale Karte.', 4500);
+      GSat.setupUI();
       refreshStyle();
     };
   });

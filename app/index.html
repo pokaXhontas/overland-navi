@@ -154,6 +154,10 @@
       <button role="radio" data-maptype="sat">Luftbild</button>
       <button role="radio" data-maptype="hybrid">Hybrid</button>
     </div>
+    <div class="seg two sat-src" role="radiogroup" aria-label="Luftbild-Quelle" id="sat-src" hidden>
+      <button role="radio" data-src="esri">Esri</button>
+      <button role="radio" data-src="google">Google</button>
+    </div>
     <label class="row"><span><b>Wasserstellen</b><small>Wasser tanken, Trinkwasser und Quellen, auch ohne Wanderwege</small></span><input type="checkbox" class="switch" id="t-water"></label>
     <label class="row"><span><b>Toiletten &amp; Duschen</b><small>Öffentlich, mit Angabe ob kostenlos (ab Straßen-Zoom)</small></span><input type="checkbox" class="switch" id="t-service"></label>
     <label class="row"><span><b>Pisten und Feldwege</b><small>Unbefestigte Feld-, Wald- und Wirtschaftswege, gestrichelt braun (in Deutschland meist für Autos gesperrt)</small></span><input type="checkbox" class="switch" id="t-tracks"></label>
@@ -387,6 +391,8 @@
 </div>
 
 <div class="list-chips" id="list-chips" hidden></div>
+
+<div class="gsat-credit" id="gsat-credit" hidden><b>Google</b><small></small></div>
 
 <button type="button" class="live-pill" id="live-pill" hidden><i></i><span></span></button>
 

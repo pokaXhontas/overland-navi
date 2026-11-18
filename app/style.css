@@ -912,3 +912,10 @@ html.dark .na-tag.ferry { color: #74C0FC; } html.dark .na-tag.toll { color: #FFC
 .sj-browser { order: -1; }
 .sj-steps { margin: 6px 0 10px; padding-left: 20px; font-size: 14px; line-height: 1.5; }
 .sj-browser p { font-size: 14px; }
+
+/* Google-Luftbild: Logo und Bildquellen */
+.sat-src { margin-top: 8px; }
+.gsat-credit { position: fixed; z-index: 4; left: calc(var(--safe-l) + 10px); bottom: calc(var(--safe-b) + 150px); display: flex; align-items: baseline; gap: 6px; max-width: 60vw; pointer-events: none; text-shadow: 0 0 3px rgba(0,0,0,.8); color: #FFFFFF; }
+.gsat-credit[hidden] { display: none; }
+.gsat-credit b { font: 600 16px/1 "Product Sans", Arial, sans-serif; letter-spacing: -.2px; }
+.gsat-credit small { font-size: 10px; opacity: .9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

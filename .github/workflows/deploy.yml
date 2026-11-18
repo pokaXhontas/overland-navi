@@ -129,6 +129,7 @@ jobs:
       - name: Seite zusammenbauen
         env:
           BUILD_DATE: ${{ steps.build.outputs.date }}
+          GOOGLE_TILES_KEY: ${{ secrets.GOOGLE_TILES_KEY }}
         run: |
           set -euo pipefail
           mkdir -p site/vendor site/data
@@ -176,7 +177,8 @@ jobs:
                   'base': f'{proxy}/{build}.pmtiles' if proxy else f'https://build.protomaps.com/{build}.pmtiles',
                   'dem': 'https://download.mapterhorn.com/planet.pmtiles',
                   'hike': f'{proxy}/wander/{{id}}.pmtiles' if proxy else '',
-                  'sync': f'{proxy}/sync/' if proxy else ''
+                  'sync': f'{proxy}/sync/' if proxy else '',
+                  'gkey': os.environ.get('GOOGLE_TILES_KEY', '')
               },
               'regions': regions
           }
