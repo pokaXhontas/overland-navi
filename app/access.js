@@ -21,15 +21,18 @@ const Access = {
       return new URL(s || this.FALLBACK).origin;
     } catch (e) { return this.FALLBACK; }
   },
+  /* Nur wenn der Worker die Zugangsprüfung kennt (ältere Worker lehnen die Kopfzeile ab) */
+  on() { const s = this.saved(); return !!(s && s.status && s.status !== 'open'); },
   /* Schlüssel an Anfragen zum eigenen Worker hängen */
   init(input, init) {
+    if (!this.on()) return init;
     const url = typeof input === 'string' ? input : (input && input.url) || '';
     if (!url.startsWith(this.origin())) return init;
     const h = new Headers((init && init.headers) || (input && input.headers) || undefined);
     h.set('X-Key', this.key());
     return { ...(init || {}), headers: h };
   },
-  msg() { return { key: this.key(), origin: this.origin() }; },
+  msg() { return { key: this.on() ? this.key() : '', origin: this.origin() }; },
   model() {
     const u = navigator.userAgent;
     if (/iPad|Macintosh/.test(u) && navigator.maxTouchPoints > 1) return 'iPad';
@@ -41,7 +44,8 @@ const Access = {
   },
   saved() { try { return JSON.parse(localStorage.getItem('ovl.access') || 'null'); } catch (e) { return null; } },
   async call(what, body) {
-    const r = await originalFetch(this.origin() + '/auth/' + what, body ? { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } } : { cache: 'no-store' });
+    const headers = { 'X-Key': this.key(), ...(body ? { 'Content-Type': 'application/json' } : {}) };
+    const r = await rawFetch(this.origin() + '/auth/' + what, body ? { method: 'POST', body: JSON.stringify(body), headers } : { cache: 'no-store', headers });
     if (r.status === 404 || r.status === 501) return { status: 'open' };   // Worker noch ohne Zugangsprüfung
     const j = await r.json().catch(() => ({}));
     if (!r.ok && !j.status) throw new Error(j.error || 'Server ' + r.status);
@@ -50,12 +54,17 @@ const Access = {
   async check() {
     if (!navigator.onLine) { const s = this.saved(); if (s && s.status !== 'ok' && s.status !== 'open') this.showGate(s.status); return; }
     let s;
-    try { s = await this.call('status'); } catch (e) { return; }   // Server nicht erreichbar: nicht aussperren
     const before = this.saved();
+    try { s = await this.call('status'); } catch (e) {
+      // Worker ohne Zugangsprüfung (lehnt die Kopfzeile ab) oder kurz nicht erreichbar: nicht aussperren
+      if (!before) localStorage.setItem('ovl.access', JSON.stringify({ status: 'open', at: Date.now() }));
+      return;
+    }
     this.state = s;
     localStorage.setItem('ovl.access', JSON.stringify({ status: s.status, admin: !!s.admin, at: Date.now() }));
     if (s.status === 'ok' || s.status === 'open') {
-      if (!$('#gate').hidden) { location.reload(); return; }   // gerade freigegeben: Karte neu laden
+      // gerade freigegeben oder Zugangsprüfung neu eingeschaltet: Karte mit Schlüssel neu laden
+      if (!$('#gate').hidden || (s.status === 'ok' && (!before || before.status === 'open'))) { location.reload(); return; }
       this.hideGate();
       $('#acc-section').hidden = !s.admin;
       if (s.admin && s.pending) toast(`${s.pending} ${s.pending === 1 ? 'neue Zugangsanfrage' : 'neue Zugangsanfragen'} – Menü → Zugänge`, 6000);
