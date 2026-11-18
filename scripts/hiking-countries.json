@@ -1441,14 +1441,6 @@
 ]
 },
 {
-"id": "us",
-"url": "https://download.geofabrik.de/north-america/us-latest.osm.pbf",
-"name": "United States of America",
-"iso": [
-"US"
-]
-},
-{
 "id": "us/puerto-rico",
 "url": "https://download.geofabrik.de/north-america/us/puerto-rico-latest.osm.pbf",
 "name": "us/puerto-rico",
