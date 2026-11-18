@@ -909,3 +909,6 @@ html.dark .na-tag.ferry { color: #74C0FC; } html.dark .na-tag.toll { color: #FFC
 .peer-ic { color: #FFFFFF; font-weight: 800; font-size: 16px; display: flex; align-items: center; justify-content: center; }
 .pc-btns.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (max-width: 600px) { .live-pill { top: calc(var(--safe-t) + var(--gap) + 92px); } }
+.sj-browser { order: -1; }
+.sj-steps { margin: 6px 0 10px; padding-left: 20px; font-size: 14px; line-height: 1.5; }
+.sj-browser p { font-size: 14px; }

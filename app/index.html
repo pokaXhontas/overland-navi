@@ -256,13 +256,14 @@
     </div>
     <div class="sheet-body">
       <div class="cat-title"><h1>Verbindung beitreten</h1></div>
-      <label class="field"><span>Sync- oder Standort-Code oder Link</span><textarea id="sj-code" rows="3" placeholder="OVL1.…" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea></label>
+      <div class="sj-browser" id="sj-browser" hidden>
+        <p><b>Du nutzt die App vom Home-Bildschirm?</b> Links öffnen auf dem iPhone leider immer Safari, und Safari hat einen eigenen Speicher. So kommt der Code in die App:</p>
+        <ol class="sj-steps"><li>Hier auf <b>Code kopieren</b> tippen.</li><li>Die App vom <b>Home-Bildschirm</b> öffnen.</li><li>Dort <b>Karten &amp; Ebenen → Code eingeben → Einfügen</b> → Verbinden.</li></ol>
+        <button type="button" class="btn primary wide" id="sj-copy">Code kopieren</button>
+      </div>
+      <label class="field"><span>Sync- oder Standort-Code oder Link</span><textarea id="sj-code" rows="3" placeholder="OVL1.… oder OVL2.…" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea></label>
       <div class="two-btns"><button type="button" class="btn" id="sj-paste">Einfügen</button><button type="button" class="btn" id="sj-scan">QR scannen</button></div>
       <div class="sj-cam" id="sj-cam" hidden></div>
-      <div class="sj-browser" id="sj-browser" hidden>
-        <p class="small"><b>App vom Home-Bildschirm?</b> Die hat ihren eigenen Speicher. Dann den Code kopieren, die App öffnen und dort unter Karten &amp; Ebenen → Verbindungen → „Code eingeben“ einfügen.</p>
-        <button type="button" class="btn wide" id="sj-copy">Code kopieren</button>
-      </div>
       <button type="button" class="btn primary wide" id="sj-go">Verbinden</button>
     </div>
   </div>

@@ -439,7 +439,7 @@ const Sync = {
     this.open = c.id;
     const code = this.code(c, write);
     await this.codePage({ title: c.name, rights: write ? 'Gemeinsam bearbeiten' : 'Nur ansehen', code,
-      text: `Overland-Navi: „${c.name}“ (${write ? 'gemeinsam bearbeiten' : 'nur ansehen'}). Öffnen oder in der App unter Verbindungen → Code eingeben einfügen:\n${code}`,
+      text: `Overland-Navi: „${c.name}“ (${write ? 'gemeinsam bearbeiten' : 'nur ansehen'}).\nDen Code kopieren, dann in der App: Karten & Ebenen → Code eingeben → Einfügen.\n\n${code}\n\nOhne App: Link öffnen`,
       back: () => this.openConn(c.id) });
   },
   /* QR, Link und Code zeigen (auch für Standort teilen) */
@@ -474,7 +474,10 @@ const Sync = {
   /* beitreten */
   openJoin(prefill) {
     $('#sj-code').value = prefill || '';
-    $('#sj-browser').hidden = !prefill || window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+    const inBrowser = !!prefill && !(window.matchMedia('(display-mode: standalone)').matches || navigator.standalone);
+    $('#sj-browser').hidden = !inBrowser;
+    $('#sj-go').textContent = inBrowser ? 'Nein, hier im Browser verbinden' : 'Verbinden';
+    $('#sj-go').classList.toggle('primary', !inBrowser);
     $('#sj-scan').hidden = !(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
     this.page('#sync-join-page');
   },
