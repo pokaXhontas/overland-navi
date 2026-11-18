@@ -308,8 +308,8 @@ const BKK = { lat: 42.8746, lon: 74.5698 };
       const now = Date.now();
       Access.call = async (what) => what === 'list' ? { me: 'a', devices: [
         { id: 'b', name: 'Tom', model: 'iPhone', status: 'pending', admin: 0, seen: now },
-        { id: 'a', name: 'Micha', model: 'iPad', status: 'ok', admin: 1, seen: now },
-        { id: 'c', name: 'Anne', model: 'iPhone', status: 'ok', admin: 1, seen: now - 3600e3 },
+        { id: 'a', name: 'Mein iPad', model: 'iPad', status: 'ok', admin: 1, seen: now },
+        { id: 'c', name: 'Zweites iPhone', model: 'iPhone', status: 'ok', admin: 1, seen: now - 3600e3 },
         { id: 'd', name: 'Kirgistan-Gruppe', model: 'Android', status: 'blocked', admin: 0, seen: now - 9 * 864e5 }] } : {};
       $('#acc-section').hidden = false;
       $('#btn-layers').click();
@@ -320,13 +320,13 @@ const BKK = { lat: 42.8746, lon: 74.5698 };
   });
 
   await scene('40-standort', async () => {
-    await ev(() => { $('#sheet').hidden = false; store.set('liveName', 'Micha'); Live.openNew(); });
+    await ev(() => { $('#sheet').hidden = false; store.set('liveName', 'Defender'); Live.openNew(); });
     await shot('40-standort-teilen', 900);
     await ev(() => {
       Sync.page(null); closeSheet();
       const now = Date.now();
       Live.groups = [{ id: 'g1', key: 'x', w: 'y', me: { on: true, until: now + 8 * 3600e3, mid: 'aaaa' } }];
-      Live.peers = { g1: { bbbb: { name: 'Anne', lat: 42.668, lon: 77.05, spd: 13, hdg: 75, t: now - 60e3, until: now + 8 * 3600e3, trail: [[42.632, 76.86, 0], [42.648, 76.94, 0], [42.661, 77.01, 0]] } } };
+      Live.peers = { g1: { bbbb: { name: 'Bulli', lat: 42.668, lon: 77.05, spd: 13, hdg: 75, t: now - 60e3, until: now + 8 * 3600e3, trail: [[42.632, 76.86, 0], [42.648, 76.94, 0], [42.661, 77.01, 0]] } } };
       gps.follow = false;
       Live.send = async () => {}; Live.tick = () => {};
       map.jumpTo({ center: [77.02, 42.62], zoom: 10, bearing: 0 });

@@ -419,7 +419,7 @@ const Sync = {
   async createFromDraft() {
     const d = this.draft;
     const name = $('#sn-name').value.trim();
-    if (!name) { $('#sn-name').focus(); toast('Bitte einen Namen eingeben, z. B. „Island mit Anne“.'); return; }
+    if (!name) { $('#sn-name').focus(); toast('Bitte einen Namen eingeben, z. B. „Island mit Freunden“.'); return; }
     if (d.scope.type === 'lists' && !d.scope.lists.length) { toast('Bitte mindestens eine Liste wählen.'); return; }
     if (d.scope.type === 'cats' && !d.scope.cats.length) { toast('Bitte mindestens eine Kategorie wählen.'); return; }
     if (!navigator.onLine) { toast('Zum Anlegen brauchst du Internet.'); return; }
