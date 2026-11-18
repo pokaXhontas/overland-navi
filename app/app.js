@@ -1767,6 +1767,7 @@ const Search = {
   async loadAll() {
     if (this.loading) return this.loading;
     this.loading = (async () => {
+     try {
       await Tiles.ready;
       const root = await Tiles.opfs();
       const c = map ? map.getCenter() : null;
@@ -1792,7 +1793,7 @@ const Search = {
         }
         this.loaded.add(r.id);
       }
-      this.loading = null;
+     } finally { this.loading = null; }   // auch bei Fehlern nicht hängen bleiben
     })();
     return this.loading;
   },
@@ -1861,10 +1862,10 @@ const Search = {
     const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(qq || q)}&lang=de&limit=12&lat=${c.lat.toFixed(3)}&lon=${c.lng.toFixed(3)}${filter}`;
     try {
       const r = await originalFetch(url);
-      if (!r.ok) return [];
+      if (!r.ok) return fm ? [] : this.nominatim(q);
       const j = await r.json();
       const ref = gps.pos || { lat: c.lat, lon: c.lng };
-      return (j.features || []).map((f) => {
+      const out = (j.features || []).map((f) => {
         const p = f.properties || {};
         const [lon, lat] = f.geometry.coordinates;
         const where = [p.street && (p.street + (p.housenumber ? ' ' + p.housenumber : '')), p.postcode, p.city || p.county, p.country].filter(Boolean).join(', ');
@@ -1880,7 +1881,28 @@ const Search = {
           return { name: p.name, type: 'poi', lat, lon, sub: kind + (where ? ' · ' + where : ''), dist: distance(ref, { lat, lon }), color: cat.color, icon: cat.d,
             poiCat: cat.id, kind, osmKey: p.osm_key, osmValue: p.osm_value, osmRef: (p.osm_type || 'N') + p.osm_id };
         }
-        return { name: p.name || where || 'Adresse', type: 'web', lat, lon, sub: 'Online · ' + where, dist: distance(ref, { lat, lon }), zoom: p.osm_key === 'place' ? 13 : 16 };
+        return { name: p.name || where || 'Adresse', type: 'web', lat, lon, sub: 'Online · ' + where, dist: distance(ref, { lat, lon }), zoom: this.zoomFor(p.osm_key, p.osm_value) };
+      });
+      return out.length || fm ? out : this.nominatim(q);
+    } catch (e) { return fm ? [] : this.nominatim(q); }
+  },
+  zoomFor(key, value) {
+    if (key === 'place') return { country: 5, state: 7, region: 7, island: 8, archipelago: 7, county: 9, city: 11, town: 13 }[value] || 13;
+    if (key === 'boundary') return 7;
+    return 16;
+  },
+  /* Ersatz, wenn Photon nicht antwortet: Nominatim (OpenStreetMap) */
+  async nominatim(q) {
+    try {
+      const c = map.getCenter();
+      const r = await originalFetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=jsonv2&accept-language=de&limit=10`);
+      if (!r.ok) return [];
+      const ref = gps.pos || { lat: c.lat, lon: c.lng };
+      return (await r.json()).map((x) => {
+        const lat = +x.lat, lon = +x.lon;
+        const name = x.name || String(x.display_name || '').split(',')[0];
+        const where = String(x.display_name || '').split(',').slice(1, 4).join(',').trim();
+        return { name, type: 'web', lat, lon, sub: 'Online · ' + where, dist: distance(ref, { lat, lon }), zoom: this.zoomFor(x.category, x.type) };
       });
     } catch (e) { return []; }
   },
@@ -1971,13 +1993,15 @@ async function runSearch() {
       if (!local0.length) return;
     }
   }
-  if (Search.loading && !cats.length) renderSearchResults([], 'Suchindex wird geladen …');
-  await Search.loadAll();
+  // online gleich mit losschicken, nicht erst auf den (evtl. großen) Suchindex warten
+  const webP = Search.online(q);
+  if (Search.loading && !cats.length) renderSearchResults([], 'Suche …');
+  try { await Promise.race([Search.loadAll(), new Promise((res) => setTimeout(res, 2500))]); } catch (e) { /* weiter mit dem, was da ist */ }
   if (seq !== searchSeq) return;
   const local = [...cats, ...Search.query(q)];
   const pick = (r) => (r.catHit ? Poi.run(r.catHit.cat, r.catHit.place) : Search.show(r));
   renderResultList($('#search-results'), local, local.length ? '' : (navigator.onLine ? 'Suche online …' : 'Nichts gefunden. Offline sind nur Orte aus geladenen Kartengebieten suchbar.'), pick);
-  const web = await Search.online(q);
+  const web = await webP;
   if (seq !== searchSeq) return;
   if (web.length) renderResultList($('#search-results'), [...local, ...web.filter((w) => !local.some((l) => l.lat !== undefined && distance(l, w) < 300 && norm(l.name) === norm(w.name)))], '', pick);
   else if (!local.length) renderSearchResults([], 'Nichts gefunden.');
