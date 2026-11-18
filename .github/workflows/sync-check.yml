@@ -17,3 +17,14 @@ jobs:
           echo "== Vorabanfrage";   curl -s -D - -o /dev/null -X OPTIONS -H "Origin: https://pokaxhontas.github.io" -H "Access-Control-Request-Method: PUT" -H "Access-Control-Request-Headers: x-write" "$P$R" | grep -iE "^HTTP|access-control-allow-(methods|headers)"
           echo "== Löschen";        curl -s -o /dev/null -w "%{http_code}\n" -X DELETE -H "X-Write: $W" "$P$R"
           echo "== Danach";         curl -s -o /dev/null -w "%{http_code}\n" "$P$R"
+      - name: Standort-Ablage prüfen
+        run: |
+          set -e
+          P=https://ovl-karte.y3m.workers.dev/loc/
+          echo "== Status"; curl -s "$P"; echo
+          R=$(openssl rand -hex 16); M=$(openssl rand -hex 8); W=$(openssl rand -hex 16)
+          echo "== Senden";         curl -s -o /dev/null -w "%{http_code}\n" -X PUT -H "X-Write: $W" --data "probe" "$P$R/$M?bis=$(( ($(date +%s) + 600) * 1000 ))"
+          echo "== Lesen";          curl -s "$P$R"; echo
+          echo "== Fremder Schlüssel"; curl -s -o /dev/null -w "%{http_code}\n" -X PUT -H "X-Write: $(openssl rand -hex 16)" --data "x" "$P$R/$(openssl rand -hex 8)"
+          echo "== Löschen";        curl -s -o /dev/null -w "%{http_code}\n" -X DELETE -H "X-Write: $W" "$P$R/$M"
+          echo "== Danach";         curl -s "$P$R"; echo
