@@ -444,7 +444,7 @@ const Tours = {
     rows.sort((a, b) => (b.inst - a.inst) || (!!b.cur - !!a.cur) || a.name.localeCompare(b.name, 'de'));
     box.innerHTML = '';
     if (!rows.length) { box.innerHTML = `<p class="muted small">${ids.size ? 'Kein Land gefunden.' : 'Die Länderliste lädt, sobald du online bist.'}</p>`; return; }
-    for (const r of rows.slice(0, 80)) {
+    for (const r of rows) {
       const row = document.createElement('div');
       row.className = 'to-packrow';
       const what = [r.cur ? `★ ${r.cur.n} empfohlene Touren mit Infos` : '', r.osm ? `${r.osm.n} bekannte Routen` : ''].filter(Boolean).join(' · ');
