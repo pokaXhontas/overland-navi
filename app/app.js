@@ -536,7 +536,7 @@ function onPositionError(err) {
   if (err.code === 1) {
     stopGPS();
     $('#acc').textContent = 'aus';
-    toast('Standort ist blockiert. Einstellungen → Datenschutz & Sicherheit → Ortungsdienste → Safari-Websites → „Beim Verwenden der App“ wählen und „Genauer Standort“ einschalten.', 10000);
+    toast('Standort ist für diese Seite gesperrt. In Safari links in der Adressleiste auf das Symbol tippen → Website-Einstellungen → Standort → „Erlauben“. Hilft das nicht: Einstellungen → Apps → Safari → Standort → „Fragen“, dann Seite neu laden.', 12000);
   } else if (err.code === 3) {
     $('#acc').textContent = 'sucht';
     if (!gps.pos) toast('Suche GPS-Signal … draußen oder am Fenster geht es schneller.', 4000);
