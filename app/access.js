@@ -22,7 +22,7 @@ const Access = {
     } catch (e) { return this.FALLBACK; }
   },
   /* Nur wenn der Worker die Zugangsprüfung kennt (ältere Worker lehnen die Kopfzeile ab) */
-  on() { const s = this.saved(); return !!(s && s.status && s.status !== 'open'); },
+  on() { const s = this.saved(); return !(s && s.status === 'open'); },
   /* Schlüssel an Anfragen zum eigenen Worker hängen */
   init(input, init) {
     if (!this.on()) return init;
@@ -64,7 +64,7 @@ const Access = {
     localStorage.setItem('ovl.access', JSON.stringify({ status: s.status, admin: !!s.admin, at: Date.now() }));
     if (s.status === 'ok' || s.status === 'open') {
       // gerade freigegeben oder Zugangsprüfung neu eingeschaltet: Karte mit Schlüssel neu laden
-      if (!$('#gate').hidden || (s.status === 'ok' && (!before || before.status === 'open'))) { location.reload(); return; }
+      if (!$('#gate').hidden || (s.status === 'ok' && before && before.status === 'open')) { location.reload(); return; }
       this.hideGate();
       $('#acc-section').hidden = !s.admin;
       if (s.admin && s.pending) toast(`${s.pending} ${s.pending === 1 ? 'neue Zugangsanfrage' : 'neue Zugangsanfragen'} – Menü → Zugänge`, 6000);
