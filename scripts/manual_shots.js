@@ -303,7 +303,7 @@ const BKK = { lat: 42.8746, lon: 74.5698 };
       Sync.page(null); closeSheet();
       const now = Date.now();
       Live.groups = [{ id: 'g1', key: 'x', w: 'y', me: { on: true, until: now + 8 * 3600e3, mid: 'aaaa' } }];
-      Live.peers = { g1: { bbbb: { name: 'Anne', lat: 42.653, lon: 77.07, spd: 13, hdg: 75, t: now - 60e3, until: now + 8 * 3600e3, trail: [[42.612, 76.86, 0], [42.628, 76.94, 0], [42.642, 77.01, 0]] } } };
+      Live.peers = { g1: { bbbb: { name: 'Anne', lat: 42.668, lon: 77.05, spd: 13, hdg: 75, t: now - 60e3, until: now + 8 * 3600e3, trail: [[42.632, 76.86, 0], [42.648, 76.94, 0], [42.661, 77.01, 0]] } } };
       gps.follow = false;
       Live.send = async () => {}; Live.tick = () => {};
       map.jumpTo({ center: [77.02, 42.62], zoom: 10, bearing: 0 });
