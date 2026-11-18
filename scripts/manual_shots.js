@@ -273,6 +273,46 @@ const BKK = { lat: 42.8746, lon: 74.5698 };
     await shot('35-beitreten', 1200);
   });
 
+
+  await scene('37-zugang', async () => {
+    await ev(() => { $('#gate-name').value = 'Tom'; Access.showGate('none'); });
+    await shot('37-sperrbildschirm', 800);
+    await ev(() => { Access.showGate('pending'); });
+    await shot('38-wartet', 800);
+    await ev(() => {
+      Access.hideGate();
+      const now = Date.now();
+      Access.call = async (what) => what === 'list' ? { me: 'a', devices: [
+        { id: 'b', name: 'Tom', model: 'iPhone', status: 'pending', admin: 0, seen: now },
+        { id: 'a', name: 'Micha', model: 'iPad', status: 'ok', admin: 1, seen: now },
+        { id: 'c', name: 'Anne', model: 'iPhone', status: 'ok', admin: 1, seen: now - 3600e3 },
+        { id: 'd', name: 'Kirgistan-Gruppe', model: 'Android', status: 'blocked', admin: 0, seen: now - 9 * 864e5 }] } : {};
+      $('#acc-section').hidden = false;
+      $('#btn-layers').click();
+      Access.renderList();
+    });
+    await sleep(900);
+    await ev(() => $('#acc-section').scrollIntoView({ block: 'start' }));
+    await shot('39-zugaenge', 1000);
+  });
+
+  await scene('40-standort', async () => {
+    await ev(() => { $('#sheet').hidden = false; store.set('liveName', 'Micha'); Live.openNew(); });
+    await shot('40-standort-teilen', 900);
+    await ev(() => {
+      Sync.page(null); closeSheet();
+      const now = Date.now();
+      Live.groups = [{ id: 'g1', key: 'x', w: 'y', me: { on: true, until: now + 8 * 3600e3, mid: 'aaaa' } }];
+      Live.peers = { g1: { bbbb: { name: 'Anne', lat: 42.468, lon: 76.62, spd: 13, hdg: 70, t: now - 60e3, until: now + 8 * 3600e3, trail: [[42.45, 76.52, 0], [42.455, 76.56, 0], [42.462, 76.6, 0]] } } };
+      gps.follow = false;
+      map.jumpTo({ center: [76.6, 42.46], zoom: 11.5, bearing: 0 });
+      Live.render(); Live.renderPill(); Live.showCard('g1', 'bbbb');
+    });
+    await sleep(2500);
+    await shot('41-standort-karte', 1500);
+    await ev(() => { Live.closeCard(); Live.groups = []; Live.peers = {}; Live.render(); Live.renderPill(); });
+  });
+
   await scene('36-google', async () => {
     await ev(async () => {
       const csv = 'Titel,Notiz,URL,Tags,Kommentar\nAla-Kul,,"https://www.google.com/maps/search/42.34,78.53",,\nJeti-Ögüz,,"https://www.google.com/maps/search/42.33,78.23",,\nAltyn-Arashan,,"https://www.google.com/maps/search/42.38,78.6",,\n';
