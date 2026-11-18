@@ -783,15 +783,37 @@ const Lists = {
         p.cc = cc;
         if (wantCat) { const c = this.osmCat(key, val); if (c && CAT[c]) p.cat = c; }
         p.pend = false;
-      } catch (e) { fails++; }
+        streak = 0;
+      } catch (e) {
+        fails++;
+        // Server bremst oder Netz weg: kurz warten, den Ort später nochmal versuchen
+        if (++streak >= 4) { pause = Date.now() + 30000; streak = 0; }
+      }
       n++;
-      if (n % 25 === 0) { toast(`Orte zuordnen … ${n} / ${todo.length}`, 60000); savePlaces(); }
+      show();
+      if (n % 25 === 0) savePlaces();
     };
-    if (todo.length > 10) toast(`Orte zuordnen … 0 / ${todo.length}`, 60000);
+    let streak = 0, pause = 0;
+    const pill = $('#enrich-pill');
+    const show = () => {
+      if (!pill || todo.length <= 10) return;
+      pill.hidden = false;
+      pill.querySelector('span').textContent = `Orte zuordnen ${n} / ${todo.length}` + (pause > Date.now() ? ' · Pause' : '');
+      pill.querySelector('i').style.width = Math.round(n / todo.length * 100) + '%';
+    };
+    if (pill) pill.onclick = () => toast('Die App fragt für jeden Google-Ort online nach Land und Art. Das läuft nur, solange die App offen ist und Internet hat, und macht beim nächsten Öffnen weiter.', 7000);
+    show();
     let k = 0;
     await Promise.all(Array.from({ length: 3 }, async () => {
-      while (k < todo.length && navigator.onLine) { const p = todo[k++]; await work(p); await new Promise((r) => setTimeout(r, 110)); }
+      while (k < todo.length && navigator.onLine) {
+        if (pause > Date.now()) { show(); await new Promise((r) => setTimeout(r, 2000)); continue; }
+        if (document.hidden) { await new Promise((r) => setTimeout(r, 1500)); continue; }
+        const p = todo[k++];
+        await work(p);
+        await new Promise((r) => setTimeout(r, 110));
+      }
     }));
+    if (pill) pill.hidden = true;
     const lost = places.filter((p) => (p.lat === null || p.lat === undefined) && !p.pend);
     if (lost.length) { places = places.filter((p) => !lost.includes(p)); toast(`${lost.length} Orte ohne Position waren nicht zu finden und wurden weggelassen: ${lost.slice(0, 3).map((p) => p.name).join(', ')}${lost.length > 3 ? ' …' : ''}`, 7000); }
     this.running = false;
