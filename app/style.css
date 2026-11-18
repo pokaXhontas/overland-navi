@@ -532,6 +532,8 @@ body.drawing .fab, body.drawing .hud { display: none; }
 .nav-choose.peek > :not(.grab):not(.na-peek) { display: none; }
 .nav-choose.peek .na-peek { display: flex; }
 .nav-choose.peek { padding-top: 10px; padding-bottom: 12px; }
+.folding { overflow: hidden !important; }
+.folding > * { flex-shrink: 0; }
 /* Navigation klein */
 .nav-banner.mini { width: auto; min-height: 0; padding: 8px 14px 8px 8px; }
 .nav-banner.mini .nb-icon { width: 42px; height: 42px; border-radius: 12px; }

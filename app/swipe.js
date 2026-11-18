@@ -77,13 +77,24 @@ const Swipe = {
       setTimeout(() => window.removeEventListener('click', stop, { capture: true }), 350);
       const size = axis(s.dir) === 'y' ? el.offsetHeight : el.offsetWidth;
       const go = s.off > Math.min(140, size * 0.3) || (s.v > 0.5 && s.off > 25);
+      if (go && opts.fold) {
+        // in einem Zug zusammen- bzw. aufklappen statt hinauszuschieben
+        const from = el.style.translate;
+        el.style.transition = 'none';
+        el.style.translate = '';
+        opts.onDismiss(s.dir, from);
+        requestAnimationFrame(() => requestAnimationFrame(() => { el.style.transition = ''; }));
+        return;
+      }
       el.style.transition = 'translate .2s ease';
       if (!go) { el.style.translate = ''; setTimeout(() => { el.style.transition = ''; }, 220); return; }
       const out = (size + 60) * sign(s.dir);
       el.style.translate = axis(s.dir) === 'y' ? `0 ${out}px` : `${out}px 0`;
       setTimeout(() => {
         el.style.transition = 'none';
+        el.dataset.swiped = '1';
         opts.onDismiss(s.dir);
+        delete el.dataset.swiped;
         el.style.translate = '';
         requestAnimationFrame(() => requestAnimationFrame(() => { el.style.transition = ''; }));
       }, 200);
@@ -98,8 +109,70 @@ const Swipe = {
       if (!el.classList.contains(cls)) return;
       if (expandZone && !e.target.closest(expandZone)) return;
       e.stopPropagation();
-      el.classList.remove(cls);
+      this.fold(el, cls, false);
     }, true);
+  },
+
+  /* weiche Übergänge beim Öffnen, Schließen und Zusammenklappen */
+  calm() { return !Element.prototype.animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches; },
+  away(r, dir) {
+    if (dir === 'up') return `0 ${-(r.bottom + 12)}px`;
+    if (dir === 'left') return `${-(r.right + 12)}px 0`;
+    if (dir === 'right') return `${innerWidth - r.left + 12}px 0`;
+    return `0 ${innerHeight - r.top + 12}px`;
+  },
+  show(el, dir) {
+    if (!el) return;
+    const was = el.hidden;
+    el.hidden = false;
+    if (!was || this.calm()) return;
+    const r = el.getBoundingClientRect();
+    if (!r.height) return;
+    el.animate([{ translate: this.away(r, typeof dir === 'function' ? dir() : dir), opacity: 0.6 }, { translate: '0 0', opacity: 1 }],
+      { duration: 340, easing: 'cubic-bezier(.2,.85,.25,1)' });
+  },
+  hide(el, dir) {
+    if (!el || el.hidden) return;
+    const swiped = el.dataset.swiped;
+    delete el.dataset.swiped;
+    const r = el.getBoundingClientRect();
+    if (swiped || this.calm() || !r.height) { el.hidden = true; return; }
+    // Abbild gleitet hinaus, das echte Fenster ist sofort zu (Zustand bleibt eindeutig)
+    const g = el.cloneNode(true);
+    g.removeAttribute('id');
+    g.querySelectorAll('[id]').forEach((n) => n.removeAttribute('id'));
+    const a = el.querySelectorAll('input, textarea, select'), b = g.querySelectorAll('input, textarea, select');
+    a.forEach((n, i) => { if (b[i]) b[i].value = n.value; });
+    g.inert = true;
+    g.setAttribute('aria-hidden', 'true');
+    Object.assign(g.style, { position: 'fixed', left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px',
+      right: 'auto', bottom: 'auto', transform: 'none', translate: 'none', margin: '0', maxHeight: 'none', pointerEvents: 'none', transition: 'none' });
+    el.after(g);
+    const sc = el.querySelectorAll('*'), gc = g.querySelectorAll('*');
+    if (el.scrollTop) g.scrollTop = el.scrollTop;
+    sc.forEach((n, i) => { if (n.scrollTop && gc[i]) gc[i].scrollTop = n.scrollTop; });
+    el.hidden = true;
+    const an = g.animate([{ translate: '0 0', opacity: 1 }, { translate: this.away(r, typeof dir === 'function' ? dir() : dir), opacity: 0.6 }],
+      { duration: 260, easing: 'cubic-bezier(.45,0,.85,.4)', fill: 'forwards' });
+    an.onfinish = an.oncancel = () => g.remove();
+  },
+  /* Höhe weich ändern; from: Verschiebung vom Wischen, die dabei zurückgeht */
+  fold(el, cls, on, from) {
+    if (el.classList.contains(cls) === on) return;
+    const h0 = el.getBoundingClientRect().height;
+    if (el._fold) { const f = el._fold; el._fold = null; f.cancel(); }
+    el.classList.toggle(cls, on);
+    if (this.calm() || el.hidden) { el.classList.remove('folding'); return; }
+    el.classList.add('folding');
+    const h1 = el.getBoundingClientRect().height;
+    const kf = [{ height: h0 + 'px' }, { height: h1 + 'px' }];
+    if (from) { kf[0].translate = from; kf[1].translate = '0 0'; }
+    const an = el._fold = el.animate(kf, { duration: 320, easing: 'cubic-bezier(.25,.85,.3,1)' });
+    for (const k of el.children) {
+      if (k.classList.contains('grab') || getComputedStyle(k).display === 'none') continue;
+      k.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, delay: on ? 40 : 90, easing: 'ease-out', fill: 'backwards' });
+    }
+    an.onfinish = an.oncancel = () => { if (el._fold === an) { el._fold = null; el.classList.remove('folding'); } };
   },
 
   setup() {
@@ -122,7 +195,8 @@ const Swipe = {
       dir: () => (alts.classList.contains('peek') ? 'up' : 'down'),
       // in der Liste wird gescrollt, nicht weggewischt
       exclude: '.na-list',
-      onDismiss: (d) => { alts.classList.toggle('peek', d === 'down'); }
+      fold: true,
+      onDismiss: (d, from) => this.fold(alts, 'peek', d === 'down', from)
     });
     this.foldable(alts, 'peek', '.na-peek-txt, .grab');
 

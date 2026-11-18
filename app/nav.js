@@ -768,12 +768,12 @@ const Nav = {
     $('#na-go').onclick = () => {
       const p = this.pending;
       this.pending = null;
-      box.hidden = true;
+      Swipe.hide(box, 'down');
       this.active = p.list[p.sel];
       this.go(gps.pos);
     };
-    $('#na-cancel').onclick = () => { this.pending = null; box.hidden = true; this.draw(); };
-    $('#na-edit').onclick = () => { const st = list[0].stops; this.pending = null; box.hidden = true; this.draw(); Planner.open(st); };
+    $('#na-cancel').onclick = () => { this.pending = null; Swipe.hide(box, 'down'); this.draw(); };
+    $('#na-edit').onclick = () => { const st = list[0].stops; this.pending = null; Swipe.hide(box, 'down'); this.draw(); Planner.open(st); };
     $('#na-save').onclick = () => this.saveAsTrack(this.pending.list[this.pending.sel]);
     $('#na-go').textContent = !list[0].joined ? 'Navigation starten' : list[0].travel === 'foot' ? 'Loslaufen' : list[0].travel === 'transit' ? 'Los geht’s' : 'Losfahren';
     $('#na-title').textContent = list[0].travel === 'transit' ? 'Verbindung auswählen' : list.length > 1 ? 'Route auswählen' : 'Deine Route';
@@ -783,7 +783,7 @@ const Nav = {
     if (list[0].travel === 'foot' && (!best || best.walk.routePct < 20)) {
       $('#na-sub').textContent = 'Hinweis: Für diese Strecke gibt es keine durchgehende markierte Wanderroute. Der Weg führt über normale Wege' + (best && best.walk.roadPct >= 15 ? ' und ein Stück an Straßen entlang.' : '.');
     }
-    box.hidden = false;
+    Swipe.show(box, 'down');
     this.draw();
     const b = new maplibregl.LngLatBounds(list[0].coords[0], list[0].coords[0]);
     for (const r of list) for (const p of r.coords) b.extend(p);

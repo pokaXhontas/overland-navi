@@ -13,7 +13,7 @@ const Planner = {
   clean(s) { return !s ? null : s.gps ? { gps: true } : { name: s.name || '', lat: +(+s.lat).toFixed(6), lon: +(+s.lon).toFixed(6), ...(s.ferry ? { ferry: true } : {}) }; },
 
   open(stops) {
-    if (Nav.pending) { Nav.pending = null; $('#nav-alts').hidden = true; Nav.draw(); }
+    if (Nav.pending) { Nav.pending = null; Swipe.hide($('#nav-alts'), 'down'); Nav.draw(); }
     closeSearch(); closeSheet();
     if (typeof closeTrackInfo === 'function') closeTrackInfo();
     if (editor.open) closeEditor();
@@ -21,7 +21,7 @@ const Planner = {
     this.stops = (stops || (last && last.stops) || [{ gps: true }, null]).map((s) => this.clean(s));
     if (this.stops.length < 2) this.stops.push(null);
     this.active = -1;
-    $('#planner').hidden = false;
+    Swipe.show($('#planner'), () => (Swipe.phone() ? 'up' : 'left'));
     this.render();
     // leeres Feld gleich zum Tippen öffnen
     const empty = this.stops.findIndex((s) => !s);
@@ -29,7 +29,7 @@ const Planner = {
   },
 
   close() {
-    $('#planner').hidden = true;
+    Swipe.hide($('#planner'), () => (Swipe.phone() ? 'up' : 'left'));
     this.active = -1;
     this.save();
   },
@@ -235,14 +235,14 @@ const Planner = {
     if (!this.stops.every(Boolean)) { toast('Bitte Start und Ziel wählen.'); return; }
     this.save();
     this.remember();
-    $('#planner').hidden = true;
+    Swipe.hide($('#planner'), () => (Swipe.phone() ? 'up' : 'left'));
     Nav.plan(this.stops.map((s) => this.clean(s)), mode);
   },
 
   /* Punkt auf der Karte wählen */
   pickOnMap(i) {
     this.picking = i;
-    $('#planner').hidden = true;
+    Swipe.hide($('#planner'), () => (Swipe.phone() ? 'up' : 'left'));
     $('#crosshair').hidden = false;
     $('#pl-pickbar').hidden = false;
     const s = this.stops[i];
@@ -266,7 +266,7 @@ const Planner = {
     }
     this.stops[i] = this.clean({ name, lat: c.lat, lon: c.lng });
     this.save();
-    $('#planner').hidden = false;
+    Swipe.show($('#planner'), () => (Swipe.phone() ? 'up' : 'left'));
     this.active = -1;
     this.render();
   },
@@ -275,7 +275,7 @@ const Planner = {
     $('#crosshair').hidden = true;
     $('#pl-pickbar').hidden = true;
     this.picking = -1;
-    $('#planner').hidden = false;
+    Swipe.show($('#planner'), () => (Swipe.phone() ? 'up' : 'left'));
     this.render();
   },
 
