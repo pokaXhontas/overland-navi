@@ -14,6 +14,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Bildschirmfotos der fertigen App (Handy-Format)
+        env:
+          OVL_CI_KEY: ${{ secrets.OVL_CI_KEY }}
         run: |
           mkdir -p /tmp/pp && (cd /tmp/pp && npm install --no-audit --no-fund puppeteer-core@23 > /dev/null)
           NODE_PATH=/tmp/pp/node_modules timeout 1500 node scripts/manual_shots.js https://pokaxhontas.github.io/overland-navi/ app/handbuch

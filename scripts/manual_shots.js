@@ -15,6 +15,7 @@ const BKK = { lat: 42.8746, lon: 74.5698 };
   const browser = await puppeteer.launch({ executablePath: process.env.CHROME || '/usr/bin/google-chrome', args: ['--no-sandbox', '--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--lang=de-DE'] });
   await browser.defaultBrowserContext().overridePermissions(new URL(SITE).origin, ['geolocation']);
   const page = await browser.newPage();
+  if (process.env.OVL_CI_KEY) await page.evaluateOnNewDocument((k) => localStorage.setItem('ovl.devKey', k), process.env.OVL_CI_KEY);   // freigegebener Prüfschlüssel
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   await page.setGeolocation({ latitude: BKK.lat, longitude: BKK.lon, accuracy: 8 });
   page.on('pageerror', (e) => console.log('Seitenfehler:', e.message));
@@ -249,7 +250,7 @@ const BKK = { lat: 42.8746, lon: 74.5698 };
     await shot('28-liste-laender', 1200);
     await ev(() => { Lists.startSel('list'); const it = [...document.querySelectorAll('#list-countries .place-item')]; it[0].click(); it[2].click(); });
     await shot('29-auswahl', 1200);
-    await ev(() => { Lists.endSel(); Lists.closeList(); Lists.editCat(null); $('#thing-name').value = 'Drohnen-Spots'; document.querySelectorAll('#thing-syms .sym')[1].click(); });
+    await ev(() => { Lists.endSel(); Lists.closeList(); Lists.editCat(null); $('#thing-name').value = 'Campspots'; document.querySelectorAll('#thing-syms .sym')[13].click(); });
     await shot('30-neue-kategorie', 1200);
     await ev(() => { $('#thing-back').click(); });
   });

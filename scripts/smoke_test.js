@@ -15,6 +15,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const ctx = browser.defaultBrowserContext();
   await ctx.overridePermissions(new URL(SITE).origin, ['geolocation']);
   const page = await browser.newPage();
+  if (process.env.OVL_CI_KEY) await page.evaluateOnNewDocument((k) => localStorage.setItem('ovl.devKey', k), process.env.OVL_CI_KEY);   // freigegebener Prüfschlüssel
   page.on('pageerror', (e) => errors.push('Seitenfehler: ' + e.message));
   page.on('console', (m) => { if (m.type() === 'error') errors.push('Konsole: ' + m.text().slice(0, 200)); });
   await page.setGeolocation({ latitude: 42.8746, longitude: 74.5698, accuracy: 10 });

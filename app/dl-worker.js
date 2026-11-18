@@ -175,6 +175,7 @@ async function downloadFile(root, name, url, size, post) {
 }
 
 self.onmessage = async (e) => {
+  if (e.data && e.data.access) self.OVL_ACCESS = e.data.access;
   const { id, boxes, maxzoom, demMaxzoom, sources, searchUrl, buildSearchIndex, mode, hikeLayers, routeLayers } = e.data;
   const post = (m) => self.postMessage(m);
   try {

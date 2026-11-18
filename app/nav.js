@@ -598,7 +598,7 @@ const Nav = {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => { this.routerJobs.delete(id); reject(new Error('Berechnung dauert zu lange')); if (this.router) { this.router.terminate(); this.router = null; } }, 120000);
       this.routerJobs.set(id, { resolve, reject, timer });
-      this.router.postMessage({ ...msg, id });
+      this.router.postMessage({ ...msg, id, access: Access.msg() });
     });
   },
   async offline(pts, online) {

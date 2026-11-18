@@ -10,6 +10,7 @@ const SHELL = [
   './',
   'index.html',
   'style.css',
+  'access.js',
   'app.js',
   'lists.js',
   'sync.js',

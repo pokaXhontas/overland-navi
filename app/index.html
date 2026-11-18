@@ -122,6 +122,13 @@
     <div class="cat-list" id="track-list"></div>
     <div class="row static"><span><b id="places-count">0 Orte</b><small>Neuer Ort: „Ort speichern“ oder lange auf die Karte drücken</small></span><button class="btn" id="btn-gpx">Alles teilen</button></div>
 
+    <div id="acc-section" hidden>
+      <h2>Zugänge</h2>
+      <p class="muted small hint-line">Nur freigegebene Geräte können die App nutzen. Neue Anfragen stehen oben.</p>
+      <div class="acc-list" id="acc-list"></div>
+      <button type="button" class="btn wide" id="acc-refresh">Liste aktualisieren</button>
+    </div>
+
     <h2>Standort teilen</h2>
     <p class="muted small hint-line">Andere sehen dich live auf ihrer Karte – gesendet wird, solange die App offen ist.</p>
     <div class="place-list" id="live-list"></div>
@@ -393,6 +400,24 @@
 
 <div class="list-chips" id="list-chips" hidden></div>
 
+<div class="gate" id="gate" hidden>
+  <div class="gate-box">
+    <img src="icons/icon-192.png" alt="" width="64" height="64">
+    <h1 id="gate-title">Diese App ist privat</h1>
+    <p id="gate-txt"></p>
+    <div id="gate-form">
+      <label class="field"><span>Dein Name</span><input id="gate-name" type="text" autocomplete="name" enterkeyhint="send" placeholder="z. B. Tom"></label>
+      <button type="button" class="btn primary wide" id="gate-req">Zugang anfragen</button>
+    </div>
+    <p class="gate-wait" id="gate-wait" hidden><i></i>Wartet auf Freigabe …</p>
+    <details class="gate-admin">
+      <summary>Ich bin Verwalter</summary>
+      <label class="field"><span>Verwalter-Code</span><input id="gate-code" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX"></label>
+      <button type="button" class="btn wide" id="gate-admin">Bestätigen</button>
+    </details>
+  </div>
+</div>
+
 <div class="gsat-credit" id="gsat-credit" hidden><b>Google</b><small></small></div>
 
 <button type="button" class="live-pill" id="live-pill" hidden><i></i><span></span></button>
@@ -629,6 +654,7 @@
 <script src="vendor/basemaps.js"></script>
 <script src="extract.js"></script>
 <script src="vehicles.js"></script>
+<script src="access.js"></script>
 <script src="app.js"></script>
 <script src="lists.js"></script>
 <script src="sync.js"></script>

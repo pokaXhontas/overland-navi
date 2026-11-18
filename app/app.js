@@ -212,7 +212,8 @@ async function upscaleDem(data, dz, ox, oy) {
 }
 
 /* Höhendaten-Kacheln für das Höhenlinien-Plugin: fetch abfangen, bevor das Plugin lädt */
-const originalFetch = window.fetch.bind(window);
+const rawFetch = window.fetch.bind(window);
+const originalFetch = (input, init) => rawFetch(input, Access.init(input, init));   // mit Geräteschlüssel für den eigenen Worker
 window.fetch = async function (input, init) {
   const url = typeof input === 'string' ? input : (input && input.url) || '';
   if (url.startsWith(DEM_PREFIX)) {
@@ -1264,7 +1265,8 @@ function startDownload(region) {
     id: region.id, boxes: region.boxes, maxzoom: region.maxzoom, demMaxzoom: region.demMaxzoom,
     sources: Tiles.sources, searchUrl: region.search ? BASE + region.search : null, buildSearchIndex: !region.search,
     hikeLayers: Hike.keysFor(region.boxes).map((k) => ({ key: k, url: Hike.dlUrl(k) })).filter((l) => l.url),
-    routeLayers: RouteData.keysFor(region.boxes).map((k) => ({ key: k, url: RouteData.dlUrl(k) })).filter((l) => l.url)
+    routeLayers: RouteData.keysFor(region.boxes).map((k) => ({ key: k, url: RouteData.dlUrl(k) })).filter((l) => l.url),
+    access: Access.msg()
   });
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 }
@@ -1427,7 +1429,7 @@ function estimateRegion(r) {
     if (m.type === 'error') end();
   };
   w.onerror = end;
-  w.postMessage({ mode: 'estimate', id: r.id, boxes: r.boxes, maxzoom: r.maxzoom, demMaxzoom: r.demMaxzoom, sources: Tiles.sources });
+  w.postMessage({ mode: 'estimate', id: r.id, boxes: r.boxes, maxzoom: r.maxzoom, demMaxzoom: r.demMaxzoom, sources: Tiles.sources, access: Access.msg() });
 }
 
 function addRegion(r) {
@@ -1515,7 +1517,7 @@ async function updateStorage() {
 /* ---------- Bedienelemente ---------- */
 function setupUI() {
   const sheet = $('#sheet');
-  $('#btn-layers').onclick = () => { closeTrackInfo(); if (editor.open) closeEditor(); closeSearch(); renderRegions(); updateStorage(); closeCatPage(); renderDataCats(); sheet.hidden = false; };
+  $('#btn-layers').onclick = () => { closeTrackInfo(); if (editor.open) closeEditor(); closeSearch(); renderRegions(); updateStorage(); closeCatPage(); renderDataCats(); Access.renderList(); sheet.hidden = false; };
   $('#sheet-close').onclick = closeSheet;
   $('#cat-close').onclick = closeSheet;
   $('#cat-back').onclick = closeCatPage;
@@ -2581,6 +2583,7 @@ async function main() {
     return;
   }
   registerServiceWorker();
+  Access.setup();
   try {
     await loadScript('vendor/maplibre-contour.js');
     Lists.init();

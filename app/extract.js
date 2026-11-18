@@ -8,6 +8,22 @@
 (function (root) {
   'use strict';
 
+  /* In Web Workern: Geräteschlüssel an Anfragen zum eigenen Worker hängen (kommt per Nachricht als access) */
+  if (typeof WorkerGlobalScope !== 'undefined' && root instanceof WorkerGlobalScope && !root.__ovlFetch) {
+    const raw = root.fetch.bind(root);
+    root.__ovlFetch = true;
+    root.fetch = (input, init) => {
+      const a = root.OVL_ACCESS;
+      const url = typeof input === 'string' ? input : (input && input.url) || '';
+      if (a && a.key && url.startsWith(a.origin)) {
+        const h = new Headers((init && init.headers) || undefined);
+        h.set('X-Key', a.key);
+        init = { ...(init || {}), headers: h };
+      }
+      return raw(input, init);
+    };
+  }
+
   /* ---------- Kachel-IDs (Hilbert-Kurve, wie PMTiles) ---------- */
   function tileIdOf(z, x, y) {
     let acc = 0;

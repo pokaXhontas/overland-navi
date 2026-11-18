@@ -710,6 +710,7 @@ if (typeof importScripts === 'function') {
   }
   self.onmessage = async (ev) => {
     const m = ev.data;
+    if (m && m.access) self.OVL_ACCESS = m.access;
     try {
       const key = JSON.stringify(m.sources);
       // Kachelspeicher behalten, solange dieselben Dateien gelten (schnellere Neuberechnung unterwegs)

@@ -229,6 +229,8 @@ jobs:
           done
 
       - name: Probelauf im Browser
+        env:
+          OVL_CI_KEY: ${{ secrets.OVL_CI_KEY }}
         continue-on-error: true
         run: |
           (cd vendor-tmp && npm install --no-audit --no-fund puppeteer-core@23 > /dev/null)
