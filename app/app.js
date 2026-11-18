@@ -42,7 +42,20 @@ function layoutFloats() {
   else top = (tr ? tr.top : edge);                                // Statuszeile rechts oben (Handy quer)
   // nach rechts bis vor Statuszeile und Knopfleiste
   let right = W - edge;
-  for (const r of [tr, ctl]) if (r && r.bottom > top && r.left > left) right = Math.min(right, r.left - gap);
+  // Leisten oben dürfen nicht unter die Statuszeile rechts reichen (iPad)
+  for (const sel of ['#draw-bar', '#nav-banner']) {
+    const e = $(sel);
+    if (!e) continue;
+    e.style.maxWidth = '';
+    const r = rect(sel);
+    if (r && tr && tr.left > r.left + 200 && r.top < tr.bottom && r.bottom > tr.top && r.right > tr.left - gap) e.style.maxWidth = Math.round(tr.left - gap - r.left) + 'px';
+  }
+  // Leisten oben (Route zeichnen, Navi-Hinweis, Planer): Hinweise darunter, nie darüber
+  for (const sel of ['#draw-bar', '#nav-banner', '#planner']) {
+    const r = rect(sel);
+    if (r && r.top < H / 2 && r.top <= top + 4 && r.left < left + 200 && r.right > left) top = Math.max(top, r.bottom + gap);
+  }
+  for (const r of [tr, ctl, rect('#draw-bar'), rect('#nav-banner')]) if (r && r.bottom > top && r.top < top + 44 && r.left > left) right = Math.min(right, r.left - gap);
   fl.style.top = top + 'px';
   fl.style.left = left + 'px';
   fl.style.maxWidth = Math.max(120, right - left) + 'px';
@@ -2750,8 +2763,8 @@ async function main() {
   // Lage der schwebenden Hinweise neu berechnen, wenn sich etwas ein- oder ausblendet
   const mo = new MutationObserver(relayout);
   mo.observe(document.body, { attributes: true, attributeFilter: ['class'], childList: true });   // Fahrmodus, Kärtchen
-  for (const sel of ['#floats', '#sel-bar', '.hud', '.fab', '.topright']) { const e = $(sel); if (e) mo.observe(e, { subtree: true, attributes: true, attributeFilter: ['hidden', 'class'] }); }
-  if (window.ResizeObserver) { const ro = new ResizeObserver(relayout); for (const sel of ['.hud', '.topright', '.controls', '.fab']) { const e = $(sel); if (e) ro.observe(e); } }
+  for (const sel of ['#floats', '#sel-bar', '.hud', '.fab', '.topright', '#draw-bar', '#nav-banner', '#planner']) { const e = $(sel); if (e) mo.observe(e, { subtree: true, attributes: true, attributeFilter: ['hidden', 'class'] }); }
+  if (window.ResizeObserver) { const ro = new ResizeObserver(relayout); for (const sel of ['.hud', '.topright', '.controls', '.fab', '#draw-bar', '#nav-banner', '#planner']) { const e = $(sel); if (e) ro.observe(e); } }
   // Quellenangabe nur als kleines (i): ausgeklappt würde sie „Ort speichern“ und die Fahrdaten überdecken.
   // Antippen klappt sie auf, nach 15 Sekunden wieder zu.
   const attrib = () => document.querySelector('.maplibregl-ctrl-attrib');
