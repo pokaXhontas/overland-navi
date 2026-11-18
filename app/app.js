@@ -2013,11 +2013,39 @@ async function runSearch() {
   if (seq !== searchSeq) return;
   const local = [...cats, ...Search.query(q)];
   const pick = (r) => (r.catHit ? Poi.run(r.catHit.cat, r.catHit.place) : Search.show(r));
-  renderResultList($('#search-results'), local, local.length ? '' : (navigator.onLine ? 'Suche online …' : 'Nichts gefunden. Offline sind nur Orte aus geladenen Kartengebieten suchbar.'), pick);
+  renderResultList($('#search-results'), rankHits(q, local), local.length ? '' : (navigator.onLine ? 'Suche online …' : 'Nichts gefunden. Offline sind nur Orte aus geladenen Kartengebieten suchbar.'), pick);
   const web = await webP;
   if (seq !== searchSeq) return;
-  if (web.length) renderResultList($('#search-results'), [...local, ...web.filter((w) => !local.some((l) => l.lat !== undefined && distance(l, w) < 300 && norm(l.name) === norm(w.name)))], '', pick);
+  if (web.length) renderResultList($('#search-results'), rankHits(q, [...local, ...web.filter((w) => !local.some((l) => l.lat !== undefined && distance(l, w) < 300 && norm(l.name) === norm(w.name)))]), '', pick);
   else if (!local.length) renderSearchResults([], 'Nichts gefunden.');
+}
+
+/* Reihenfolge der Treffer, immer nach derselben Logik:
+ * 1. Koordinaten  2. Name genau wie die Eingabe  3. Name fängt so an  4. ein Wort im Namen fängt so an  5. Rest.
+ * Innerhalb davon: eigene Orte zuerst, dann vom Großen zum Kleinen (Land/Insel/Region → Stadt → Dorf, Gipfel, See → Einzelnes),
+ * bei Gleichstand das Nähere zuerst. */
+function rankHits(q, list) {
+  const nq = norm(q);
+  if (!nq) return list;
+  const tier = (r) => {
+    if (r.type === 'coord' || r.type === 'quick-gps' || r.type === 'quick-map') return 0;
+    if (r.catHit) return norm(r.catHit.cat.label) === nq ? 1 : 4;
+    const names = [r.name, ...(r.alts ? String(r.alts).split('|') : [])].filter(Boolean).map(norm);
+    if (names.some((n) => n === nq)) return 1;
+    if (names.some((n) => n.startsWith(nq))) return 2;
+    if (names.some((n) => n.split(' ').some((w) => w.startsWith(nq)))) return 3;
+    return 4;
+  };
+  const size = (r) => {
+    if (r.type === 'own') return -1;
+    if (r.type === 'web') return r.zoom <= 9 ? 0 : r.zoom <= 12 ? 1 : r.zoom <= 13 ? 2 : 3;
+    if (r.type === 'city' || r.type === 'town') return 1;
+    if (['village', 'suburb', 'peak', 'pass', 'water', 'river', 'glacier'].includes(r.type)) return 2;
+    return 3;
+  };
+  return list.map((r, i) => ({ r, i, t: tier(r), z: size(r), d: typeof r.dist === 'number' ? r.dist : Infinity }))
+    .sort((a, b) => a.t - b.t || a.z - b.z || (a.d !== b.d ? a.d - b.d : a.i - b.i))
+    .map((x) => x.r);
 }
 
 const FERRY_ICON = 'M3 17l2 4h14l2-4ZM6 17V11h12v6M9 11V7h6v4M12 3v4';
