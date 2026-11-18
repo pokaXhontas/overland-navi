@@ -167,7 +167,7 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .btn.danger { color: #C53030; }
 
 .toast {
-  position: fixed; z-index: 20; left: 50%; bottom: calc(var(--safe-b) + 130px);
+  position: fixed; z-index: 20; left: 50%; bottom: var(--toast-b, calc(var(--safe-b) + 130px));
   transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
   background: var(--text); color: var(--bg); padding: 12px 18px; border-radius: 16px;
   font-size: 15px; font-weight: 600; max-width: calc(100vw - 40px); text-align: center;
@@ -844,7 +844,7 @@ html.dark .na-tag.ferry { color: #74C0FC; } html.dark .na-tag.toll { color: #FFC
 .imp-name { border-radius: 10px; border: 1px solid var(--line); background: var(--faint); padding: 8px 10px; font: inherit; font-size: 16px; font-weight: 650; color: var(--text); outline: none; }
 .imp-txt small { font-size: 12px; color: var(--muted); }
 .chip-btn.add { border-style: dashed; background: transparent; color: var(--accent-text); }
-.list-chips { position: fixed; z-index: 5; left: 50%; transform: translateX(-50%); top: calc(var(--safe-t) + var(--gap) + 56px); display: flex; gap: 6px; max-width: calc(100vw - 2 * var(--gap) - 140px); overflow-x: auto; scrollbar-width: none; padding: 4px 4px 8px; }
+.list-chips { position: relative; display: flex; gap: 6px; max-width: 100%; overflow-x: auto; scrollbar-width: none; padding: 4px 4px 8px; }
 .list-chips::-webkit-scrollbar { display: none; }
 .list-chips[hidden] { display: none; }
 .lchip { height: 34px; padding: 0 13px; border-radius: 17px; font: inherit; font-size: 13px; font-weight: 650; color: var(--muted); white-space: nowrap; flex-shrink: 0; border: 1px solid var(--line); background: var(--panel-solid); box-shadow: 0 2px 8px rgba(0,0,0,.18); }
@@ -860,7 +860,6 @@ html.dark .na-tag.ferry { color: #74C0FC; } html.dark .na-tag.toll { color: #FFC
 .pc-btns .btn { height: 44px; padding: 0 4px; font-size: 13.5px; display: flex; align-items: center; justify-content: center; text-decoration: none; color: var(--text); }
 .pc-btns .btn.primary { color: var(--accent-ink); }
 @media (max-width: 600px) {
-  .list-chips { left: var(--gap); transform: none; max-width: calc(100vw - 3 * var(--gap) - var(--ctl)); top: calc(var(--safe-t) + var(--gap) + 46px); }
   .dlg { top: 12vh; max-height: none; }
   .pin-card { left: 8px; right: 8px; width: auto; bottom: calc(var(--safe-b) + 8px); }
   .sel-bar { right: 8px; left: 8px; width: auto; bottom: calc(var(--safe-b) + 8px); }
@@ -893,7 +892,7 @@ html.dark .na-tag.ferry { color: #74C0FC; } html.dark .na-tag.toll { color: #FFC
 .live-ic { background: var(--faint); color: var(--muted); border-radius: 50%; }
 .live-ic.on { background: #E03131; color: #FFFFFF; }
 #btn-live-new { margin: 6px 0 4px; }
-.live-pill { position: fixed; z-index: 5; left: var(--gap); top: calc(var(--safe-t) + var(--gap) + 98px); height: 32px; padding: 0 12px 0 10px; border-radius: 16px; border: 0; display: flex; align-items: center; gap: 8px; background: #E03131; color: #FFFFFF; font: inherit; font-size: 13px; font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+.live-pill { position: relative; height: 32px; padding: 0 12px 0 10px; border-radius: 16px; border: 0; display: flex; align-items: center; gap: 8px; background: #E03131; color: #FFFFFF; font: inherit; font-size: 13px; font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
 .live-pill[hidden] { display: none; }
 .live-pill i { width: 8px; height: 8px; border-radius: 50%; background: #FFFFFF; animation: livepulse 1.6s ease-in-out infinite; }
 .live-pill.err { background: #868E96; }
@@ -908,7 +907,6 @@ html.dark .na-tag.ferry { color: #74C0FC; } html.dark .na-tag.toll { color: #FFC
 .peer.stale .peer-dir { display: none; }
 .peer-ic { color: #FFFFFF; font-weight: 800; font-size: 16px; display: flex; align-items: center; justify-content: center; }
 .pc-btns.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-@media (max-width: 600px) { .live-pill { top: calc(var(--safe-t) + var(--gap) + 92px); } }
 .sj-browser { order: -1; }
 .sj-steps { margin: 6px 0 10px; padding-left: 20px; font-size: 14px; line-height: 1.5; }
 .sj-browser p { font-size: 14px; }
@@ -921,7 +919,7 @@ html.dark .na-tag.ferry { color: #74C0FC; } html.dark .na-tag.toll { color: #FFC
 .gsat-credit small { font-size: 10px; opacity: .9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Fortschritt beim Zuordnen der Google-Orte */
-.enrich-pill { position: fixed; z-index: 5; left: var(--gap); top: calc(var(--safe-t) + var(--gap) + 140px); height: 34px; min-width: 210px; padding: 0 14px; border-radius: 17px; border: 1px solid var(--line); background: var(--panel-solid); color: var(--text); font: inherit; font-size: 13px; font-weight: 650; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,.2); }
+.enrich-pill { position: relative; height: 34px; min-width: 210px; padding: 0 14px; border-radius: 17px; border: 1px solid var(--line); background: var(--panel-solid); color: var(--text); font: inherit; font-size: 13px; font-weight: 650; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,.2); }
 .enrich-pill[hidden] { display: none; }
 .enrich-pill i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: rgba(112,72,232,.22); transition: width .4s; }
 .enrich-pill span { position: relative; }
@@ -947,3 +945,38 @@ html.dark .na-tag.ferry { color: #74C0FC; } html.dark .na-tag.toll { color: #FFC
 .acc-row.new b::after { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-left: 6px; vertical-align: middle; }
 .acc-btns { display: flex; gap: 6px; flex-shrink: 0; }
 .acc-btns .btn { height: 36px; padding: 0 12px; font-size: 13.5px; }
+#gate-push[hidden] { display: none; }
+#acc-push { height: auto; min-height: 44px; padding: 8px 10px; line-height: 1.25; }
+
+/* Schwebende Hinweise links oben: Listen-Schalter, Standort geteilt, Orte zuordnen.
+ * Lage und Breite setzt layoutFloats(), damit nichts über Fahrdaten, Statuszeile oder Knöpfen liegt. */
+.floats { position: fixed; z-index: 5; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; top: calc(var(--safe-t) + var(--gap) + 56px); left: calc(var(--safe-l) + var(--gap)); max-width: 50vw; pointer-events: none; }
+.floats > * { pointer-events: auto; max-width: 100%; }
+.floats .list-chips { margin: -4px 0 -8px -4px; }
+body.navigating .floats { display: none; }
+.controls.tight .zoom { display: none; }
+
+.region-extra { display: flex; flex-wrap: wrap; gap: 8px; }
+.region-extra .btn { height: 38px; font-size: 13.5px; }
+.region-top .btn { flex-shrink: 0; }
+.region-top b { overflow-wrap: anywhere; }
+/* Kärtchen auf dem Handy: Fahrdaten und „Ort speichern“ solange ausblenden, Kärtchen über der Quellenangabe */
+@media (max-width: 600px), (max-height: 500px) and (orientation: landscape) {
+  body.card-open .hud, body.card-open .fab { display: none; }
+  .pin-card { bottom: calc(var(--safe-b) + 40px); }
+}
+body.selecting .sheet-body { padding-bottom: 150px; }
+.two-btns .btn { white-space: normal; height: auto; min-height: 44px; line-height: 1.25; padding: 8px 10px; }
+
+/* Quellenangabe: zugeklappt nur das (i), aufgeklappt erst nach Antippen */
+.maplibregl-ctrl-attrib:not(.user-open) .maplibregl-ctrl-attrib-inner { display: none !important; }
+.maplibregl-ctrl-attrib:not(.user-open) { padding: 0 !important; min-height: 24px !important; min-width: 24px; background: rgba(255,255,255,.85) !important; border-radius: 12px; }
+.maplibregl-ctrl-attrib .maplibregl-ctrl-attrib-button { display: block !important; }
+.maplibregl-ctrl-attrib.user-open { padding: 2px 28px 2px 8px !important; }
+/* Platz für das (i) unten rechts */
+.fab { bottom: calc(var(--safe-b) + var(--gap) + 28px); }
+.fab.compact { width: 72px; padding: 0; justify-content: center; }
+.fab.compact .fab-txt { display: none; }
+body.selecting .fab, body.selecting .hud { display: none; }
+@media (max-height: 500px) and (orientation: landscape) { body.card-open .floats { display: none; } }
+body.card-open .maplibregl-ctrl-bottom-right, body.selecting .maplibregl-ctrl-bottom-right { visibility: hidden; }

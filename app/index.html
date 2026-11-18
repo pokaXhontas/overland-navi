@@ -126,7 +126,7 @@
       <h2>Zugänge</h2>
       <p class="muted small hint-line">Nur freigegebene Geräte können die App nutzen. Neue Anfragen stehen oben.</p>
       <div class="acc-list" id="acc-list"></div>
-      <button type="button" class="btn wide" id="acc-refresh">Liste aktualisieren</button>
+      <div class="two-btns"><button type="button" class="btn" id="acc-push">Bei neuen Anfragen benachrichtigen</button><button type="button" class="btn" id="acc-refresh">Aktualisieren</button></div>
     </div>
 
     <h2>Standort teilen</h2>
@@ -398,7 +398,11 @@
   </div>
 </div>
 
-<div class="list-chips" id="list-chips" hidden></div>
+<div class="floats" id="floats">
+  <div class="list-chips" id="list-chips" hidden></div>
+  <button type="button" class="live-pill" id="live-pill" hidden><i></i><span></span></button>
+  <button type="button" class="enrich-pill" id="enrich-pill" hidden><i></i><span></span></button>
+</div>
 
 <div class="gate" id="gate" hidden>
   <div class="gate-box">
@@ -410,6 +414,7 @@
       <button type="button" class="btn primary wide" id="gate-req">Zugang anfragen</button>
     </div>
     <p class="gate-wait" id="gate-wait" hidden><i></i>Wartet auf Freigabe …</p>
+    <button type="button" class="btn wide" id="gate-push" hidden>Benachrichtigen, wenn freigegeben</button>
     <details class="gate-admin">
       <summary>Ich bin Verwalter</summary>
       <label class="field"><span>Verwalter-Code</span><input id="gate-code" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX"></label>
@@ -420,8 +425,6 @@
 
 <div class="gsat-credit" id="gsat-credit" hidden><b>Google</b><small></small></div>
 
-<button type="button" class="live-pill" id="live-pill" hidden><i></i><span></span></button>
-<button type="button" class="enrich-pill" id="enrich-pill" hidden><i></i><span></span></button>
 
 <section class="planner panel" id="planner" aria-label="Route planen" hidden>
   <div class="pl-head">

@@ -80,10 +80,12 @@ const Access = {
     const waiting = status === 'pending';
     $('#gate-title').textContent = blocked ? 'Kein Zugang' : 'Diese App ist privat';
     $('#gate-txt').textContent = blocked ? 'Dieses Gerät wurde gesperrt. Wenn das ein Versehen ist, sag den Leuten Bescheid, von denen du den Link hast.'
-      : waiting ? 'Deine Anfrage ist angekommen. Sobald sie freigegeben ist, startet die App hier von selbst.'
+      : waiting ? 'Deine Anfrage ist angekommen. Du kannst die App schließen – beim nächsten Öffnen geht es los, sobald du freigegeben bist. Mit Benachrichtigung erfährst du es sofort.'
         : 'Gib deinen Namen ein und frag nach Zugang. Sobald jemand zustimmt, startet die App hier von selbst.';
     $('#gate-form').hidden = blocked || waiting;
     $('#gate-wait').hidden = !waiting;
+    $('#gate-push').hidden = !waiting;
+    if (waiting) this.renderPushBtn($('#gate-push'), 'Du wirst benachrichtigt ✓', 'Benachrichtigen, wenn freigegeben');
     clearInterval(this.timer);
     if (waiting) this.timer = setInterval(() => { if (!document.hidden) this.check(); }, 15000);
   },
@@ -108,10 +110,46 @@ const Access = {
     } catch (e) { toast('Ging nicht – Internet da?'); }
   },
 
+  /* ---------- Push-Nachrichten ---------- */
+  pushOk() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; },
+  async pushOn() {
+    if (!this.pushOk() || Notification.permission !== 'granted') return false;
+    try { const reg = await navigator.serviceWorker.ready; return !!(await reg.pushManager.getSubscription()); } catch (e) { return false; }
+  },
+  async enablePush() {
+    if (!this.pushOk()) {
+      const ios = /iPhone|iPad/.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.userAgent));
+      toast(ios && !(navigator.standalone || matchMedia('(display-mode: standalone)').matches)
+        ? 'Benachrichtigungen gehen auf dem iPhone nur in der App vom Home-Bildschirm (nicht in Safari).'
+        : 'Dieses Gerät oder dieser Browser kann keine Benachrichtigungen empfangen.', 7000);
+      return false;
+    }
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') { toast('Benachrichtigungen sind nicht erlaubt. In den Einstellungen bei Mitteilungen → Overland-Navi einschalten.', 7000); return false; }
+      const reg = await navigator.serviceWorker.ready;
+      const { key } = await this.call('vapid');
+      if (!key) throw new Error('kein Schlüssel');
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: Uint8Array.from(atob(key.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((key.length + 3) % 4)), (c) => c.charCodeAt(0)) });
+      const r = await this.call('push', { sub: sub.toJSON(), test: true });
+      if (r.error) throw new Error(r.error);
+      toast('Benachrichtigungen sind an. Zur Probe kommt gleich eine Nachricht.', 5000);
+      return true;
+    } catch (e) { toast('Benachrichtigungen ließen sich nicht einschalten: ' + e.message, 7000); return false; }
+  },
+  async renderPushBtn(btn, onTxt, offTxt) {
+    if (!btn) return;
+    const on = await this.pushOn();
+    btn.textContent = on ? onTxt : offTxt;
+    btn.classList.toggle('primary', !on);
+  },
+
   /* ---------- Verwaltung im Menü ---------- */
   async renderList() {
     const box = $('#acc-list');
     if (!box || $('#acc-section').hidden) return;
+    this.renderPushBtn($('#acc-push'), 'Benachrichtigungen sind an ✓', 'Bei neuen Anfragen benachrichtigen');
     let data;
     try { data = await this.call('list'); } catch (e) { box.innerHTML = '<p class="muted small">Liste gerade nicht abrufbar.</p>'; return; }
     if (!data.devices) return;
@@ -155,6 +193,12 @@ const Access = {
     $('#gate-req').onclick = () => this.request();
     $('#gate-admin').onclick = () => this.becomeAdmin();
     $('#acc-refresh').onclick = () => this.renderList();
+    $('#acc-push').onclick = async () => { await this.enablePush(); this.renderPushBtn($('#acc-push'), 'Benachrichtigungen sind an ✓', 'Bei neuen Anfragen benachrichtigen'); };
+    $('#gate-push').onclick = async () => { await this.enablePush(); this.renderPushBtn($('#gate-push'), 'Du wirst benachrichtigt ✓', 'Benachrichtigen, wenn freigegeben'); };
+    // Tipp auf eine Nachricht: Zugänge öffnen
+    const openAcc = () => { if ($('#acc-section').hidden) return; $('#btn-layers').click(); setTimeout(() => $('#acc-section').scrollIntoView({ block: 'start' }), 300); };
+    if (location.hash === '#zugaenge') { history.replaceState(null, '', location.pathname + location.search); setTimeout(openAcc, 1500); }
+    if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', (e) => { if (e.data && e.data.type === 'open') { this.check(); if (e.data.hash === '#zugaenge') openAcc(); } });
     const nm = localStorage.getItem('ovl.liveName');
     if (nm) { try { $('#gate-name').value = JSON.parse(nm); } catch (e) { /* egal */ } }
     this.check();

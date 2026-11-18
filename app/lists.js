@@ -150,9 +150,10 @@ const Lists = {
     if (p.url) g.href = p.url; else g.href = `https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lon}`;
     document.body.appendChild(el);
     this.card = el;
+    document.body.classList.add('card-open');
     if (typeof Swipe !== 'undefined' && Swipe.attach) { try { Swipe.attach(el, { dir: () => 'down', onDismiss: () => this.closeCard() }); } catch (e) { /* ohne Wischen */ } }
   },
-  closeCard() { if (this.card) { this.card.remove(); this.card = null; } },
+  closeCard() { document.body.classList.toggle('card-open', !!(typeof Live !== 'undefined' && Live.card)); if (this.card) { this.card.remove(); this.card = null; } },
 
   /* ---------- Menü: Listen ---------- */
   stats(id) {
@@ -283,11 +284,13 @@ const Lists = {
 
   /* ---------- Auswählen und Sammelaktionen ---------- */
   startSel(from) {
+    document.body.classList.add('selecting');
     this.sel = { active: true, ids: new Set(), from };
     this.rerenderPages();
     this.renderSelBar();
   },
   endSel(quiet) {
+    document.body.classList.remove('selecting');
     const was = this.sel.active;
     this.sel = { active: false, ids: new Set(), from: null };
     $('#sel-bar').hidden = true;

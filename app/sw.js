@@ -141,3 +141,24 @@ self.addEventListener('fetch', (event) => {
     return new Response('Offline', { status: 503 });
   })());
 });
+
+/* Push-Nachrichten: neue Zugangsanfragen (für Verwalter) und „Zugang freigegeben“ */
+self.addEventListener('push', (event) => {
+  let m = {};
+  try { m = event.data ? event.data.json() : {}; } catch (e) { m = { title: 'Overland-Navi', body: event.data ? event.data.text() : '' }; }
+  event.waitUntil(self.registration.showNotification(m.title || 'Overland-Navi', {
+    body: m.body || '', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: m.url === '#zugaenge' ? 'zugang' : undefined, data: { url: m.url || '' }
+  }));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const hash = (event.notification.data && event.notification.data.url) || '';
+  event.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of all) {
+      if (c.url.startsWith(self.registration.scope)) { c.postMessage({ type: 'open', hash }); return c.focus(); }
+    }
+    return self.clients.openWindow(self.registration.scope + hash);
+  })());
+});

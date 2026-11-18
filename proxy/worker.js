@@ -65,6 +65,64 @@ async function sync(request, env, room) {
   return reply(200, String(v), { ETag: '"' + v + '"' });
 }
 
+/* ---------- Push-Nachrichten (Web Push, RFC 8291/8292) ---------- */
+const b64u = (b) => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const unb64u = (t) => Uint8Array.from(atob(t.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((t.length + 3) % 4)), (c) => c.charCodeAt(0));
+const cat = (...a) => { const out = new Uint8Array(a.reduce((n, x) => n + x.length, 0)); let o = 0; for (const x of a) { out.set(x, o); o += x.length; } return out; };
+const te = (t) => new TextEncoder().encode(t);
+async function hkdf(salt, ikm, info, len) {
+  const k = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
+  return new Uint8Array(await crypto.subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt, info }, k, len * 8));
+}
+/* Schlüsselpaar für die Absenderkennung: legt der Worker beim ersten Mal selbst an und merkt es sich in der Datenbank */
+let vapid = null;
+async function vapidKeys(db) {
+  if (vapid) return vapid;
+  await db.prepare('CREATE TABLE IF NOT EXISTS cfg (k TEXT PRIMARY KEY, v TEXT)').run();
+  let row = await db.prepare("SELECT v FROM cfg WHERE k = 'vapid'").first();
+  if (!row) {
+    const kp = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+    const jwk = await crypto.subtle.exportKey('jwk', kp.privateKey);
+    const pub = await crypto.subtle.exportKey('raw', kp.publicKey);
+    await db.prepare("INSERT OR IGNORE INTO cfg (k, v) VALUES ('vapid', ?)").bind(JSON.stringify({ jwk, pub: b64u(pub) })).run();
+    row = await db.prepare("SELECT v FROM cfg WHERE k = 'vapid'").first();
+  }
+  const v = JSON.parse(row.v);
+  vapid = { pub: v.pub, key: await crypto.subtle.importKey('jwk', v.jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']) };
+  return vapid;
+}
+async function pushTo(db, sub, msg) {
+  const v = await vapidKeys(db);
+  const ua = unb64u(sub.p256dh), auth = unb64u(sub.auth);
+  const eph = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const as = new Uint8Array(await crypto.subtle.exportKey('raw', eph.publicKey));
+  const uaKey = await crypto.subtle.importKey('raw', ua, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+  const ecdh = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: uaKey }, eph.privateKey, 256));
+  const ikm = await hkdf(auth, ecdh, cat(te('WebPush: info\0'), ua, as), 32);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const cek = await hkdf(salt, ikm, te('Content-Encoding: aes128gcm\0'), 16);
+  const nonce = await hkdf(salt, ikm, te('Content-Encoding: nonce\0'), 12);
+  const k = await crypto.subtle.importKey('raw', cek, 'AES-GCM', false, ['encrypt']);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, k, cat(te(JSON.stringify(msg)), new Uint8Array([2]))));
+  const head = new Uint8Array(21); head.set(salt); new DataView(head.buffer).setUint32(16, 4096); head[20] = 65;
+  const body = cat(head, as, ct);
+  const aud = new URL(sub.endpoint).origin;
+  const jwtHead = b64u(te(JSON.stringify({ typ: 'JWT', alg: 'ES256' })));
+  const jwtBody = b64u(te(JSON.stringify({ aud, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: 'https://pokaxhontas.github.io' })));
+  const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, v.key, te(jwtHead + '.' + jwtBody));
+  const r = await fetch(sub.endpoint, { method: 'POST', body, headers: {
+    'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream', TTL: '86400', Urgency: 'high',
+    Authorization: `vapid t=${jwtHead}.${jwtBody}.${b64u(sig)}, k=${v.pub}` } });
+  if (r.status === 404 || r.status === 410) await db.prepare('DELETE FROM push WHERE endpoint = ?').bind(sub.endpoint).run();   // abgemeldet
+  return r.status;
+}
+async function pushTable(db) { await db.prepare('CREATE TABLE IF NOT EXISTS push (endpoint TEXT PRIMARY KEY, dev TEXT NOT NULL, p256dh TEXT, auth TEXT, created INTEGER)').run(); }
+async function notify(db, where, args, msg) {
+  await pushTable(db);
+  const { results } = await db.prepare('SELECT p.endpoint, p.p256dh, p.auth FROM push p JOIN dev d ON d.id = p.dev WHERE ' + where).bind(...args).all();
+  await Promise.all(results.map((sub) => pushTo(db, sub, msg).catch(() => 0)));
+}
+
 /* ---------- Zugang ---------- */
 const ADMIN_HASH = 'aa589afaca59eb6e8cd6d17e06acd21bcab19bda712b0210ac9a24988d0f0975';   // Hash des Verwalter-Codes (der Code selbst steht nirgends)
 const CI_HASH = '3a078d0c6bb72b7de96caa4b4437e5ecd79c4e025dbfd9cde8a5507d6d257f7b';      // Hash des Schlüssels für die automatischen Prüfläufe
@@ -98,7 +156,7 @@ async function gate(request, env) {
   }
   return reply(401, JSON.stringify({ status: d ? d.status : 'none' }), { 'Content-Type': 'application/json' });
 }
-async function auth(request, env, what) {
+async function auth(request, env, what, ctx) {
   if (!env.LOC) return reply(501, JSON.stringify({ status: 'open' }), { 'Content-Type': 'application/json' });
   const db = env.LOC;
   await devTable(db);
@@ -116,8 +174,11 @@ async function auth(request, env, what) {
     if (d.status === 'none') {
       const open = (await db.prepare("SELECT COUNT(*) AS n FROM dev WHERE status = 'pending'").first()).n;
       if (open >= 50) return json({ status: 'none', error: 'zu viele offene Anfragen' }, 429);
+      const name = String(body.name || '').slice(0, 40), model = String(body.model || '').slice(0, 40);
       await db.prepare('INSERT INTO dev (id, name, model, status, admin, created, seen) VALUES (?, ?, ?, ?, 0, ?, ?)')
-        .bind(d.id, String(body.name || '').slice(0, 40), String(body.model || '').slice(0, 40), 'pending', now, now).run();
+        .bind(d.id, name, model, 'pending', now, now).run();
+      const job = notify(db, "d.admin = 1 AND d.status = 'ok'", [], { title: 'Neue Zugangsanfrage', body: `${name || 'Jemand'}${model ? ' (' + model + ')' : ''} möchte Overland-Navi nutzen.`, url: '#zugaenge' });
+      if (ctx) ctx.waitUntil(job); else await job;
       return json({ status: 'pending' });
     }
     if (d.status === 'pending' && body.name) await db.prepare('UPDATE dev SET name = ?, model = ? WHERE id = ?').bind(String(body.name).slice(0, 40), String(body.model || '').slice(0, 40), d.id).run();
@@ -130,6 +191,17 @@ async function auth(request, env, what) {
       .bind(d.id, String(body.name || '').slice(0, 40), String(body.model || '').slice(0, 40), 'ok', now, now).run();
     return json({ status: 'ok', admin: true });
   }
+  if (what === 'vapid') return json({ key: (await vapidKeys(db)).pub });
+  if (what === 'push' && request.method === 'POST') {
+    if (d.status === 'none' || d.status === 'blocked') return json({ error: 'erst Zugang anfragen' }, 403);
+    const sub = body.sub || {};
+    if (!/^https:\/\//.test(sub.endpoint || '') || !sub.keys || !sub.keys.p256dh || !sub.keys.auth) return json({ error: 'ungültig' }, 400);
+    await pushTable(db);
+    await db.prepare('INSERT INTO push (endpoint, dev, p256dh, auth, created) VALUES (?, ?, ?, ?, ?) ON CONFLICT (endpoint) DO UPDATE SET dev = excluded.dev, p256dh = excluded.p256dh, auth = excluded.auth')
+      .bind(sub.endpoint, d.id, sub.keys.p256dh, sub.keys.auth, now).run();
+    if (body.test) await pushTo(db, { endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth }, { title: 'Benachrichtigungen sind an', body: d.admin ? 'Neue Zugangsanfragen erscheinen ab jetzt hier.' : 'Du bekommst hier Bescheid, sobald dein Zugang freigegeben ist.' });
+    return json({ ok: true });
+  }
   if (!d.admin || d.status !== 'ok') return json({ error: 'nur für Verwalter' }, 403);
   if (what === 'list') {
     const { results } = await db.prepare('SELECT id, name, model, status, admin, created, seen FROM dev ORDER BY status = \'pending\' DESC, seen DESC').all();
@@ -137,9 +209,16 @@ async function auth(request, env, what) {
   }
   if (what === 'set' && request.method === 'POST') {
     if (body.id === d.id && (body.status !== 'ok' || body.admin === false)) return json({ error: 'Dich selbst kannst du nicht sperren' }, 400);
-    if (body.status === 'delete') await db.prepare('DELETE FROM dev WHERE id = ?').bind(body.id).run();
+    if (body.status === 'delete') { await db.prepare('DELETE FROM dev WHERE id = ?').bind(body.id).run(); await pushTable(db); await db.prepare('DELETE FROM push WHERE dev = ?').bind(body.id).run(); }
     else {
-      if (['ok', 'blocked', 'pending'].includes(body.status)) await db.prepare('UPDATE dev SET status = ? WHERE id = ?').bind(body.status, body.id).run();
+      if (['ok', 'blocked', 'pending'].includes(body.status)) {
+        const old = await db.prepare('SELECT status FROM dev WHERE id = ?').bind(body.id).first();
+        await db.prepare('UPDATE dev SET status = ? WHERE id = ?').bind(body.status, body.id).run();
+        if (body.status === 'ok' && old && old.status === 'pending') {
+          const job = notify(db, 'd.id = ?', [body.id], { title: 'Zugang freigegeben', body: 'Du kannst Overland-Navi jetzt nutzen. Tippen zum Öffnen.', url: '' });
+          if (ctx) ctx.waitUntil(job); else await job;
+        }
+      }
       if (typeof body.admin === 'boolean') await db.prepare('UPDATE dev SET admin = ? WHERE id = ?').bind(body.admin ? 1 : 0, body.id).run();
     }
     seenOk.clear();
@@ -185,11 +264,11 @@ async function loc(request, env, room, member) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     const path = new URL(request.url).pathname;
-    const am = path.match(/^\/auth\/(status|request|admin|list|set)$/);
-    if (am) return auth(request, env, am[1]);
+    const am = path.match(/^\/auth\/(status|request|admin|list|set|vapid|push)$/);
+    if (am) return auth(request, env, am[1], ctx);
     const sm = path.match(/^\/sync\/([a-f0-9]{32})$/);
     if (sm) return (await gate(request, env)) || sync(request, env, sm[1]);
     const lm = path.match(/^\/loc\/([a-f0-9]{32})(?:\/([a-f0-9]{16}))?$/);

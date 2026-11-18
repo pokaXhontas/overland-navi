@@ -26,7 +26,55 @@ const settings = {
 };
 let places = store.get('places', []);
 
+/* Schwebende Hinweise so legen, dass sie nie über Fahrdaten, Statuszeile, Knöpfen oder „Ort speichern“ liegen */
+function layoutFloats() {
+  const fl = $('#floats');
+  if (!fl) return;
+  const W = innerWidth, H = innerHeight;
+  const rect = (sel) => { const e = $(sel); if (!e || e.closest('[hidden]') || getComputedStyle(e).display === 'none') return null; const r = e.getBoundingClientRect(); return r.width && r.height ? r : null; };
+  const gap = 8, edge = 12;
+  const hud = rect('.hud'), tr = rect('.topright'), ctl = rect('.controls'), fab = rect('.fab');
+  const hudTop = hud && hud.top < H / 2;   // Fahrdaten oben links (iPad) oder unten (Handy)
+  let left = edge + (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--safe-l')) || 0);
+  let top;
+  if (hudTop) { top = hud.bottom + gap; left = hud.left; }
+  else if (tr && tr.left < W / 2) top = tr.bottom + gap;        // Statuszeile über die ganze Breite (Handy hoch)
+  else top = (tr ? tr.top : edge);                                // Statuszeile rechts oben (Handy quer)
+  // nach rechts bis vor Statuszeile und Knopfleiste
+  let right = W - edge;
+  for (const r of [tr, ctl]) if (r && r.bottom > top && r.left > left) right = Math.min(right, r.left - gap);
+  fl.style.top = top + 'px';
+  fl.style.left = left + 'px';
+  fl.style.maxWidth = Math.max(120, right - left) + 'px';
+  // Knopfleiste zu lang (iPad quer, kleine Handys mit Kärtchen): Zoom-Knöpfe weglassen, Zwei-Finger-Zoom geht immer
+  const c = $('.controls');
+  if (c) {
+    c.classList.remove('tight');
+    const cr = rect('.controls');
+    for (const r of [fab, rect('.pin-card'), rect('.sel-bar')]) {
+      if (cr && r && cr.bottom > r.top - gap && cr.right > r.left && cr.left < r.right) c.classList.add('tight');
+    }
+  }
+  // schmales Handy: „Ort speichern“ ohne Schrift, wenn es sonst an die Fahrdaten stößt
+  const f = $('.fab');
+  if (f) {
+    f.classList.remove('compact');
+    const fr = rect('.fab'), hr = rect('.hud');
+    if (fr && hr && hr.top < fr.bottom && hr.bottom > fr.top && hr.right + gap > fr.left) f.classList.add('compact');
+  }
+  // Meldungen über allem, was unten liegt
+  let low = H;
+  for (const sel of ['.fab', '.pin-card', '.sel-bar', '.nav-foot']) { const r = rect(sel); if (r && r.top > H / 2) low = Math.min(low, r.top); }
+  if (hud && !hudTop) low = Math.min(low, hud.top);
+  document.documentElement.style.setProperty('--toast-b', Math.max(20, H - low + 12) + 'px');
+}
+let layoutQueued = false;
+function relayout() { if (layoutQueued) return; layoutQueued = true; requestAnimationFrame(() => { layoutQueued = false; layoutFloats(); }); }
+addEventListener('resize', relayout);
+addEventListener('orientationchange', () => setTimeout(relayout, 300));
+
 function toast(msg, ms = 2600) {
+  layoutFloats();
   const t = $('#toast');
   t.textContent = msg;
   t.classList.add('show');
@@ -1337,6 +1385,8 @@ function renderRegions() {
       </div>`;
     div.querySelector('b').textContent = r.name;
     const btn = div.querySelector('button');
+    // weitere Knöpfe in eine eigene Zeile unter Name und Status, damit nichts überlappt
+    const extra = () => { let e = div.querySelector('.region-extra'); if (!e) { e = document.createElement('div'); e.className = 'region-extra'; div.querySelector('.region-top').after(e); } return e; };
     const state = div.querySelector('.state');
     if (job) {
       state.textContent = 'Wird geladen …';
@@ -1365,7 +1415,7 @@ function renderRegions() {
           : needHike ? (Hike.regionStale(r) ? 'Wanderwege aktualisieren' : 'Wanderwege laden')
           : (RouteData.regionStale(r) ? 'Offline-Routen aktualisieren' : 'Offline-Routen laden');
         hb.onclick = () => { if (!navigator.onLine) { toast('Dafür brauchst du Internet.'); return; } startDownload(r); };
-        div.querySelector('.region-top').insertBefore(hb, btn);
+        extra().appendChild(hb);
       }
       if (Hike.regionDone(r)) state.append(' · mit Wanderwegen');
       if (RouteData.regionDone(r)) state.append(' · mit Offline-Routen');
@@ -1376,7 +1426,7 @@ function renderRegions() {
         more.className = 'btn small-btn';
         more.textContent = 'Suche ergänzen';
         more.onclick = () => { if (!navigator.onLine) { toast('Dafür brauchst du Internet.'); return; } startDownload(r); };
-        div.querySelector('.region-top').insertBefore(more, btn);
+        extra().appendChild(more);
       }
     } else {
       const partial = Tiles.partial.has(r.id);
@@ -1398,7 +1448,7 @@ function renderRegions() {
         del.className = 'btn danger small-btn';
         del.textContent = r.custom ? 'Entfernen' : 'Verwerfen';
         del.onclick = () => deleteRegion(r, r.custom);
-        div.querySelector('.region-top').appendChild(del);
+        extra().appendChild(del);
       }
       btn.onclick = () => {
         if (!navigator.onLine) { toast('Zum Laden brauchst du eine Internetverbindung.'); return; }
@@ -2663,8 +2713,31 @@ async function main() {
   map.on('error', (e) => { if (e && e.error) console.warn('Karte:', e.error.message || e.error); });
 
   setupUI();
+  // Lage der schwebenden Hinweise neu berechnen, wenn sich etwas ein- oder ausblendet
+  const mo = new MutationObserver(relayout);
+  mo.observe(document.body, { attributes: true, attributeFilter: ['class'], childList: true });   // Fahrmodus, Kärtchen
+  for (const sel of ['#floats', '#sel-bar', '.hud', '.fab', '.topright']) { const e = $(sel); if (e) mo.observe(e, { subtree: true, attributes: true, attributeFilter: ['hidden', 'class'] }); }
+  if (window.ResizeObserver) { const ro = new ResizeObserver(relayout); for (const sel of ['.hud', '.topright', '.controls', '.fab']) { const e = $(sel); if (e) ro.observe(e); } }
+  // Quellenangabe nur als kleines (i): ausgeklappt würde sie „Ort speichern“ und die Fahrdaten überdecken.
+  // Antippen klappt sie auf, nach 15 Sekunden wieder zu.
+  const attrib = () => document.querySelector('.maplibregl-ctrl-attrib');
+  const prepAttrib = () => { const a = attrib(); if (a) a.classList.add('maplibregl-compact'); };
+  prepAttrib();
+  map.once('load', prepAttrib);
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest || !e.target.closest('.maplibregl-ctrl-attrib-button')) return;
+    const a = attrib();
+    if (!a) return;
+    const open = !a.classList.contains('user-open');
+    a.classList.toggle('user-open', open);
+    clearTimeout(prepAttrib.t);
+    if (open) prepAttrib.t = setTimeout(() => a.classList.remove('user-open'), 15000);
+  }, true);
+  relayout();
   startGPS();
   updateWakeLock();
 }
 
-main().catch((e) => fatal('Fehler beim Start: ' + (e && e.message ? e.message : e)));
+// erst starten, wenn alle Skripte der Seite geladen sind (sonst fehlen je nach Ladereihenfolge z. B. Hike oder Lists)
+const startApp = () => main().catch((e) => fatal('Fehler beim Start: ' + (e && e.message ? e.message : e)));
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startApp); else startApp();

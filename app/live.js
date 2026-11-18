@@ -210,6 +210,7 @@ const Live = {
       <div class="pc-btns two"><button type="button" class="btn primary pc-route">Route hierhin</button><button type="button" class="btn pc-center">Zeigen</button></div>`;
     document.body.appendChild(el);
     this.card = { el, gid, m };
+    document.body.classList.add('card-open');
     el.querySelector('.pc-x').onclick = () => this.closeCard();
     el.querySelector('.pc-route').onclick = () => { const p = this.peers[gid][m]; this.closeCard(); Nav.choose({ name: p.name, lat: p.lat, lon: p.lon }); };
     el.querySelector('.pc-center').onclick = () => { const p = this.peers[gid][m]; gps.follow = false; map.easeTo({ center: [p.lon, p.lat], zoom: Math.max(map.getZoom(), 13) }); };
@@ -229,7 +230,7 @@ const Live = {
     el.querySelector('small').textContent = bits.join(' · ');
     el.querySelector('p').textContent = p.until ? 'Teilt ' + this.untilText(p.until) : '';
   },
-  closeCard() { if (this.card) { this.card.el.remove(); this.card = null; } },
+  closeCard() { if (this.card) { this.card.el.remove(); this.card = null; } if (!document.querySelector('.pin-card')) document.body.classList.remove('card-open'); },
 
   /* kleiner Hinweis auf der Karte, solange man selbst teilt */
   renderPill() {
@@ -242,7 +243,6 @@ const Live = {
     pill.classList.toggle('err', !!err);
     pill.querySelector('span').textContent = err ? 'Standort: ' + (navigator.onLine ? 'Fehler' : 'offline') : 'Standort geteilt' + (on.length === 1 && on[0].me.until ? ' · ' + this.untilText(on[0].me.until) : '');
     pill.onclick = () => this.openGroup(on[0].id);
-    pill.style.top = $('#list-chips') && !$('#list-chips').hidden ? '' : 'calc(var(--safe-t) + var(--gap) + 52px)';
   },
 
   /* ---------- Menü ---------- */
