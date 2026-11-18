@@ -439,7 +439,7 @@ const Sync = {
     this.open = c.id;
     const code = this.code(c, write);
     await this.codePage({ title: c.name, rights: write ? 'Gemeinsam bearbeiten' : 'Nur ansehen', code,
-      text: `Overland-Navi: „${c.name}“ (${write ? 'gemeinsam bearbeiten' : 'nur ansehen'}).\nDen Code kopieren, dann in der App: Karten & Ebenen → Code eingeben → Einfügen.\n\n${code}\n\nOhne App: Link öffnen`,
+      text: `Overland-Navi: „${c.name}“ (${write ? 'gemeinsam bearbeiten' : 'nur ansehen'}).\nDen Code kopieren, dann in der App: Menü → Verbindungen → Code eingeben → Einfügen.\n\n${code}\n\nOhne App: Link öffnen`,
       back: () => this.openConn(c.id) });
   },
   /* QR, Link und Code zeigen (auch für Standort teilen) */

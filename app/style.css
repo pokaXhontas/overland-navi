@@ -982,3 +982,50 @@ body.selecting .sheet-body { padding-bottom: 150px; }
 body.selecting .fab, body.selecting .hud { display: none; }
 @media (max-height: 500px) and (orientation: landscape) { body.card-open .floats { display: none; } }
 body.card-open .maplibregl-ctrl-bottom-right, body.selecting .maplibregl-ctrl-bottom-right { visibility: hidden; }
+
+/* ---------- Menü: Übersicht, Suche, Bereiche ---------- */
+.menu-search { padding: 0 24px 10px; }
+.search-field { display: flex; align-items: center; gap: 8px; min-height: 46px; padding: 0 6px 0 14px; border-radius: 14px; background: var(--faint); }
+.search-field > svg { width: 19px; height: 19px; flex-shrink: 0; fill: none; stroke: var(--muted); stroke-width: 2.2; stroke-linecap: round; }
+.search-field input { flex: 1; min-width: 0; border: 0; background: transparent; font: inherit; font-size: 16px; color: var(--text); padding: 10px 0; -webkit-appearance: none; appearance: none; }
+.search-field input::-webkit-search-cancel-button { display: none; }
+.sf-clear { width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--line); display: flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0; }
+.sf-clear[hidden] { display: none; }
+.sf-clear svg { width: 14px; height: 14px; fill: none; stroke: var(--text); stroke-width: 3; stroke-linecap: round; }
+#menu-home h2:first-child, #menu-groups > h2:first-child, #menu-results > h2:first-child { margin-top: 6px; }
+.menu-row { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 2px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--text); text-align: left; font: inherit; }
+.menu-row:active { background: var(--faint); }
+.menu-row[hidden] { display: none; }
+.mr-icon { width: 36px; height: 36px; border-radius: 11px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.mr-icon svg { width: 20px; height: 20px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.menu-row .pi-txt { flex: 1; }
+.menu-row .pi-txt b { font-size: 16px; font-weight: 600; }
+.menu-row .pi-txt small { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mr-badge { min-width: 24px; height: 24px; padding: 0 8px; border-radius: 12px; background: var(--accent); color: var(--accent-ink); font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.mr-badge[hidden] { display: none; }
+.sec-title { margin: 2px 0 10px; font-size: 26px; font-weight: 700; letter-spacing: -0.01em; }
+.sec-page .page-head { justify-content: space-between; }
+.menu-hit { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); }
+.mh-main { flex: 1; min-width: 0; display: flex; align-items: center; padding: 11px 2px; border: 0; background: transparent; color: var(--text); text-align: left; font: inherit; }
+.mh-main .pi-txt b { font-size: 16px; font-weight: 600; }
+.mh-main .pi-txt small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.menu-none { margin-top: 16px; }
+@keyframes flashRow { 0%, 40% { background: rgba(255, 122, 26, .22); } 100% { background: transparent; } }
+.flash { animation: flashRow 1.6s ease-out; border-radius: 12px; }
+
+/* ---------- Zeile nach links wischen zum Löschen ---------- */
+.sw-row { position: relative; overflow: hidden; touch-action: pan-y; }
+.sw-row > .sw-main { position: relative; z-index: 1; background: var(--panel-solid); touch-action: pan-y; }
+.sw-del { position: absolute; inset: 0; z-index: 0; display: flex; align-items: center; justify-content: flex-end; padding: 0 22px; border: 0; background: #E03131; color: #fff; font: inherit; font-size: 15px; font-weight: 700; }
+.sw-row:not(.sw-open) .sw-del { visibility: hidden; }
+.sw-row.sw-far .sw-del { justify-content: flex-start; }
+.cat-list .sw-row { border-bottom: 1px solid var(--line); }
+.cat-list .sw-row > .cat-row { border-bottom: 0; }
+.trash-item { width: 100%; }
+.trash-back { margin-left: auto; padding-left: 8px; color: var(--accent-text); font-size: 14px; font-weight: 650; white-space: nowrap; }
+
+/* Hinweis mit Knopf, z. B. „Rückgängig“ */
+.toast.has-act { display: flex; align-items: center; gap: 14px; width: min(440px, calc(100vw - 40px)); padding: 8px 8px 8px 18px; text-align: left; }
+.toast.has-act > span { flex: 1; min-width: 0; }
+.toast-act { flex-shrink: 0; min-height: 36px; padding: 0 14px; border-radius: 11px; border: 0; background: var(--accent); color: var(--accent-ink); font: inherit; font-size: 15px; font-weight: 700; }
+#sheet, #sheet .sheet-body { touch-action: pan-y; }

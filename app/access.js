@@ -67,6 +67,7 @@ const Access = {
       if (!$('#gate').hidden || (s.status === 'ok' && before && before.status === 'open')) { location.reload(); return; }
       this.hideGate();
       $('#acc-section').hidden = !s.admin;
+      if (typeof Menu !== 'undefined') Menu.refresh();
       if (s.admin && s.pending) toast(`${s.pending} ${s.pending === 1 ? 'neue Zugangsanfrage' : 'neue Zugangsanfragen'} – Menü → Zugänge`, 6000);
       if (before && before.status !== 'ok' && before.status !== 'open' && s.status === 'ok') toast('Zugang freigegeben – willkommen!');
       return;
@@ -196,7 +197,7 @@ const Access = {
     $('#acc-push').onclick = async () => { await this.enablePush(); this.renderPushBtn($('#acc-push'), 'Benachrichtigungen sind an ✓', 'Bei neuen Anfragen benachrichtigen'); };
     $('#gate-push').onclick = async () => { await this.enablePush(); this.renderPushBtn($('#gate-push'), 'Du wirst benachrichtigt ✓', 'Benachrichtigen, wenn freigegeben'); };
     // Tipp auf eine Nachricht: Zugänge öffnen
-    const openAcc = () => { if ($('#acc-section').hidden) return; $('#btn-layers').click(); setTimeout(() => $('#acc-section').scrollIntoView({ block: 'start' }), 300); };
+    const openAcc = () => { if ($('#acc-section').hidden) return; $('#btn-layers').click(); Menu.open('zug'); };
     if (location.hash === '#zugaenge') { history.replaceState(null, '', location.pathname + location.search); setTimeout(openAcc, 1500); }
     if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', (e) => { if (e.data && e.data.type === 'open') { this.check(); if (e.data.hash === '#zugaenge') openAcc(); } });
     const nm = localStorage.getItem('ovl.liveName');

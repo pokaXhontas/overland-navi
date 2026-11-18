@@ -176,12 +176,158 @@ const Swipe = {
     an.onfinish = an.oncancel = () => { if (el._fold === an) { el._fold = null; el.classList.remove('folding'); } };
   },
 
+  /* ---------- Zeile nach links wischen: kurz → „Löschen“-Knopf, ganz durch → sofort weg ---------- */
+  row(inner, opts) {
+    const w = document.createElement('div');
+    w.className = 'sw-row';
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'sw-del';
+    del.innerHTML = `<span>${opts.label || 'Löschen'}</span>`;
+    w.append(del, inner);
+    inner.classList.add('sw-main');
+    const W = 96;
+    const set = (x, anim) => {
+      inner.style.transition = anim ? 'transform .22s ease' : 'none';
+      inner.style.transform = x ? `translateX(${x}px)` : '';
+      w.classList.toggle('sw-open', x < 0);
+      w.classList.toggle('sw-far', x < -w.offsetWidth * 0.5);
+    };
+    w._close = () => set(0, true);
+    const gone = () => {
+      if (w._gone) return;
+      w._gone = true;
+      w.style.height = w.offsetHeight + 'px';
+      set(-w.offsetWidth - 20, true);
+      setTimeout(() => {
+        w.style.transition = 'height .2s ease, opacity .2s ease';
+        w.style.overflow = 'hidden';
+        w.style.height = '0px';
+        w.style.opacity = '0';
+        setTimeout(() => opts.onDelete(), 200);
+      }, 180);
+    };
+    del.onclick = (e) => { e.stopPropagation(); gone(); };
+    let st = null;
+    w.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      if (e.target.closest('.sw-del, input, select, textarea, .switch')) return;
+      if (opts.enabled && !opts.enabled()) return;
+      this.closeRows(w);
+      st = { x: e.clientX, y: e.clientY, id: e.pointerId, on: false, base: w.classList.contains('sw-open') ? -W : 0, dx: 0, t: performance.now() };
+    });
+    w.addEventListener('pointermove', (e) => {
+      if (!st || e.pointerId !== st.id) return;
+      const dx = e.clientX - st.x, dy = e.clientY - st.y;
+      if (!st.on) {
+        if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { st = null; return; }
+        if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy)) return;
+        if (dx > 0 && !st.base) { st = null; return; }   // nach rechts: das ist „zurück“, nicht diese Zeile
+        st.on = true;
+        try { w.setPointerCapture(e.pointerId); } catch (err) { /* egal */ }
+      }
+      e.preventDefault();
+      st.dx = dx;
+      set(Math.min(0, st.base + dx));
+    });
+    const end = (e) => {
+      if (!st || e.pointerId !== st.id) return;
+      const s = st;
+      st = null;
+      if (!s.on) return;
+      this.noClick();
+      const x = s.base + s.dx, v = -s.dx / Math.max(1, performance.now() - s.t);
+      if (x < -w.offsetWidth * 0.55 || (v > 1.2 && x < -W)) gone();
+      else if (x < -W / 2 || (v > 0.4 && x < -20)) set(-W, true);
+      else set(0, true);
+    };
+    w.addEventListener('pointerup', end);
+    w.addEventListener('pointercancel', (e) => { if (st && e.pointerId === st.id) { st = null; set(0, true); } });
+    return w;
+  },
+  closeRows(except) {
+    for (const r of document.querySelectorAll('.sw-row.sw-open')) if (r !== except && r._close) r._close();
+  },
+  /* nach einer Wischgeste keinen echten Klick auslösen (eigene Klicks der App schon) */
+  noClick() {
+    const stop = (ev) => { if (ev.isTrusted) { ev.stopPropagation(); ev.preventDefault(); } };
+    window.addEventListener('click', stop, { capture: true, once: true });
+    setTimeout(() => window.removeEventListener('click', stop, { capture: true }), 350);
+  },
+
+  /* ---------- Menü: nach rechts wischen → eine Ebene zurück, im Hauptmenü → schließen ---------- */
+  backGesture(sheet, close) {
+    const top = () => {
+      const pages = [...sheet.querySelectorAll(':scope > .sheet-page')].filter((p) => !p.hidden);
+      return pages.length ? pages[pages.length - 1] : null;
+    };
+    const scrollsX = (t) => {
+      for (let n = t; n && n !== sheet; n = n.parentNode) {
+        if (!(n instanceof HTMLElement)) continue;
+        if (n.scrollWidth > n.clientWidth + 2 && /(auto|scroll)/.test(getComputedStyle(n).overflowX)) return true;
+      }
+      return false;
+    };
+    let st = null;
+    sheet.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      if (e.target.closest('input[type=range], textarea, select, .sw-row.sw-open, .maplibregl-canvas')) return;
+      if (scrollsX(e.target)) return;
+      st = { x: e.clientX, y: e.clientY, id: e.pointerId, on: false, dx: 0, t: performance.now(), el: null };
+    });
+    sheet.addEventListener('pointermove', (e) => {
+      if (!st || e.pointerId !== st.id) return;
+      const dx = e.clientX - st.x, dy = e.clientY - st.y;
+      if (!st.on) {
+        if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { st = null; return; }
+        if (dx < 12 || dx < Math.abs(dy) * 1.2) return;
+        st.on = true;
+        st.el = top() || sheet;
+        try { sheet.setPointerCapture(e.pointerId); } catch (err) { /* egal */ }
+        this.closeRows();
+      }
+      e.preventDefault();
+      st.dx = Math.max(0, dx);
+      st.el.style.transition = 'none';
+      st.el.style.transform = `translateX(${st.dx}px)`;
+    });
+    const end = (e) => {
+      if (!st || e.pointerId !== st.id) return;
+      const s = st;
+      st = null;
+      if (!s.on) return;
+      this.noClick();
+      const el = s.el, v = s.dx / Math.max(1, performance.now() - s.t);
+      el.style.transition = 'transform .2s ease';
+      if (!(s.dx > Math.min(130, el.offsetWidth * 0.3) || (v > 0.5 && s.dx > 30))) { el.style.transform = ''; setTimeout(() => { el.style.transition = ''; }, 220); return; }
+      el.style.transform = 'translateX(105%)';
+      setTimeout(() => {
+        el.style.transition = 'none';
+        if (el === sheet) close();
+        else { const b = el.querySelector(':scope > .sheet-head .back'); if (b) b.click(); else el.hidden = true; }
+        el.style.transform = '';
+        requestAnimationFrame(() => requestAnimationFrame(() => { el.style.transition = ''; }));
+      }, 200);
+    };
+    sheet.addEventListener('pointerup', end);
+    sheet.addEventListener('pointercancel', (e) => {
+      if (!st || e.pointerId !== st.id) return;
+      const s = st;
+      st = null;
+      if (s.on && s.el) { s.el.style.transition = 'transform .2s ease'; s.el.style.transform = ''; }
+    });
+  },
+
   setup() {
+    // offene Lösch-Knöpfe schließen, sobald woanders getippt wird
+    document.addEventListener('pointerdown', (e) => { if (!e.target.closest('.sw-row')) this.closeRows(); }, true);
     const side = () => (this.phone() ? 'down' : 'right');
     // iPhone: an Kopfzeile oder Griff ziehen, damit die Listen normal scrollen; iPad: überall seitlich
     const sheetHandle = () => (this.phone() ? '.sheet-head, .grab' : null);
     // Seitenfenster: Menü, Ort, Track
-    this.attach($('#sheet'), { dir: side, handle: sheetHandle, onDismiss: () => closeSheet() });
+    // Menü: am iPhone an der Kopfzeile nach unten wegziehen; nach rechts geht überall eine Ebene zurück
+    this.attach($('#sheet'), { dir: () => 'down', handle: () => '.sheet-head, .grab', enabled: () => this.phone(), onDismiss: () => closeSheet() });
+    this.backGesture($('#sheet'), () => closeSheet());
     this.attach($('#spot'), { dir: side, handle: sheetHandle, onDismiss: () => closeEditor(), enabled: () => !editor.moving });
     this.attach($('#trackinfo'), { dir: side, handle: sheetHandle, onDismiss: () => closeTrackInfo() });
     this.attach($('#hike-sheet'), { dir: side, handle: sheetHandle, onDismiss: () => Hike.close() });

@@ -345,7 +345,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.evaluate(() => Nav.stop(true));
 
   // Menü: Fahrzeugauswahl und Länderliste
-  await page.evaluate(() => $('#btn-layers').click());
+  await page.evaluate(() => { $('#btn-layers').click(); Menu.open('navi'); });
   await page.evaluate(() => $('#voice-test').scrollIntoView());
   await sleep(300);
   await page.click('#voice-test');
@@ -356,10 +356,24 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await sleep(1500);
   console.log('Probe hören (Ersatzweg Audio-Player):', await page.evaluate(() => Pack.how + ' · läuft: ' + (Pack.el && !Pack.el.paused) + ' · Dauer ' + (Pack.el && Pack.el.duration ? Pack.el.duration.toFixed(2) : '?') + ' s'));
   await page.evaluate(() => { Pack.running = Pack._r; });
-  await page.evaluate(() => $('#veh-grid').scrollIntoView());
+  await page.evaluate(() => { Menu.open('look'); $('#veh-grid').scrollIntoView(); });
   await shot('6-menue-fahrzeuge');
   await drag('#sheet', 300, 0);
-  console.log('Menü nach Wischen nach rechts:', await page.evaluate(() => $('#sheet').hidden ? 'zu' : 'offen'));
+  console.log('Menü nach Wischen nach rechts (Bereich):', await page.evaluate(() => (!$('#sec-look').hidden ? 'Bereich offen' : 'Übersicht') + ', ' + ($('#sheet').hidden ? 'zu' : 'offen')));
+  await drag('#sheet', 300, 0);
+  console.log('Menü nach Wischen nach rechts (Übersicht):', await page.evaluate(() => $('#sheet').hidden ? 'zu' : 'offen'));
+  console.log('Papierkorb:', await page.evaluate(async () => {
+    const n0 = places.length;
+    const p = { id: 990001, name: 'Probe-Papierkorb', lat: 42.5, lon: 74.6, cat: 'wild', list: 'mine', photos: [], time: new Date().toISOString(), updated: new Date().toISOString() };
+    places.push(p); savePlaces();
+    Trash.places([p]);
+    const gone = places.length === n0;
+    const e = Trash.list.find((x) => x.places && x.places[0].id === 990001);
+    await Trash.restore(e);
+    const back = places.some((x) => x.id === 990001);
+    places = places.filter((x) => x.id !== 990001); savePlaces();
+    return (gone ? 'gelöscht' : 'FEHLER') + ' · ' + (back ? 'zurückgeholt' : 'FEHLER');
+  }));
   await page.evaluate(() => $('#btn-layers').click());
   await sleep(500);
   await page.evaluate(() => openAddPage());

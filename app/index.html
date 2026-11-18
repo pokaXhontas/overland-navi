@@ -36,7 +36,7 @@
   <button class="ctl panel" id="btn-search" aria-label="Suchen">
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
   </button>
-  <button class="ctl panel" id="btn-layers" aria-label="Karten und Ebenen">
+  <button class="ctl panel" id="btn-layers" aria-label="Menü">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/></svg>
   </button>
   <button class="ctl panel" id="btn-route" aria-label="Route planen">
@@ -103,60 +103,129 @@
   <button class="btn wide flat-btn" id="na-cancel">Abbrechen</button>
 </section>
 
-<aside class="sheet" id="sheet" aria-label="Karten und Ebenen" hidden>
+<aside class="sheet" id="sheet" aria-label="Menü" hidden>
   <div class="grab sheet-grab" aria-hidden="true"></div>
   <div class="sheet-head">
-    <h1>Karten &amp; Ebenen</h1>
+    <h1>Menü</h1>
     <button class="round" id="sheet-close" aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
   </div>
-  <div class="sheet-body">
-    <h2 class="first">Meine Daten</h2>
-    <p class="muted small hint-line">Schalter blendet auf der Karte aus. Antippen zeigt, was drin ist.</p>
-    <p class="sub-head"><b>Listen</b></p>
+  <div class="menu-search"><label class="search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14ZM20 20l-4-4"/></svg><input type="search" id="menu-q" placeholder="Einstellung oder Ort suchen" aria-label="Im Menü suchen" autocomplete="off" enterkeyhint="search"><button type="button" class="sf-clear" id="menu-q-clear" aria-label="Suche leeren" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></label></div>
+  <div class="sheet-body" id="menu-home">
+    <div id="menu-results" hidden></div>
+    <div id="menu-groups">
+      <h2>Meine Daten</h2>
+      <button type="button" class="menu-row" data-sec="listen"><span class="mr-icon" style="background:#7048E8"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg></span><span class="pi-txt"><b>Listen</b><small id="ms-listen"></small></span><span class="mr-badge" id="mb-listen" hidden></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+      <button type="button" class="menu-row" data-sec="kat"><span class="mr-icon" style="background:#C2255C"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8ZM7.5 8h.01"/></svg></span><span class="pi-txt"><b>Kategorien</b><small id="ms-kat"></small></span><span class="mr-badge" id="mb-kat" hidden></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+      <button type="button" class="menu-row" data-sec="tracks"><span class="mr-icon" style="background:#C2560A"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19c3 0 3-6 7-6s4-7 9-7"/></svg></span><span class="pi-txt"><b>Tracks</b><small id="ms-tracks"></small></span><span class="mr-badge" id="mb-tracks" hidden></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+      <button type="button" class="menu-row" data-sec="trash"><span class="mr-icon" style="background:#6B7480"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3"/></svg></span><span class="pi-txt"><b>Papierkorb</b><small id="ms-trash"></small></span><span class="mr-badge" id="mb-trash" hidden></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+      <h2>Teilen</h2>
+      <button type="button" class="menu-row" data-sec="standort"><span class="mr-icon" style="background:#E03131"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s6-5.4 6-10.5a6 6 0 0 0-12 0C6 15.6 12 21 12 21ZM12 10.5h.01"/></svg></span><span class="pi-txt"><b>Standort teilen</b><small id="ms-standort"></small></span><span class="mr-badge" id="mb-standort" hidden></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+      <button type="button" class="menu-row" data-sec="verb"><span class="mr-icon" style="background:#1971C2"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span><span class="pi-txt"><b>Verbindungen</b><small id="ms-verb"></small></span><span class="mr-badge" id="mb-verb" hidden></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+      <button type="button" class="menu-row" data-sec="zug" id="acc-section" hidden><span class="mr-icon" style="background:#5C677D"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6ZM9 12l2 2 4-4"/></svg></span><span class="pi-txt"><b>Zugänge</b><small id="ms-zug"></small></span><span class="mr-badge" id="mb-zug" hidden></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+      <h2>Karte &amp; unterwegs</h2>
+      <button type="button" class="menu-row" data-sec="karte"><span class="mr-icon" style="background:#2B8A3E"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 8l10 5 10-5ZM2 13l10 5 10-5"/></svg></span><span class="pi-txt"><b>Karte &amp; Ebenen</b><small id="ms-karte"></small></span><span class="mr-badge" id="mb-karte" hidden></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+      <button type="button" class="menu-row" data-sec="offline"><span class="mr-icon" style="background:#0B7285"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></span><span class="pi-txt"><b>Offline-Karten</b><small id="ms-offline"></small></span><span class="mr-badge" id="mb-offline" hidden></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+      <button type="button" class="menu-row" data-sec="navi"><span class="mr-icon" style="background:#9C4F00"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9ZM16.5 8.5a5 5 0 0 1 0 7"/></svg></span><span class="pi-txt"><b>Navigation &amp; Ansagen</b><small id="ms-navi"></small></span><span class="mr-badge" id="mb-navi" hidden></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+      <h2>App</h2>
+      <button type="button" class="menu-row" data-sec="look"><span class="mr-icon" style="background:#5F3DC4"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18 2 2 0 0 0 2-2c0-1.1.9-2 2-2h1.5A3.5 3.5 0 0 0 21 13.5 9 9 0 0 0 12 3ZM7.5 11h.01M10 7.5h.01M14.5 7.5h.01"/></svg></span><span class="pi-txt"><b>Aussehen</b><small id="ms-look"></small></span><span class="mr-badge" id="mb-look" hidden></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+      <button type="button" class="menu-row" data-sec="import"><span class="mr-icon" style="background:#495057"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V9M7 14l5-5 5 5M5 4h14"/></svg></span><span class="pi-txt"><b>Importieren</b><small id="ms-import"></small></span><span class="mr-badge" id="mb-import" hidden></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+      <button type="button" class="menu-row" data-sec="hilfe"><span class="mr-icon" style="background:#087F5B"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5ZM5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3M9 7h6M9 10.5h6"/></svg></span><span class="pi-txt"><b>Hilfe</b><small id="ms-hilfe"></small></span><span class="mr-badge" id="mb-hilfe" hidden></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+    </div>
+    <p class="muted small foot">Kartendaten © OpenStreetMap-Mitwirkende · Protomaps · Höhen: Mapterhorn<br>Version __BUILD__</p>
+  </div>
+
+  <div class="sheet-page sec-page" id="sec-listen" hidden>
+    <div class="sheet-head page-head">
+      <button class="back" data-menu-back aria-label="Zurück zum Menü"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Menü</span></button>
+      <button class="round" data-menu-close aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <h1 class="sec-title">Listen</h1>
+      <p class="muted small hint-line">Schalter blendet eine Liste auf der Karte aus. Antippen zeigt, was drin ist. Nach links wischen löscht.</p>
     <div class="cat-list" id="list-list"></div>
     <button type="button" class="add-line" id="btn-new-list"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Neue Liste</span></button>
-    <p class="sub-head"><b>Kategorien</b><small class="muted">gelten für alle Listen</small></p>
+      <div class="row static"><span><b id="places-count">0 Orte</b><small>Neuer Ort: „Ort speichern“ oder lange auf die Karte drücken</small></span><button class="btn" id="btn-gpx">Alles teilen</button></div>
+    </div>
+  </div>
+  <div class="sheet-page sec-page" id="sec-kat" hidden>
+    <div class="sheet-head page-head">
+      <button class="back" data-menu-back aria-label="Zurück zum Menü"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Menü</span></button>
+      <button class="round" data-menu-close aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <h1 class="sec-title">Kategorien</h1>
+      <p class="muted small hint-line">Gelten für alle Listen. Schalter blendet aus, Antippen zeigt die Orte darin.</p>
     <div class="cat-list" id="cat-list"></div>
     <button type="button" class="add-line" id="btn-new-cat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Neue Kategorie</span></button>
-    <p class="sub-head"><b>Tracks</b></p>
+    </div>
+  </div>
+  <div class="sheet-page sec-page" id="sec-tracks" hidden>
+    <div class="sheet-head page-head">
+      <button class="back" data-menu-back aria-label="Zurück zum Menü"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Menü</span></button>
+      <button class="round" data-menu-close aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <h1 class="sec-title">Tracks</h1>
+      <p class="muted small hint-line">Schalter blendet einen Track aus. Nach links wischen löscht.</p>
     <div class="cat-list" id="track-list"></div>
-    <div class="row static"><span><b id="places-count">0 Orte</b><small>Neuer Ort: „Ort speichern“ oder lange auf die Karte drücken</small></span><button class="btn" id="btn-gpx">Alles teilen</button></div>
-
-    <div id="acc-section" hidden>
-      <h2>Zugänge</h2>
+    </div>
+  </div>
+  <div class="sheet-page sec-page" id="sec-trash" hidden>
+    <div class="sheet-head page-head">
+      <button class="back" data-menu-back aria-label="Zurück zum Menü"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Menü</span></button>
+      <button class="round" data-menu-close aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <h1 class="sec-title">Papierkorb</h1>
+      <p class="muted small hint-line">Gelöschtes bleibt hier 30 Tage, dann ist es endgültig weg. Antippen holt es zurück.</p>
+      <div class="place-list" id="trash-list"></div>
+      <button type="button" class="btn danger wide" id="trash-empty">Papierkorb leeren</button>
+    </div>
+  </div>
+  <div class="sheet-page sec-page" id="sec-standort" hidden>
+    <div class="sheet-head page-head">
+      <button class="back" data-menu-back aria-label="Zurück zum Menü"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Menü</span></button>
+      <button class="round" data-menu-close aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <h1 class="sec-title">Standort teilen</h1>
+      <p class="muted small hint-line">Andere sehen dich live auf ihrer Karte – gesendet wird, solange die App offen ist.</p>
+    <div class="place-list" id="live-list"></div>
+    <button type="button" class="btn wide" id="btn-live-new">Meinen Standort teilen</button>
+    </div>
+  </div>
+  <div class="sheet-page sec-page" id="sec-verb" hidden>
+    <div class="sheet-head page-head">
+      <button class="back" data-menu-back aria-label="Zurück zum Menü"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Menü</span></button>
+      <button class="round" data-menu-close aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <h1 class="sec-title">Verbindungen</h1>
+      <p class="muted small hint-line">Orte live mit anderen teilen und gemeinsam pflegen – per Sync-Code oder QR.</p>
+    <div class="place-list" id="sync-list"></div>
+    <div class="two-btns"><button type="button" class="btn" id="btn-sync-new">Neue Verbindung</button><button type="button" class="btn" id="btn-sync-join">Code eingeben</button></div>
+    </div>
+  </div>
+  <div class="sheet-page sec-page" id="sec-zug" hidden>
+    <div class="sheet-head page-head">
+      <button class="back" data-menu-back aria-label="Zurück zum Menü"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Menü</span></button>
+      <button class="round" data-menu-close aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <h1 class="sec-title">Zugänge</h1>
       <p class="muted small hint-line">Nur freigegebene Geräte können die App nutzen. Neue Anfragen stehen oben.</p>
       <div class="acc-list" id="acc-list"></div>
       <div class="two-btns"><button type="button" class="btn" id="acc-push">Bei neuen Anfragen benachrichtigen</button><button type="button" class="btn" id="acc-refresh">Aktualisieren</button></div>
     </div>
-
-    <h2>Standort teilen</h2>
-    <p class="muted small hint-line">Andere sehen dich live auf ihrer Karte – gesendet wird, solange die App offen ist.</p>
-    <div class="place-list" id="live-list"></div>
-    <button type="button" class="btn wide" id="btn-live-new">Meinen Standort teilen</button>
-
-    <h2>Verbindungen</h2>
-    <p class="muted small hint-line">Orte live mit anderen teilen und gemeinsam pflegen – per Sync-Code oder QR.</p>
-    <div class="place-list" id="sync-list"></div>
-    <div class="two-btns"><button type="button" class="btn" id="btn-sync-new">Neue Verbindung</button><button type="button" class="btn" id="btn-sync-join">Code eingeben</button></div>
-
-    <h2>Importieren</h2>
-    <label class="import-btn">
-      <input type="file" id="import-file" multiple>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V9M7 14l5-5 5 5M5 4h14"/></svg>
-      <span><b>GPX, KML oder ZIP öffnen</b><small>Tracks und Orte aus MapOut, iOverlander und anderen Apps – auch Google-Maps-Listen (Takeout-ZIP oder CSV)</small></span>
-    </label>
-
-    <h2>Navigation &amp; Ansagen</h2>
-    <label class="row"><span><b>Ansagen bei der Navigation</b><small>Auch unterwegs über den Lautsprecher-Knopf</small></span><input type="checkbox" class="switch" id="voice-on"></label>
-    <label class="row"><span><b>Navi-Kamera</b><small>Zoomt vor Abzweigungen heran, Fahrzeug im unteren Drittel</small></span><input type="checkbox" class="switch" id="t-navcam"></label>
-    <label class="row"><span><b>3D-Ansicht beim Navigieren</b><small>Karte nach vorn gekippt</small></span><input type="checkbox" class="switch" id="t-navpitch"></label>
-    <label class="row"><span><b>Auch im Stummmodus ansagen</b><small>Am iPhone trotz Stummschalter hörbar. Laufende Musik pausiert dafür kurz.</small></span><input type="checkbox" class="switch" id="voice-silent"></label>
-    <label class="field"><span>Stimme</span><select id="voice-select"></select></label>
-    <label class="field"><span>Tempo <em id="voice-rate-val">100 %</em></span><input type="range" id="voice-rate" min="0.7" max="1.3" step="0.05"></label>
-    <button class="btn wide" id="voice-test">Probe hören</button>
-    <p class="muted small">Die mitgelieferten Stimmen funktionieren auch offline. Weitere Gerätestimmen: am iPad unter Einstellungen → Bedienungshilfen → Gesprochene Inhalte → Stimmen → Deutsch eine „Premium“- oder „Erweitert“-Stimme laden (z. B. Anna). Danach erscheint sie hier.</p>
-    <h2>Darstellung</h2>
-    <p class="sub-head"><b>Kartenart</b><small class="muted">Luftbild und Hybrid brauchen Internet</small></p>
+  </div>
+  <div class="sheet-page sec-page" id="sec-karte" hidden>
+    <div class="sheet-head page-head">
+      <button class="back" data-menu-back aria-label="Zurück zum Menü"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Menü</span></button>
+      <button class="round" data-menu-close aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <h1 class="sec-title">Karte &amp; Ebenen</h1>
+      <p class="sub-head"><b>Kartenart</b><small class="muted">Luftbild und Hybrid brauchen Internet</small></p>
     <div class="seg" role="radiogroup" aria-label="Kartenart">
       <button role="radio" data-maptype="topo">Topo</button>
       <button role="radio" data-maptype="sat">Luftbild</button>
@@ -166,33 +235,88 @@
       <button role="radio" data-src="esri">Esri</button>
       <button role="radio" data-src="google">Google</button>
     </div>
+      <label class="row"><span><b>Höhenlinien</b><small>Mit Höhenangaben</small></span><input type="checkbox" class="switch" id="t-contours"></label>
+      <label class="row"><span><b>Geländeschattierung</b><small>Berge plastisch darstellen</small></span><input type="checkbox" class="switch" id="t-hillshade"></label>
     <label class="row"><span><b>Wasserstellen</b><small>Wasser tanken, Trinkwasser und Quellen, auch ohne Wanderwege</small></span><input type="checkbox" class="switch" id="t-water"></label>
     <label class="row"><span><b>Toiletten &amp; Duschen</b><small>Öffentlich, mit Angabe ob kostenlos (ab Straßen-Zoom)</small></span><input type="checkbox" class="switch" id="t-service"></label>
     <label class="row"><span><b>Pisten und Feldwege</b><small>Unbefestigte Feld-, Wald- und Wirtschaftswege, gestrichelt braun (in Deutschland meist für Autos gesperrt)</small></span><input type="checkbox" class="switch" id="t-tracks"></label>
     <label class="row"><span><b>Bus &amp; Bahn</b><small>Linien und Haltestellen in Städten ab 50.000 Einwohnern</small></span><input type="checkbox" class="switch" id="t-oev"></label>
-    <p class="sub-head"><b>Farbschema</b></p>
+    </div>
+  </div>
+  <div class="sheet-page sec-page" id="sec-offline" hidden>
+    <div class="sheet-head page-head">
+      <button class="back" data-menu-back aria-label="Zurück zum Menü"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Menü</span></button>
+      <button class="round" data-menu-close aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <h1 class="sec-title">Offline-Karten</h1>
+      <div id="regions" class="regions"><p class="muted">Wird geladen …</p></div>
+    <button class="add-region" id="btn-add-region"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span><b>Land oder Gebiet hinzufügen</b><small>Jedes Land der Welt oder der aktuelle Kartenausschnitt</small></span></button>
+    <p class="muted small" id="storage"></p>
+    </div>
+  </div>
+  <div class="sheet-page sec-page" id="sec-navi" hidden>
+    <div class="sheet-head page-head">
+      <button class="back" data-menu-back aria-label="Zurück zum Menü"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Menü</span></button>
+      <button class="round" data-menu-close aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <h1 class="sec-title">Navigation &amp; Ansagen</h1>
+      <label class="row"><span><b>Ansagen bei der Navigation</b><small>Auch unterwegs über den Lautsprecher-Knopf</small></span><input type="checkbox" class="switch" id="voice-on"></label>
+    <label class="row"><span><b>Navi-Kamera</b><small>Zoomt vor Abzweigungen heran, Fahrzeug im unteren Drittel</small></span><input type="checkbox" class="switch" id="t-navcam"></label>
+    <label class="row"><span><b>3D-Ansicht beim Navigieren</b><small>Karte nach vorn gekippt</small></span><input type="checkbox" class="switch" id="t-navpitch"></label>
+    <label class="row"><span><b>Auch im Stummmodus ansagen</b><small>Am iPhone trotz Stummschalter hörbar. Laufende Musik pausiert dafür kurz.</small></span><input type="checkbox" class="switch" id="voice-silent"></label>
+    <label class="field"><span>Stimme</span><select id="voice-select"></select></label>
+    <label class="field"><span>Tempo <em id="voice-rate-val">100 %</em></span><input type="range" id="voice-rate" min="0.7" max="1.3" step="0.05"></label>
+    <button class="btn wide" id="voice-test">Probe hören</button>
+    <p class="muted small">Die mitgelieferten Stimmen funktionieren auch offline. Weitere Gerätestimmen: am iPad unter Einstellungen → Bedienungshilfen → Gesprochene Inhalte → Stimmen → Deutsch eine „Premium“- oder „Erweitert“-Stimme laden (z. B. Anna). Danach erscheint sie hier.</p>
+    </div>
+  </div>
+  <div class="sheet-page sec-page" id="sec-look" hidden>
+    <div class="sheet-head page-head">
+      <button class="back" data-menu-back aria-label="Zurück zum Menü"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Menü</span></button>
+      <button class="round" data-menu-close aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <h1 class="sec-title">Aussehen</h1>
+      <p class="sub-head"><b>Farbschema</b></p>
     <div class="seg" role="radiogroup" aria-label="Farbschema">
       <button role="radio" data-theme="auto">Automatisch</button>
       <button role="radio" data-theme="light">Hell</button>
       <button role="radio" data-theme="dark">Dunkel</button>
     </div>
-    <label class="row"><span><b>Höhenlinien</b><small>Mit Höhenangaben</small></span><input type="checkbox" class="switch" id="t-contours"></label>
-    <label class="row"><span><b>Geländeschattierung</b><small>Berge plastisch darstellen</small></span><input type="checkbox" class="switch" id="t-hillshade"></label>
+    
+    
     <label class="row"><span><b>Karte in Fahrtrichtung</b><small>Sonst ist Norden immer oben</small></span><input type="checkbox" class="switch" id="t-headingup"></label>
     <p class="sub-head"><b>Positionssymbol</b><small class="muted">Pfeil oder dein Fahrzeug, darüber zeigt die Spitze die Fahrtrichtung</small></p>
     <div class="veh-grid" id="veh-grid" role="radiogroup" aria-label="Positionssymbol"></div>
     <div class="veh-colors" id="veh-colors" role="radiogroup" aria-label="Fahrzeugfarbe"></div>
     <label class="row"><span><b>Bildschirm anlassen</b><small>Solange die App offen ist</small></span><input type="checkbox" class="switch" id="t-wake"></label>
-
-    <h2>Offline-Karten</h2>
-    <div id="regions" class="regions"><p class="muted">Wird geladen …</p></div>
-    <button class="add-region" id="btn-add-region"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span><b>Land oder Gebiet hinzufügen</b><small>Jedes Land der Welt oder der aktuelle Kartenausschnitt</small></span></button>
-    <p class="muted small" id="storage"></p>
-
-    <h2>Hilfe</h2>
-    <button class="add-region" id="btn-manual"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5ZM5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3M9 7h6M9 10.5h6"/></svg><span><b>Handbuch</b><small>So funktioniert die App – Schritt für Schritt mit Bildern</small></span></button>
-
-    <p class="muted small foot">Kartendaten © OpenStreetMap-Mitwirkende · Protomaps · Höhen: Mapterhorn<br>Version __BUILD__</p>
+    </div>
+  </div>
+  <div class="sheet-page sec-page" id="sec-import" hidden>
+    <div class="sheet-head page-head">
+      <button class="back" data-menu-back aria-label="Zurück zum Menü"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Menü</span></button>
+      <button class="round" data-menu-close aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <h1 class="sec-title">Importieren</h1>
+      <label class="import-btn">
+      <input type="file" id="import-file" multiple>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V9M7 14l5-5 5 5M5 4h14"/></svg>
+      <span><b>GPX, KML oder ZIP öffnen</b><small>Tracks und Orte aus MapOut, iOverlander und anderen Apps – auch Google-Maps-Listen (Takeout-ZIP oder CSV)</small></span>
+    </label>
+    </div>
+  </div>
+  <div class="sheet-page sec-page" id="sec-hilfe" hidden>
+    <div class="sheet-head page-head">
+      <button class="back" data-menu-back aria-label="Zurück zum Menü"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Menü</span></button>
+      <button class="round" data-menu-close aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <h1 class="sec-title">Hilfe</h1>
+      <button class="add-region" id="btn-manual"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5ZM5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3M9 7h6M9 10.5h6"/></svg><span><b>Handbuch</b><small>So funktioniert die App – Schritt für Schritt mit Bildern</small></span></button>
+    </div>
   </div>
 
   <div class="sheet-page" id="cat-page" hidden>
@@ -270,7 +394,7 @@
       <div class="cat-title"><h1>Verbindung beitreten</h1></div>
       <div class="sj-browser" id="sj-browser" hidden>
         <p><b>Du nutzt die App vom Home-Bildschirm?</b> Links öffnen auf dem iPhone leider immer Safari, und Safari hat einen eigenen Speicher. So kommt der Code in die App:</p>
-        <ol class="sj-steps"><li>Hier auf <b>Code kopieren</b> tippen.</li><li>Die App vom <b>Home-Bildschirm</b> öffnen.</li><li>Dort <b>Karten &amp; Ebenen → Code eingeben → Einfügen</b> → Verbinden.</li></ol>
+        <ol class="sj-steps"><li>Hier auf <b>Code kopieren</b> tippen.</li><li>Die App vom <b>Home-Bildschirm</b> öffnen.</li><li>Dort <b>Menü → Verbindungen → Code eingeben → Einfügen</b> → Verbinden.</li></ol>
         <button type="button" class="btn primary wide" id="sj-copy">Code kopieren</button>
       </div>
       <label class="field"><span>Sync- oder Standort-Code oder Link</span><textarea id="sj-code" rows="3" placeholder="OVL1.… oder OVL2.…" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea></label>
@@ -666,6 +790,8 @@
 <script src="planner.js"></script>
 <script src="draw.js"></script>
 <script src="swipe.js"></script>
+<script src="trash.js"></script>
+<script src="menu.js"></script>
 <script src="hike.js"></script>
 <script src="tours.js"></script>
 <script src="poi.js"></script>

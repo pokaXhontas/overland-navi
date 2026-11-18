@@ -73,10 +73,23 @@ function relayout() { if (layoutQueued) return; layoutQueued = true; requestAnim
 addEventListener('resize', relayout);
 addEventListener('orientationchange', () => setTimeout(relayout, 300));
 
-function toast(msg, ms = 2600) {
+function toast(msg, ms = 2600, act) {
   layoutFloats();
   const t = $('#toast');
   t.textContent = msg;
+  t.classList.toggle('has-act', !!act);
+  if (act) {
+    // z. B. „Rückgängig“ nach dem Löschen
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'toast-act';
+    b.textContent = act.label;
+    b.onclick = () => { t.classList.remove('show'); act.run(); };
+    const m = document.createElement('span');
+    m.textContent = msg;
+    t.textContent = '';
+    t.append(m, b);
+  }
   t.classList.add('show');
   clearTimeout(toast._t);
   toast._t = setTimeout(() => t.classList.remove('show'), ms);
@@ -1157,16 +1170,9 @@ async function saveEditor() {
 }
 
 async function deleteEditorPlace() {
-  if (!editor.confirmDelete) {
-    editor.confirmDelete = true;
-    $('#spot-delete').textContent = 'Wirklich löschen? Nochmal tippen';
-    return;
-  }
+  // landet im Papierkorb, „Rückgängig“ holt ihn sofort zurück
   const p = places.find((x) => x.id === editor.id);
-  if (p) for (const id of p.photos) { try { await PhotoDB.del(id); } catch (e) { /* egal */ } }
-  places = places.filter((x) => x.id !== editor.id);
-  savePlaces();
-  toast('Ort gelöscht');
+  if (p) Trash.places([p]);
   closeEditor();
 }
 
@@ -1567,7 +1573,7 @@ async function updateStorage() {
 /* ---------- Bedienelemente ---------- */
 function setupUI() {
   const sheet = $('#sheet');
-  $('#btn-layers').onclick = () => { closeTrackInfo(); if (editor.open) closeEditor(); closeSearch(); renderRegions(); updateStorage(); closeCatPage(); renderDataCats(); Access.renderList(); sheet.hidden = false; };
+  $('#btn-layers').onclick = () => { closeTrackInfo(); if (editor.open) closeEditor(); closeSearch(); renderRegions(); updateStorage(); closeCatPage(); renderDataCats(); Access.renderList(); Menu.reset(); sheet.hidden = false; };
   $('#sheet-close').onclick = closeSheet;
   $('#cat-close').onclick = closeSheet;
   $('#cat-back').onclick = closeCatPage;
@@ -1633,6 +1639,9 @@ function setupUI() {
   Lists.setup();
   Sync.setup();
   Live.setup();
+  Trash.init();
+  Trash.setup();
+  Menu.setup();
   Tours.setup();
   Poi.setup();
   for (const [id, key, def] of [['#t-water', 'waterOn', true], ['#t-service', 'serviceOn', true], ['#t-tracks', 'hikeTracks', true]]) {
@@ -2033,7 +2042,7 @@ function tracksGeoJSON() {
 }
 
 async function loadTracks() {
-  try { tracks = (await DB.run('tracks', 'readonly', (s) => s.getAll())) || []; } catch (e) { tracks = []; }
+  try { tracks = ((await DB.run('tracks', 'readonly', (s) => s.getAll())) || []).filter((t) => !t.trashed); } catch (e) { tracks = []; }
   tracks.sort((a, b) => (a.created || 0) - (b.created || 0));
   updateTracksSource();
 }
@@ -2063,17 +2072,11 @@ function buildTrackRow(t) {
   const sw = row.querySelector('.switch');
   sw.checked = !!t.visible;
   sw.onchange = () => { t.visible = sw.checked; saveTrack(t); updateTracksSource(); };
-  const del = row.querySelector('.ti-del');
-  del.onclick = async () => {
-    if (!del.classList.contains('confirm')) { del.classList.add('confirm'); toast('Zum Löschen nochmal tippen'); setTimeout(() => del.classList.remove('confirm'), 3000); return; }
-    await DB.run('tracks', 'readwrite', (st) => st.delete(t.id));
-    if (typeof Sync !== 'undefined') Sync.soon();
-    tracks = tracks.filter((x) => x !== t);
-    updateTracksSource();
-    toast('Track gelöscht');
-  };
+  row.querySelector('.ti-del').onclick = () => Trash.track(t);
   return row;
 }
+/* Track-Zeile, nach links wischen löscht (in den Papierkorb) */
+function swipeTrackRow(t) { return Swipe.row(buildTrackRow(t), { onDelete: () => Trash.track(t) }); }
 
 /* ---------- Kategorien: ein-/ausblenden und Inhalte ansehen ---------- */
 const TRACK_CAT = { id: 'tracks', label: 'Tracks', color: '#4F6FE0', ink: '#FFFFFF', d: 'M4 19c3-6 5 2 8-4s5-2 8-8M4 19h.01M20 7h.01' };
@@ -2102,8 +2105,19 @@ function renderDataCats() {
   Lists.renderLists();
   box.innerHTML = '';
   const tbox = $('#track-list');
-  if (tbox) tbox.innerHTML = '';
-  for (const c of [TRACK_CAT, ...CATS]) {
+  if (tbox) {
+    tbox.innerHTML = '';
+    const all = document.createElement('label');
+    all.className = 'row';
+    all.innerHTML = '<span><b>Tracks auf der Karte</b><small></small></span><input type="checkbox" class="switch">';
+    all.querySelector('small').textContent = tracks.length ? `${tracks.length} ${tracks.length === 1 ? 'Track' : 'Tracks'} · einzeln unten ein- und ausblenden` : 'Noch keine Tracks. Aufzeichnen oder importieren.';
+    const sw = all.querySelector('.switch');
+    sw.checked = !settings.hidden.includes('tracks');
+    sw.onchange = () => setCatHidden('tracks', !sw.checked);
+    tbox.appendChild(all);
+    for (const t of tracks) tbox.appendChild(swipeTrackRow(t));
+  }
+  for (const c of CATS) {
     const n = catItems(c.id).length;
     if (!n && !c.custom && c.id !== 'tracks' && ['natur', 'gewaesser', 'strand', 'kultur', 'ort', 'unterkunft', 'essen', 'einkauf'].includes(c.id)) continue;   // neue feste Kategorien erst zeigen, wenn etwas drin ist
     const row = document.createElement('div');
@@ -2117,7 +2131,7 @@ function renderDataCats() {
     sw.checked = !hidden;
     sw.setAttribute('aria-label', c.label + ' auf der Karte zeigen');
     sw.onchange = () => setCatHidden(c.id, !sw.checked);
-    (c.id === 'tracks' && tbox ? tbox : box).appendChild(row);
+    box.appendChild(c.custom ? Swipe.row(row, { onDelete: () => Trash.catDel(c.id) }) : row);
   }
 }
 
@@ -2129,7 +2143,7 @@ function openCatPage(id) {
   page.querySelector('.sheet-body').scrollTop = 0;
 }
 function closeCatPage() { openCat = null; Lists.endSel(true); $('#cat-page').hidden = true; }
-function closeSheet() { closeCatPage(); if (typeof Lists !== 'undefined') Lists.closeList(); $('#add-page').hidden = true; $('#sheet').hidden = true; for (const id of ['#choose-page', '#thing-page', '#imp-page', '#sync-new-page', '#sync-code-page', '#sync-join-page', '#sync-conn-page', '#live-new-page', '#live-group-page']) { const e = $(id); if (e) e.hidden = true; } $('#dlg').hidden = true; }
+function closeSheet() { for (const p of document.querySelectorAll('#sheet > .sec-page')) p.hidden = true; if (typeof Swipe !== 'undefined') Swipe.closeRows(); closeCatPage(); if (typeof Lists !== 'undefined') Lists.closeList(); $('#add-page').hidden = true; $('#sheet').hidden = true; for (const id of ['#choose-page', '#thing-page', '#imp-page', '#sync-new-page', '#sync-code-page', '#sync-join-page', '#sync-conn-page', '#live-new-page', '#live-group-page']) { const e = $(id); if (e) e.hidden = true; } $('#dlg').hidden = true; }
 
 function refreshCatPage() {
   if (!openCat) return;
@@ -2158,7 +2172,7 @@ function refreshCatPage() {
   const box = $('#cat-items');
   box.innerHTML = '';
   if (isTracks) {
-    for (const t of tracks) box.appendChild(buildTrackRow(t));
+    for (const t of tracks) box.appendChild(swipeTrackRow(t));
     return;
   }
   const ref = gps.pos || (map ? { lat: map.getCenter().lat, lon: map.getCenter().lng } : null);
@@ -2169,7 +2183,7 @@ function refreshCatPage() {
     dist.className = 'pi-dist';
     dist.textContent = fmtDist(d);
     row.appendChild(dist);
-    box.appendChild(row);
+    box.appendChild(Lists.swipeItem(p, row));
   }
   if (list.length > 400) {
     const more = document.createElement('p');
@@ -2392,15 +2406,10 @@ function setupTrackInfoUI() {
   $('#ti-delete').onclick = async () => {
     const t = trackInfo.track;
     if (!t) return;
-    if (!trackInfo.confirmDelete) { trackInfo.confirmDelete = true; $('#ti-delete').textContent = 'Wirklich löschen? Nochmal tippen'; return; }
-    await DB.run('tracks', 'readwrite', (st) => st.delete(t.id));
-    if (typeof Sync !== 'undefined') Sync.soon();
-    tracks = tracks.filter((x) => x !== t);
     trackInfo.open = false; trackInfo.track = null;
     $('#trackinfo').hidden = true;
     highlightTrack(null);
-    updateTracksSource();
-    toast('Track gelöscht');
+    await Trash.track(t);
   };
   $('#ti-name').addEventListener('change', () => {
     const t = trackInfo.track;

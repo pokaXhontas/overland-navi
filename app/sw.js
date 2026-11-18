@@ -13,6 +13,8 @@ const SHELL = [
   'access.js',
   'app.js',
   'lists.js',
+  'trash.js',
+  'menu.js',
   'sync.js',
   'live.js',
   'dl-worker.js',

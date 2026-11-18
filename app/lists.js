@@ -181,7 +181,7 @@ const Lists = {
       sw.checked = !!l.on;
       sw.setAttribute('aria-label', l.name + ' auf der Karte zeigen');
       sw.onchange = () => { l.on = sw.checked; this.saveMeta(); this.refresh(); };
-      box.appendChild(row);
+      box.appendChild(own ? row : Swipe.row(row, { onDelete: () => Trash.listDel(l.id) }));
     }
   },
   openList(id) {
@@ -255,7 +255,7 @@ const Lists = {
         box.appendChild(bar);
         const list = document.createElement('div');
         list.className = 'place-list sub';
-        for (const p of inCC) list.appendChild(this.itemRow(p));
+        for (const p of inCC) list.appendChild(this.swipeItem(p));
         box.appendChild(list);
       }
     }
@@ -280,6 +280,11 @@ const Lists = {
       if (own) openEditor(p); else this.showCard(p);
     };
     return b;
+  },
+
+  /* Ort-Zeile mit Wischen nach links zum Löschen (nicht im Auswahlmodus) */
+  swipeItem(p, row) {
+    return Swipe.row(row || this.itemRow(p), { onDelete: () => Trash.places([p]), enabled: () => !this.sel.active });
   },
 
   /* ---------- Auswählen und Sammelaktionen ---------- */
@@ -336,10 +341,9 @@ const Lists = {
       const b = $('#sel-del');
       if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = `${items.length} wirklich löschen?`; setTimeout(() => { delete b.dataset.sure; b.textContent = 'Löschen'; }, 4000); return; }
       delete b.dataset.sure; b.textContent = 'Löschen';
-      for (const p of items) for (const ph of p.photos || []) { try { await PhotoDB.del(ph); } catch (e) { /* egal */ } }
-      const del = new Set(items.map((p) => p.id));
-      places = places.filter((p) => !del.has(p.id));
-      toast(`${items.length} Orte gelöscht`);
+      this.endSel(true);
+      Trash.places(items);
+      return;
     }
     this.endSel(true);
     this.refresh();
@@ -430,18 +434,11 @@ const Lists = {
         const n = isCat ? places.filter((p) => p.cat === id).length : places.filter((p) => p.list === id).length;
         if (!del.dataset.sure) {
           del.dataset.sure = '1';
-          del.textContent = isCat ? `Löschen? ${n} Orte kommen nach „Sonstiges“` : `Löschen? Auch die ${n} Orte darin werden gelöscht`;
+          del.textContent = isCat ? `Löschen? ${n} Orte kommen nach „Sonstiges“` : `Löschen? Die ${n} Orte darin kommen mit in den Papierkorb`;
           return;
         }
-        if (isCat) {
-          for (const p of places) if (p.cat === id) p.cat = 'other';
-          setCustomCats(customCats().filter((c) => c.id !== id));
-        } else {
-          places = places.filter((p) => p.list !== id);
-          this.all = this.all.filter((l) => l.id !== id);
-          this.saveMeta();
-          if (this.open === id) this.closeList();
-        }
+        // in den Papierkorb, lässt sich zurückholen
+        if (isCat) Trash.catDel(id); else Trash.listDel(id);
         this.refresh();
         renderDataCats();
         if (isCat && openCat === id) closeCatPage();

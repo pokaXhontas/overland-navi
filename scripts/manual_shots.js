@@ -85,11 +85,15 @@ const BKK = { lat: 42.8746, lon: 74.5698 };
   await scene('02-menue', async () => {
     await ev(() => $('#btn-layers').click());
     await shot('02-menue');
-    await ev(() => { const b = $('#sheet .sheet-body'); const h = [...b.querySelectorAll('h2')].find((x) => /Navigation/.test(x.textContent)); b.scrollTop = h.offsetTop - 10; });
+    await ev(() => { const q = $('#menu-q'); q.value = 'höhen'; Menu.search(); });
+    await shot('02b-menue-suche', 800);
+    await ev(() => { $('#menu-q').value = ''; Menu.search(); Menu.open('navi'); });
     await shot('03-menue-ansagen', 800);
-    await ev(() => { const b = $('#sheet .sheet-body'); const h = [...b.querySelectorAll('h2')].find((x) => /Darstellung/.test(x.textContent)); b.scrollTop = h.offsetTop - 10; });
+    await ev(() => Menu.open('karte'));
     await shot('04-menue-darstellung', 800);
-    await ev(() => { const b = $('#sheet .sheet-body'); const h = [...b.querySelectorAll('h2')].find((x) => /Offline-Karten/.test(x.textContent)); b.scrollTop = h.offsetTop - 10; });
+    await ev(() => Menu.open('look'));
+    await shot('04b-menue-aussehen', 800);
+    await ev(() => Menu.open('offline'));
     await shot('05-offline-karten', 1500);
     await ev(() => openAddPage());
     await sleep(1500);
@@ -244,13 +248,33 @@ const BKK = { lat: 42.8746, lon: 74.5698 };
     await shot('25-karte-listen', 2500);
     await ev(() => Lists.showCard(places.find((p) => p.name === 'Tash Rabat')));
     await shot('26-kaertchen', 1200);
-    await ev(() => { Lists.closeCard(); $('#sheet').hidden = false; renderDataCats(); $('#sheet .sheet-body').scrollTop = 0; });
+    await ev(() => { Lists.closeCard(); Menu.open('listen'); });
     await shot('27-menue-listen', 1200);
     await ev(() => { Lists.openList(Lists.all.find((l) => l.name === 'Reiseplanung').id); Lists.openCC = 'kg'; Lists.renderListPage(); });
     await shot('28-liste-laender', 1200);
     await ev(() => { Lists.startSel('list'); const it = [...document.querySelectorAll('#list-countries .place-item')]; it[0].click(); it[2].click(); });
     await shot('29-auswahl', 1200);
-    await ev(() => { Lists.endSel(); Lists.closeList(); Lists.editCat(null); $('#thing-name').value = 'Campspots'; document.querySelectorAll('#thing-syms .sym')[13].click(); });
+    // nach links wischen: Löschen-Knopf
+    await ev(() => {
+      Lists.endSel();
+      const r = document.querySelectorAll('#list-countries .sw-row')[1];
+      r.classList.add('sw-open');
+      r.querySelector('.sw-main').style.transform = 'translateX(-96px)';
+    });
+    await shot('29b-wischen-loeschen', 800);
+    // gelöscht → Papierkorb, danach alles zurückholen
+    await ev(() => {
+      Swipe.closeRows();
+      const ps = places.filter((p) => ['Kel-Suu', 'Skazka-Canyon'].includes(p.name));
+      if (ps[0]) Trash.places([ps[0]]);
+      if (ps[1]) Trash.places([ps[1]]);
+      $('#toast').classList.remove('show');
+      Lists.closeList();
+      Menu.open('trash');
+    });
+    await shot('29c-papierkorb', 1000);
+    await ev(async () => { for (const e of [...Trash.list]) await Trash.restore(e); $('#toast').classList.remove('show'); });
+    await ev(() => { Lists.closeList(); Lists.editCat(null); $('#thing-name').value = 'Campspots'; document.querySelectorAll('#thing-syms .sym')[13].click(); });
     await shot('30-neue-kategorie', 1200);
     await ev(() => { $('#thing-back').click(); });
   });
@@ -289,10 +313,9 @@ const BKK = { lat: 42.8746, lon: 74.5698 };
         { id: 'd', name: 'Kirgistan-Gruppe', model: 'Android', status: 'blocked', admin: 0, seen: now - 9 * 864e5 }] } : {};
       $('#acc-section').hidden = false;
       $('#btn-layers').click();
-      Access.renderList();
+      Menu.open('zug');
     });
     await sleep(900);
-    await ev(() => $('#acc-section').scrollIntoView({ block: 'start' }));
     await shot('39-zugaenge', 1000);
   });
 
