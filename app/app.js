@@ -467,6 +467,7 @@ function onPosition(p) {
   gps.speed = speed;
   gps.pos = cur;
   gps.alt = (c.altitude === null || c.altitude === undefined) ? null : c.altitude;
+  if (typeof Live !== 'undefined') Live.onPos(cur, speed);
 
   $('#spd').textContent = speed === null ? '0' : Math.round(speed * 3.6);
   $('#crs').textContent = gps.heading === null ? '–' : compassText(gps.heading);
@@ -1520,6 +1521,7 @@ function setupUI() {
   Hike.setup();
   Lists.setup();
   Sync.setup();
+  Live.setup();
   Tours.setup();
   Poi.setup();
   for (const [id, key, def] of [['#t-water', 'waterOn', true], ['#t-service', 'serviceOn', true], ['#t-tracks', 'hikeTracks', true]]) {
@@ -2014,7 +2016,7 @@ function openCatPage(id) {
   page.querySelector('.sheet-body').scrollTop = 0;
 }
 function closeCatPage() { openCat = null; Lists.endSel(true); $('#cat-page').hidden = true; }
-function closeSheet() { closeCatPage(); if (typeof Lists !== 'undefined') Lists.closeList(); $('#add-page').hidden = true; $('#sheet').hidden = true; for (const id of ['#choose-page', '#thing-page', '#imp-page', '#sync-new-page', '#sync-code-page', '#sync-join-page', '#sync-conn-page']) { const e = $(id); if (e) e.hidden = true; } $('#dlg').hidden = true; }
+function closeSheet() { closeCatPage(); if (typeof Lists !== 'undefined') Lists.closeList(); $('#add-page').hidden = true; $('#sheet').hidden = true; for (const id of ['#choose-page', '#thing-page', '#imp-page', '#sync-new-page', '#sync-code-page', '#sync-join-page', '#sync-conn-page', '#live-new-page', '#live-group-page']) { const e = $(id); if (e) e.hidden = true; } $('#dlg').hidden = true; }
 
 function refreshCatPage() {
   if (!openCat) return;

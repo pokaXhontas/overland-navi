@@ -121,6 +121,11 @@
     <div class="cat-list" id="track-list"></div>
     <div class="row static"><span><b id="places-count">0 Orte</b><small>Neuer Ort: „Ort speichern“ oder lange auf die Karte drücken</small></span><button class="btn" id="btn-gpx">Alles teilen</button></div>
 
+    <h2>Standort teilen</h2>
+    <p class="muted small hint-line">Andere sehen dich live auf ihrer Karte – gesendet wird, solange die App offen ist.</p>
+    <div class="place-list" id="live-list"></div>
+    <button type="button" class="btn wide" id="btn-live-new">Meinen Standort teilen</button>
+
     <h2>Verbindungen</h2>
     <p class="muted small hint-line">Orte live mit anderen teilen und gemeinsam pflegen – per Sync-Code oder QR.</p>
     <div class="place-list" id="sync-list"></div>
@@ -238,7 +243,7 @@
     </div>
     <div class="sheet-body">
       <div class="cat-title"><h1 id="sc-name"></h1></div>
-      <p class="muted small"><b id="sc-rights"></b> · Den QR-Code mit dem anderen Handy scannen oder den Link schicken. Wer den Code hat, bekommt die Orte – nur an Leute geben, denen du vertraust.</p>
+      <p class="muted small"><b id="sc-rights"></b> · <span id="sc-hint"></span></p>
       <div class="sc-qr" id="sc-qr"></div>
       <code class="sc-code" id="sc-code"></code>
       <div class="two-btns"><button type="button" class="btn primary" id="sc-share">Link senden</button><button type="button" class="btn" id="sc-copy">Code kopieren</button></div>
@@ -251,7 +256,7 @@
     </div>
     <div class="sheet-body">
       <div class="cat-title"><h1>Verbindung beitreten</h1></div>
-      <label class="field"><span>Sync-Code oder Link</span><textarea id="sj-code" rows="3" placeholder="OVL1.…" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea></label>
+      <label class="field"><span>Sync- oder Standort-Code oder Link</span><textarea id="sj-code" rows="3" placeholder="OVL1.…" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea></label>
       <div class="two-btns"><button type="button" class="btn" id="sj-paste">Einfügen</button><button type="button" class="btn" id="sj-scan">QR scannen</button></div>
       <div class="sj-cam" id="sj-cam" hidden></div>
       <div class="sj-browser" id="sj-browser" hidden>
@@ -274,6 +279,39 @@
       <div class="two-btns"><button type="button" class="btn" id="scn-code-edit">Code: bearbeiten</button><button type="button" class="btn" id="scn-code-view">Code: nur ansehen</button></div>
       <p class="muted small">Fotos bleiben auf dem Gerät. Abgeglichen wird automatisch, sobald die App offen ist und Internet hat.</p>
       <button type="button" class="btn danger wide" id="scn-del">Verbindung trennen</button>
+    </div>
+  </div>
+
+  <div class="sheet-page" id="live-new-page" hidden>
+    <div class="sheet-head page-head">
+      <button class="back" id="ln-back" aria-label="Zurück"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Zurück</span></button>
+    </div>
+    <div class="sheet-body">
+      <div class="cat-title"><h1>Standort teilen</h1></div>
+      <label class="field"><span>So sehen dich die anderen</span><input id="ln-name" type="text" autocomplete="off" enterkeyhint="done" placeholder="z. B. Micha oder Defender"></label>
+      <h2>Wie lange?</h2>
+      <div class="seg" role="radiogroup" aria-label="Dauer" id="ln-dur">
+        <button role="radio" data-d="1h">1 Stunde</button>
+        <button role="radio" data-d="8h">8 Stunden</button>
+        <button role="radio" data-d="inf">Ohne Ende</button>
+      </div>
+      <label class="row"><span><b>Gegenseitig</b><small>Die anderen können ihren Standort zurück teilen</small></span><input type="checkbox" class="switch" id="ln-mutual"></label>
+      <p class="muted small">Gesendet wird nur, solange die App offen ist: beim Fahren alle 30 Sekunden, im Stand alle 5 Minuten. Ohne Netz sehen die anderen deinen letzten Standort mit Uhrzeit, die Strecke dazwischen kommt nach. Verschlüsselt – nur wer den Code hat, sieht dich.</p>
+      <button type="button" class="btn primary wide" id="ln-go">Teilen starten</button>
+    </div>
+  </div>
+
+  <div class="sheet-page" id="live-group-page" hidden>
+    <div class="sheet-head page-head">
+      <button class="back" id="lg-back" aria-label="Zurück"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg><span>Zurück</span></button>
+    </div>
+    <div class="sheet-body">
+      <div class="cat-title"><span class="pi-icon live-ic on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Zm0-9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/></svg></span><h1 id="lg-title"></h1></div>
+      <label class="row"><span><b>Meinen Standort teilen</b><small id="lg-share-txt"></small></span><input type="checkbox" class="switch" id="lg-share"></label>
+      <h2>Wer ist zu sehen?</h2>
+      <div class="place-list" id="lg-peers"></div>
+      <button type="button" class="btn wide" id="lg-code">Weitere Leute einladen (Code)</button>
+      <button type="button" class="btn danger wide" id="lg-leave">Gruppe verlassen</button>
     </div>
   </div>
 
@@ -348,6 +386,8 @@
 </div>
 
 <div class="list-chips" id="list-chips" hidden></div>
+
+<button type="button" class="live-pill" id="live-pill" hidden><i></i><span></span></button>
 
 <section class="planner panel" id="planner" aria-label="Route planen" hidden>
   <div class="pl-head">
@@ -583,6 +623,7 @@
 <script src="app.js"></script>
 <script src="lists.js"></script>
 <script src="sync.js"></script>
+<script src="live.js"></script>
 <script src="nav.js"></script>
 <script src="planner.js"></script>
 <script src="draw.js"></script>

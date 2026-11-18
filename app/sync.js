@@ -271,6 +271,7 @@ const Sync = {
     return c;
   },
   async join(text) {
+    if (/OVL2\./.test(String(text || '')) && typeof Live !== 'undefined') return Live.join(text);
     const k = this.parse(text);
     if (!k) { toast('Das ist kein gültiger Code. Er beginnt mit OVL1.'); return null; }
     const have = this.get(k.id);
@@ -371,7 +372,7 @@ const Sync = {
     return m < 1 ? 'gerade abgeglichen' : m < 60 ? `vor ${m} Min. abgeglichen` : m < 1440 ? `vor ${Math.round(m / 60)} Std. abgeglichen` : `am ${new Date(t).toLocaleDateString('de')} abgeglichen`;
   },
   page(id) {
-    for (const p of ['#sync-new-page', '#sync-code-page', '#sync-join-page', '#sync-conn-page']) $(p).hidden = p !== id;
+    for (const p of ['#sync-new-page', '#sync-code-page', '#sync-join-page', '#sync-conn-page', '#live-new-page', '#live-group-page']) $(p).hidden = p !== id;
     if (id) { $('#sheet').hidden = false; $(id + ' .sheet-body').scrollTop = 0; }
   },
 
@@ -437,9 +438,16 @@ const Sync = {
   async showCode(c, write) {
     this.open = c.id;
     const code = this.code(c, write);
+    await this.codePage({ title: c.name, rights: write ? 'Gemeinsam bearbeiten' : 'Nur ansehen', code,
+      text: `Overland-Navi: „${c.name}“ (${write ? 'gemeinsam bearbeiten' : 'nur ansehen'}). Öffnen oder in der App unter Verbindungen → Code eingeben einfügen:\n${code}`,
+      back: () => this.openConn(c.id) });
+  },
+  /* QR, Link und Code zeigen (auch für Standort teilen) */
+  async codePage({ title, rights, code, text, back, hint }) {
     const link = this.link(code);
-    $('#sc-name').textContent = c.name;
-    $('#sc-rights').textContent = write ? 'Gemeinsam bearbeiten' : 'Nur ansehen';
+    $('#sc-name').textContent = title;
+    $('#sc-rights').textContent = rights;
+    $('#sc-hint').textContent = hint || 'Den QR-Code mit dem anderen Handy scannen oder den Link schicken. Wer den Code hat, bekommt die Orte – nur an Leute geben, denen du vertraust.';
     $('#sc-code').textContent = code;
     const qr = $('#sc-qr');
     qr.innerHTML = '';
@@ -451,11 +459,11 @@ const Sync = {
       qr.innerHTML = q.createSvgTag({ cellSize: 6, margin: 2, scalable: true });
     } catch (e) { qr.innerHTML = '<p class="muted small">QR-Code gerade nicht verfügbar – schick den Link oder den Code.</p>'; }
     $('#sc-share').onclick = async () => {
-      const text = `Overland-Navi: „${c.name}“ (${write ? 'gemeinsam bearbeiten' : 'nur ansehen'}). Öffnen oder in der App unter Verbindungen → Beitreten einfügen:\n${code}`;
-      if (navigator.share) { try { await navigator.share({ title: c.name, text, url: link }); return; } catch (e) { if (e.name === 'AbortError') return; } }
+      if (navigator.share) { try { await navigator.share({ title, text, url: link }); return; } catch (e) { if (e.name === 'AbortError') return; } }
       this.copy(text + '\n' + link);
     };
     $('#sc-copy').onclick = () => this.copy(code);
+    this._codeBack = back || null;
     this.page('#sync-code-page');
   },
   async copy(text) {
@@ -475,7 +483,8 @@ const Sync = {
     btn.disabled = true;
     try {
       const c = await this.join($('#sj-code').value);
-      if (c) { this.renderMenu(); this.openConn(c.id); }
+      if (c && c.live) Live.openGroup(c.id);
+      else if (c) { this.renderMenu(); this.openConn(c.id); }
     } finally { btn.disabled = false; }
   },
   async scan() {
@@ -556,7 +565,7 @@ const Sync = {
     $('#btn-sync-join').onclick = () => this.openJoin('');
     $('#sn-back').onclick = () => this.page(null);
     $('#sn-create').onclick = () => this.createFromDraft();
-    $('#sc-back').onclick = () => { if (this.open) this.openConn(this.open); else this.page(null); };
+    $('#sc-back').onclick = () => { if (this._codeBack) this._codeBack(); else this.page(null); };
     $('#sj-back').onclick = () => this.page(null);
     $('#sj-go').onclick = () => this.doJoin();
     $('#sj-scan').onclick = () => this.scan();
@@ -565,7 +574,7 @@ const Sync = {
     $('#scn-back').onclick = () => { this.open = null; this.page(null); };
     this.renderMenu();
     // Link mit Code geöffnet?
-    const m = location.hash.match(/join=([^&]+)/);
+    const m = location.hash.match(/join=([^&]+)/);   // Sync- oder Standort-Code
     if (m) {
       history.replaceState(null, '', location.pathname + location.search);
       setTimeout(() => this.openJoin(decodeURIComponent(m[1])), 800);

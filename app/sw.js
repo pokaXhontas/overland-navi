@@ -13,6 +13,7 @@ const SHELL = [
   'app.js',
   'lists.js',
   'sync.js',
+  'live.js',
   'dl-worker.js',
   'extract.js',
   'vehicles.js',

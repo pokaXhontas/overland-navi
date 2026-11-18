@@ -888,3 +888,24 @@ html.dark .na-tag.ferry { color: #74C0FC; } html.dark .na-tag.toll { color: #FFC
 .sj-browser { margin: 10px 0; padding: 12px 14px; border-radius: 14px; background: rgba(28,126,214,.10); }
 .sj-browser p { margin: 0 0 6px; line-height: 1.4; }
 #scn-status.err { color: #C53030; }
+
+/* ---------- Standort teilen ---------- */
+.live-ic { background: var(--faint); color: var(--muted); border-radius: 50%; }
+.live-ic.on { background: #E03131; color: #FFFFFF; }
+#btn-live-new { margin: 6px 0 4px; }
+.live-pill { position: fixed; z-index: 5; left: var(--gap); top: calc(var(--safe-t) + var(--gap) + 98px); height: 32px; padding: 0 12px 0 10px; border-radius: 16px; border: 0; display: flex; align-items: center; gap: 8px; background: #E03131; color: #FFFFFF; font: inherit; font-size: 13px; font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+.live-pill[hidden] { display: none; }
+.live-pill i { width: 8px; height: 8px; border-radius: 50%; background: #FFFFFF; animation: livepulse 1.6s ease-in-out infinite; }
+.live-pill.err { background: #868E96; }
+.live-pill.err i { animation: none; }
+@keyframes livepulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+.peer { position: relative; width: 34px; height: 34px; cursor: pointer; }
+.peer b { position: absolute; inset: 0; border-radius: 50%; background: var(--c); color: #FFFFFF; border: 3px solid #FFFFFF; box-shadow: 0 2px 8px rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 800; }
+.peer span { position: absolute; top: 37px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 12px; font-weight: 700; color: #1A1A1A; background: rgba(255,255,255,.92); padding: 1px 7px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+.peer-dir { position: absolute; left: 50%; top: 50%; width: 0; height: 0; margin: -29px 0 0 -7px; border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 11px solid var(--c); transform-origin: 7px 29px; }
+.peer-dir[hidden] { display: none; }
+.peer.stale b { background: #ADB5BD; }
+.peer.stale .peer-dir { display: none; }
+.peer-ic { color: #FFFFFF; font-weight: 800; font-size: 16px; display: flex; align-items: center; justify-content: center; }
+.pc-btns.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 600px) { .live-pill { top: calc(var(--safe-t) + var(--gap) + 92px); } }

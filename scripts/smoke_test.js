@@ -390,6 +390,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     try { await loadScript('vendor/qrcode.js'); const q = qrcode(0, 'M'); q.addData('test'); q.make(); out.push('QR ok'); } catch (e) { out.push('QR FEHLER ' + e.message); }
     try { await loadScript('vendor/jsqr.js'); out.push('Scanner ' + (typeof jsQR)); } catch (e) { out.push('Scanner FEHLER'); }
     try { const r = await fetch(Sync.url()); out.push('Sync-Server ' + r.status + ' ' + (await r.text()).slice(0, 40)); } catch (e) { out.push('Sync-Server nicht erreichbar'); }
+    out.push('Standort-Code ' + (Live.parse(Live.code({ id: c.id, key: c.key, w: Sync.b64u(Sync.rand(16)) }, true)) ? 'ok' : 'FEHLER'));
+    try { const r = await fetch(Live.url()); out.push('Standort-Server ' + r.status + ' ' + (await r.text()).slice(0, 40)); } catch (e) { out.push('Standort-Server nicht erreichbar'); }
     places = places.filter((p) => Lists.get(p.list).name !== 'Probeliste');
     Lists.all = Lists.all.filter((l) => l.name !== 'Probeliste');
     Lists.saveMeta(); savePlaces();
