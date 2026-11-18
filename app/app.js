@@ -2697,6 +2697,7 @@ async function main() {
     if (p) { if (Lists.isOwn(p)) openEditor(p); else Lists.showCard(p); }
   });
   map.on('click', 'tracks-hit', (e) => {
+    if (Nav.altAt(e.point) >= 0) return;
     if (editor.moving || editor.open || (typeof Draw !== 'undefined' && Draw.active)) return;
     if (map.queryRenderedFeatures(e.point, { layers: ['places-icon', 'poi-icon'].filter((l) => map.getLayer(l)) }).length) return;
     const f = e.features && e.features[0];

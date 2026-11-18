@@ -28,6 +28,7 @@ const Tours = {
     const c = this.curated.find((p) => p.country === id);
     if (c) return c.name;
     const m = Hike.index[id];
+    if (m && m.label) return m.label;
     try { if (m && m.iso && m.iso[0]) return new Intl.DisplayNames(['de'], { type: 'region' }).of(m.iso[0]); } catch (e) { /* weiter */ }
     return (m && m.name) || id;
   },
@@ -440,10 +441,14 @@ const Tours = {
       const osm = Hike.index[id] && Hike.index[id].tours;
       return { id, name: this.countryName(id), cur, osm, inst: this.isInstalled(id) };
     });
-    if (q) rows = rows.filter((r) => r.name.toLowerCase().includes(q) || r.id.includes(q));
+    // Teilgebiete (z. B. US-Bundesstaaten) erst über die Suche, damit die Liste übersichtlich bleibt
+    const sub = (r) => Hike.index[r.id] && Hike.index[r.id].region;
+    const more = rows.filter((r) => sub(r) && !r.inst).length;
+    if (q) rows = rows.filter((r) => r.name.toLowerCase().includes(q) || r.id.includes(q) || (Hike.index[r.id] && String(Hike.index[r.id].name || '').toLowerCase().includes(q)));
+    else rows = rows.filter((r) => !sub(r) || r.inst);
     rows.sort((a, b) => (b.inst - a.inst) || (!!b.cur - !!a.cur) || a.name.localeCompare(b.name, 'de'));
     box.innerHTML = '';
-    if (!rows.length) { box.innerHTML = `<p class="muted small">${ids.size ? 'Kein Land gefunden.' : 'Die Länderliste lädt, sobald du online bist.'}</p>`; return; }
+    if (!rows.length) { box.innerHTML = `<p class="muted small">${ids.size ? 'Nichts gefunden. Versuch es mit dem englischen Namen, z. B. „Colorado“.' : 'Die Länderliste lädt, sobald du online bist.'}</p>`; return; }
     for (const r of rows) {
       const row = document.createElement('div');
       row.className = 'to-packrow';
@@ -458,6 +463,12 @@ const Tours = {
       btn.classList.toggle('primary', !r.inst);
       btn.onclick = () => (r.inst ? this.remove(r.id) : this.install(r.id));
       box.appendChild(row);
+    }
+    if (!q && more) {
+      const p = document.createElement('p');
+      p.className = 'muted small';
+      p.textContent = `Dazu ${more} weitere Gebiete, etwa die Bundesstaaten der USA. Gib oben den Namen ein, um sie zu finden.`;
+      box.appendChild(p);
     }
   },
 
@@ -483,6 +494,7 @@ const Tours = {
     const tap = (e) => {
       if ((typeof Draw !== 'undefined' && Draw.active) || editor.open || editor.moving) return;
       if (this._lastTap === e.originalEvent) return;
+      if (Nav.altAt(e.point) >= 0) return;
       if (map.queryRenderedFeatures(e.point, { layers: ['places-icon', 'tracks-hit', 'hike-pts', 'poi-icon'].filter((l) => map.getLayer(l)) }).length) return;
       this._lastTap = e.originalEvent;
       const f = e.features && e.features[0];

@@ -382,7 +382,7 @@ const Hike = {
       row.innerHTML = `<span class="hk-dash" style="--c:${s.color}"></span><span class="hk-badge" style="background:${s.color}">${s.t}</span><span><b>${s.name}</b><small>${s.text}</small></span>`;
       legend.appendChild(row);
     }
-    const n = this.keys().length;
+    const n = this.keys().filter((k) => !this.index[k].region).length;
     const off = Tiles.regions.filter((r) => this.regionDone(r)).map((r) => r.name);
     const need = Tiles.regions.filter((r) => Tiles.local.has(r.id) && this.keysFor(r.boxes).length && !this.regionDone(r)).map((r) => r.name);
     let txt = n ? `Online gibt es Wanderwege für ${n} Länder.` : 'Die Wanderwege werden gerade erstellt. Schau später nochmal rein.';
@@ -453,6 +453,7 @@ const Hike = {
     map.on('mouseleave', 'hike-pts', () => { map.getCanvas().style.cursor = ''; });
     map.on('click', 'hike-hit', (e) => {
       if (this._ptTap === e.originalEvent) return;
+      if (Nav.altAt(e.point) >= 0) return;
       if (map.getLayer('oev-halt') && map.queryRenderedFeatures(e.point, { layers: ['oev-halt'] }).length) return;
       if ((typeof Draw !== 'undefined' && Draw.active) || editor.open || editor.moving) return;
       if (map.queryRenderedFeatures(e.point, { layers: ['places-icon', 'tracks-hit', 'tours-hit', 'tours-pt', 'hike-pts', 'poi-icon'].filter((l) => map.getLayer(l)) }).length) return;

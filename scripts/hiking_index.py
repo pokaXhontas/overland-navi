@@ -26,6 +26,8 @@ for a in rel["assets"]:
     m = meta.get(key, {})
     index[key] = {"size": a["size"], "date": a["updated_at"][:10], "ts": a["updated_at"], "bbox": [round(w, 4), round(s, 4), round(e, 4), round(n, 4)],
                   "name": m.get("name", key), "iso": m.get("iso", [])}
+    if m.get("region"):
+        index[key].update(label=m.get("label", key), region=True)
     t = tours.get(key)
     if t:
         try:

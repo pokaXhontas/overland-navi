@@ -50,6 +50,7 @@ const Swipe = {
       if (!st.on) {
         if (Math.abs(cross) > 12 && Math.abs(cross) > Math.abs(main)) { st = null; return; }
         if (Math.abs(main) < 8) return;
+        if (el.classList.contains('swiping')) { st = null; return; }   // eine andere Wischrichtung ist schon dran
         st.on = true;
         try { zone.setPointerCapture(e.pointerId); } catch (err) { /* egal */ }
         el.style.transition = 'none';
@@ -199,6 +200,8 @@ const Swipe = {
       onDismiss: (d, from) => this.fold(alts, 'peek', d === 'down', from)
     });
     this.foldable(alts, 'peek', '.na-peek-txt, .grab');
+    // seitlich (nach links) hinausschieben schließt die Auswahl, wie „Abbrechen“
+    this.attach(alts, { dir: () => 'left', onDismiss: () => Nav.cancelPick() });
 
     // Navigation: Hinweis oben und Restweg unten lassen sich klein machen
     const banner = $('#nav-banner'), foot = $('#nav-foot');

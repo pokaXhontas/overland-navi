@@ -763,6 +763,8 @@ const Nav = {
       $('#na-peek-time').textContent = `${this.fmtTime(cur.time)} · ${fmtDist(cur.total)}`;
     };
     render();
+    this.pending.render = render;
+    if (!this._altTap) { this._altTap = true; map.on('click', (e) => this.tapAlt(e)); }
     box.classList.remove('peek');
     $('#na-peek-go').onclick = (e) => { e.stopPropagation(); $('#na-go').click(); };
     $('#na-go').onclick = () => {
@@ -772,13 +774,13 @@ const Nav = {
       this.active = p.list[p.sel];
       this.go(gps.pos);
     };
-    $('#na-cancel').onclick = () => { this.pending = null; Swipe.hide(box, 'down'); this.draw(); };
+    $('#na-cancel').onclick = () => this.cancelPick();
     $('#na-edit').onclick = () => { const st = list[0].stops; this.pending = null; Swipe.hide(box, 'down'); this.draw(); Planner.open(st); };
     $('#na-save').onclick = () => this.saveAsTrack(this.pending.list[this.pending.sel]);
     $('#na-go').textContent = !list[0].joined ? 'Navigation starten' : list[0].travel === 'foot' ? 'Loslaufen' : list[0].travel === 'transit' ? 'Los geht’s' : 'Losfahren';
     $('#na-title').textContent = list[0].travel === 'transit' ? 'Verbindung auswählen' : list.length > 1 ? 'Route auswählen' : 'Deine Route';
     $('#na-credit').hidden = list[0].travel !== 'transit';
-    $('#na-sub').textContent = list.length > 1 ? 'Antippen zeigt sie auf der Karte' : ((list[0].vias.length ? list[0].vias.length + (list[0].vias.length === 1 ? ' Zwischenstopp' : ' Zwischenstopps') : 'Direkt') + ' · ' + (list[0].startPt && !list[0].startPt.gps ? 'ab ' + list[0].startPt.name : 'ab deinem Standort'));
+    $('#na-sub').textContent = list.length > 1 ? 'Tippe eine Route an, hier oder auf der Karte' : ((list[0].vias.length ? list[0].vias.length + (list[0].vias.length === 1 ? ' Zwischenstopp' : ' Zwischenstopps') : 'Direkt') + ' · ' + (list[0].startPt && !list[0].startPt.gps ? 'ab ' + list[0].startPt.name : 'ab deinem Standort'));
     const best = list.find((x) => x.walk);
     if (list[0].travel === 'foot' && (!best || best.walk.routePct < 20)) {
       $('#na-sub').textContent = 'Hinweis: Für diese Strecke gibt es keine durchgehende markierte Wanderroute. Der Weg führt über normale Wege' + (best && best.walk.roadPct >= 15 ? ' und ein Stück an Straßen entlang.' : '.');
@@ -1060,7 +1062,7 @@ const Nav = {
     const fc = { type: 'FeatureCollection', features: [] };
     const pd = this.pending;
     if (pd) {
-      pd.list.forEach((r, i) => { if (i !== pd.sel) fc.features.push({ type: 'Feature', properties: { kind: 'alt' }, geometry: { type: 'LineString', coordinates: r.coords } }); });
+      pd.list.forEach((r, i) => { if (i !== pd.sel) fc.features.push({ type: 'Feature', properties: { kind: 'alt', i }, geometry: { type: 'LineString', coordinates: r.coords } }); });
       fc.features.push({ type: 'Feature', properties: { kind: 'route' }, geometry: { type: 'LineString', coordinates: pd.list[pd.sel].coords } });
       fc.features.push({ type: 'Feature', properties: { kind: 'target' }, geometry: { type: 'Point', coordinates: [pd.target.lon, pd.target.lat] } });
       const r0 = pd.list[pd.sel];
@@ -1080,6 +1082,48 @@ const Nav = {
     for (const v of a.vias || []) fc.features.push({ type: 'Feature', properties: { kind: 'via' }, geometry: { type: 'Point', coordinates: [v.lon, v.lat] } });
     if (a.startPt && !a.startPt.gps) fc.features.push({ type: 'Feature', properties: { kind: 'start' }, geometry: { type: 'Point', coordinates: [a.startPt.lon, a.startPt.lat] } });
     return fc;
+  },
+
+  cancelPick() {
+    if (!this.pending) return;
+    this.pending = null;
+    Swipe.hide($('#nav-alts'), 'down');
+    this.draw();
+  },
+
+  /* andere Route direkt auf der Karte antippen: Nummer der getroffenen Linie oder -1 */
+  altAt(pt) {
+    const pd = this.pending;
+    if (!pd || !map.getLayer('route-alt')) return -1;
+    const R = 18;
+    const hits = map.queryRenderedFeatures([[pt.x - R, pt.y - R], [pt.x + R, pt.y + R]], { layers: ['route-alt'] });
+    if (!hits.length) return -1;
+    if (map.queryRenderedFeatures(pt, { layers: ['places-icon', 'poi-icon', 'route-target', 'hike-pts', 'oev-halt', 'tours-pt'].filter((l) => map.getLayer(l)) }).length) return -1;
+    // bei mehreren Linien die nächste nehmen
+    let best = -1, bd = Infinity;
+    for (const i of new Set(hits.map((f) => f.properties.i))) {
+      const c = pd.list[i] && pd.list[i].coords;
+      if (!c) continue;
+      let prev = null;
+      for (const q of c) {
+        const a = map.project(q);
+        if (prev) {
+          const dx = a.x - prev.x, dy = a.y - prev.y, l2 = dx * dx + dy * dy;
+          const t = l2 ? Math.max(0, Math.min(1, ((pt.x - prev.x) * dx + (pt.y - prev.y) * dy) / l2)) : 0;
+          const d = Math.hypot(prev.x + t * dx - pt.x, prev.y + t * dy - pt.y);
+          if (d < bd) { bd = d; best = i; }
+        }
+        prev = a;
+      }
+    }
+    return bd <= R * 1.5 ? best : -1;
+  },
+  tapAlt(e) {
+    const i = this.altAt(e.point);
+    if (i < 0) return;
+    this.pending.sel = i;
+    if (this.pending.render) this.pending.render();
+    this.draw();
   },
 
   draw(pos) {
