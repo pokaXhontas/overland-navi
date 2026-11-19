@@ -1,0 +1,10 @@
+{
+  "appId": "io.github.pokaxhontas.overlandnavi",
+  "appName": "Overland-Navi",
+  "webDir": "www",
+  "ios": {
+    "contentInset": "never",
+    "scheme": "Overland-Navi",
+    "limitsNavigationsToAppBoundDomains": false
+  }
+}

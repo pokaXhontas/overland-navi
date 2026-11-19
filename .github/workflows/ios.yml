@@ -1,0 +1,119 @@
+name: iPhone-App (TestFlight)
+
+# Baut aus der fertigen Webseite eine iPhone-/iPad-App (Capacitor).
+# Ohne Apple-Schlüssel: nur Bauprobe für den Simulator. Mit Schlüssel: signieren und zu TestFlight hochladen.
+# Die Webseite und die Home-Bildschirm-App bleiben davon unberührt.
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Bauen und veröffentlichen"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: ios-app
+  cancel-in-progress: true
+
+jobs:
+  app:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: macos-latest
+    timeout-minutes: 75
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HAS_KEY: ${{ secrets.ASC_KEY_P8 != '' && secrets.ASC_KEY_ID != '' && secrets.ASC_ISSUER_ID != '' && secrets.APPLE_TEAM_ID != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fertige Webseite holen (letzte erfolgreiche Veröffentlichung)
+        run: |
+          RID="${{ github.event.workflow_run.id }}"
+          if [ -z "$RID" ]; then
+            RID=$(gh run list -R "$GITHUB_REPOSITORY" -w deploy.yml -s success -L 1 --json databaseId -q '.[0].databaseId')
+          fi
+          echo "Webseite aus Lauf $RID"
+          gh run download "$RID" -R "$GITHUB_REPOSITORY" -n github-pages -D pages
+          mkdir -p native/www
+          tar -xf pages/artifact.tar -C native/www
+          # in der App nicht nötig: Handbuch-Bilder bleiben online erreichbar
+          du -sh native/www
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Capacitor einrichten
+        working-directory: native
+        run: |
+          npm install --no-audit --no-fund @capacitor/core@latest @capacitor/cli@latest @capacitor/ios@latest
+          npx cap add ios
+          npx cap sync ios
+          ls ios/App
+
+      - name: App einstellen (Name, Rechte, Symbol, Version)
+        working-directory: native/ios/App
+        run: |
+          PL=App/Info.plist
+          B=/usr/libexec/PlistBuddy
+          set_() { $B -c "Set :$1 $2" "$PL" 2>/dev/null || $B -c "Add :$1 $3 $2" "$PL"; }
+          set_ CFBundleDisplayName "Overland-Navi" string
+          set_ NSLocationWhenInUseUsageDescription "Für deine Position auf der Karte, die Navigation und das Teilen des Standorts." string
+          set_ NSCameraUsageDescription "Für Fotos zu deinen Orten." string
+          set_ NSPhotoLibraryUsageDescription "Für Fotos zu deinen Orten." string
+          set_ ITSAppUsesNonExemptEncryption false bool
+          set_ UIRequiresFullScreen false bool
+          # Symbol: 1024 px aus dem Web-Symbol
+          ICON=$(ls App/Assets.xcassets/AppIcon.appiconset/*.png | head -1)
+          sips -z 1024 1024 ../../www/icons/icon-512.png --out "$ICON" >/dev/null
+          # Alpha-Kanal entfernen (Apple lehnt transparente Symbole ab)
+          sips -s format jpeg "$ICON" --out /tmp/icon.jpg >/dev/null && sips -s format png /tmp/icon.jpg --out "$ICON" >/dev/null
+          echo "Symbol: $ICON"
+          plutil -p "$PL" | head -40
+
+      - name: Bauprobe für den Simulator (ohne Apple-Schlüssel)
+        if: env.HAS_KEY != 'true'
+        working-directory: native/ios/App
+        run: |
+          if [ -d App.xcworkspace ]; then T="-workspace App.xcworkspace"; else T="-project App.xcodeproj"; fi
+          xcodebuild $T -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build | tail -30
+          echo "Bauprobe erfolgreich. Für TestFlight fehlen noch die Apple-Secrets (siehe native/README.md)."
+
+      - name: Signieren und zu TestFlight hochladen
+        if: env.HAS_KEY == 'true'
+        working-directory: native/ios/App
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          KEY="$RUNNER_TEMP/AuthKey.p8"
+          printf '%s\n' "$ASC_KEY_P8" > "$KEY"
+          AUTH="-allowProvisioningUpdates -authenticationKeyPath $KEY -authenticationKeyID $ASC_KEY_ID -authenticationKeyIssuerID $ASC_ISSUER_ID"
+          if [ -d App.xcworkspace ]; then T="-workspace App.xcworkspace"; else T="-project App.xcodeproj"; fi
+          BUILD=$(( ${{ github.run_number }} + 100 ))
+          xcodebuild $T -scheme App -configuration Release -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" archive $AUTH \
+            DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic \
+            PRODUCT_BUNDLE_IDENTIFIER=io.github.pokaxhontas.overlandnavi \
+            MARKETING_VERSION=1.0 CURRENT_PROJECT_VERSION=$BUILD | tail -30
+          cat > "$RUNNER_TEMP/export.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$TEAM</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict></plist>
+          EOF
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" -exportOptionsPlist "$RUNNER_TEMP/export.plist" \
+            -exportPath "$RUNNER_TEMP/out" $AUTH | tail -30
+          echo "Hochgeladen: Version 1.0 ($BUILD). In App Store Connect → TestFlight erscheint sie nach der Verarbeitung (meist 5–30 Minuten)."

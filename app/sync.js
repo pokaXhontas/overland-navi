@@ -28,7 +28,11 @@ const Sync = {
   now() { return new Date().toISOString(); },
 
   code(c, write) { return ['OVL1', c.id, c.key].concat(write && c.w ? [c.w] : []).join('.'); },
-  link(code) { return location.origin + location.pathname.replace(/index\.html$/, '') + '#join=' + code; },
+  link(code) {
+    // in der iPhone-App (capacitor://) immer auf die öffentliche Webseite verlinken
+    const web = /^https?:$/.test(location.protocol) ? location.origin + location.pathname.replace(/index\.html$/, '') : 'https://pokaxhontas.github.io/overland-navi/';
+    return web + '#join=' + code;
+  },
   parse(text) {
     const m = String(text || '').match(/OVL1\.([a-f0-9]{32})\.([A-Za-z0-9_-]{43})(?:\.([A-Za-z0-9_-]{22}))?/);
     return m ? { id: m[1], key: m[2], w: m[3] || '' } : null;
@@ -474,7 +478,7 @@ const Sync = {
   /* beitreten */
   openJoin(prefill) {
     $('#sj-code').value = prefill || '';
-    const inBrowser = !!prefill && !(window.matchMedia('(display-mode: standalone)').matches || navigator.standalone);
+    const inBrowser = !!prefill && !(window.matchMedia('(display-mode: standalone)').matches || navigator.standalone || window.Capacitor);
     $('#sj-browser').hidden = !inBrowser;
     $('#sj-go').textContent = inBrowser ? 'Nein, hier im Browser verbinden' : 'Verbinden';
     $('#sj-go').classList.toggle('primary', !inBrowser);

@@ -1,0 +1,6 @@
+{
+  "name": "overland-navi-native",
+  "private": true,
+  "description": "iPhone-/iPad-App (TestFlight) aus derselben Web-App. Wird in .github/workflows/ios.yml gebaut.",
+  "author": "pokaXhontas"
+}
