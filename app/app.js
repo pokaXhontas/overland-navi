@@ -716,7 +716,8 @@ function onPositionError(err) {
   if (err.code === 1) {
     stopGPS();
     $('#acc').textContent = 'aus';
-    toast('Standort ist für diese Seite gesperrt. In Safari links in der Adressleiste auf das Symbol tippen → Website-Einstellungen → Standort → „Erlauben“. Hilft das nicht: Einstellungen → Apps → Safari → Standort → „Fragen“, dann Seite neu laden.', 12000);
+    if (window.Capacitor) toast('Standort ist für Overland-Navi aus. Einstellungen → Apps → Overland-Navi → Standort → „Beim Verwenden der App“ und „Genauer Standort“ an, dann die App neu öffnen.', 12000);
+    else toast('Standort ist für diese Seite gesperrt. In Safari links in der Adressleiste auf das Symbol tippen → Website-Einstellungen → Standort → „Erlauben“. Hilft das nicht: Einstellungen → Apps → Safari → Standort → „Fragen“, dann Seite neu laden.', 12000);
   } else if (err.code === 3) {
     $('#acc').textContent = 'sucht';
     if (!gps.pos) toast('Suche GPS-Signal … draußen oder am Fenster geht es schneller.', 4000);

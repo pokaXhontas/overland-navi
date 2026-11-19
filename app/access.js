@@ -122,6 +122,7 @@ const Access = {
       const ios = /iPhone|iPad/.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.userAgent));
       toast(ios && !(navigator.standalone || window.Capacitor || matchMedia('(display-mode: standalone)').matches)
         ? 'Benachrichtigungen gehen auf dem iPhone nur in der App vom Home-Bildschirm (nicht in Safari).'
+        : window.Capacitor ? 'In der iPhone-App gibt es noch keine Benachrichtigungen. Die Version vom Home-Bildschirm (aus Safari) kann sie empfangen.'
         : 'Dieses Gerät oder dieser Browser kann keine Benachrichtigungen empfangen.', 7000);
       return false;
     }
