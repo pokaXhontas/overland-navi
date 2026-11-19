@@ -167,7 +167,7 @@ const Lists = {
       row.innerHTML = '<span class="lp-dot"></span><span><b>Tracks</b><small></small></span><input type="checkbox" class="switch">';
       row.querySelector('.lp-dot').style.background = TRACK_CAT.color;
       const vis = tracks.filter((t) => t.visible).length;
-      row.querySelector('small').textContent = vis === tracks.length ? `${tracks.length}` : `${vis} von ${tracks.length}`;
+      row.querySelector('small').textContent = vis === tracks.length ? `${tracks.length} ${tracks.length === 1 ? 'Track' : 'Tracks'}` : `${vis} von ${tracks.length} sichtbar`;
       const sw = row.querySelector('.switch');
       sw.checked = this.tracksOn();
       sw.onchange = async () => {
