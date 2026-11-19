@@ -17,11 +17,24 @@ permissions:
 
 concurrency:
   group: ios-app
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
+  # Automatisch nur, wenn die Apple-Schlüssel eingetragen sind – sonst kein Mac-Rechner und keine Mails
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.c.outputs.go }}
+    steps:
+      - id: c
+        env:
+          K: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || { [ -n "$K" ] && [ "${{ github.event.workflow_run.conclusion }}" = "success" ]; }; then echo go=true >> "$GITHUB_OUTPUT"; else echo go=false >> "$GITHUB_OUTPUT"; echo "Übersprungen: noch keine Apple-Schlüssel eingetragen."; fi
+
   app:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    needs: check
+    if: needs.check.outputs.go == 'true'
     runs-on: macos-latest
     timeout-minutes: 75
     env:
