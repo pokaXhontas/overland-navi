@@ -226,6 +226,18 @@ jobs:
           if [ -f voices-build/index.json ]; then cp -r voices-build/. site/voices/; else echo '{"v":1,"voices":[],"keys":[]}' > site/voices/index.json; fi
           ls site/voices
 
+      - name: Zugang des Prüflaufs beim Worker prüfen
+        continue-on-error: true
+        env:
+          K: ${{ secrets.OVL_CI_KEY }}
+        run: |
+          # nur Anfang des Hashes zeigen, nie den Schlüssel
+          echo "Schlüssel-Hash beginnt mit: $(printf '%s' "$K" | sha256sum | cut -c1-6) (erwartet $(grep -o "CI_HASH = '[0-9a-f]\{6\}" proxy/worker.js | tail -c 7)), Länge ${#K}"
+          W=https://ovl-karte.y3m.workers.dev
+          echo "Status: $(curl -s -H "X-Key: $K" "$W/auth/status")"
+          echo "Wanderindex: $(curl -s -o /dev/null -w '%{http_code}' -H "X-Key: $K" "$W/wander/index.json")"
+          echo "Karte (Bereich): $(curl -s -o /dev/null -w '%{http_code}' -H "X-Key: $K" -H 'Range: bytes=0-15' "$W/20261118.pmtiles")"
+
       - name: Online-Dienste für Route und Luftbild prüfen
         continue-on-error: true
         run: |

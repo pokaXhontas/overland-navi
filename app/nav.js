@@ -20,8 +20,14 @@ const Pack = {
   index: null, ctx: null, raw: new Map(), dec: new Map(), playing: [], el: null, elReady: false,
   async load() {
     if (this.index) return this.index;
-    try { const r = await fetch('voices/index.json'); this.index = r.ok ? await r.json() : null; } catch (e) { this.index = null; }
+    try {
+      const r = await fetch('voices/index.json');
+      this.index = r.ok ? await r.json() : null;
+      if (!r.ok) this.loadError = 'Status ' + r.status;
+    } catch (e) { this.index = null; this.loadError = e.message; }
     if (!this.index || !this.index.voices) this.index = { voices: [], keys: [] };
+    else if (!this.index.voices.length) this.loadError = 'leer';
+    this.loaded = true;
     return this.index;
   },
   ac() {
@@ -1363,6 +1369,12 @@ const Nav = {
           g.appendChild(o);
         }
         sel.appendChild(g);
+      } else if (Pack.loaded) {
+        // sichtbar machen, statt still nur Gerätestimmen anzubieten
+        const o = document.createElement('option');
+        o.disabled = true;
+        o.textContent = 'Mitgelieferte Stimmen fehlen (' + (Pack.loadError || 'nicht gefunden') + ')';
+        sel.appendChild(o);
       }
       const g2 = document.createElement('optgroup');
       g2.label = 'Stimmen vom Gerät';
