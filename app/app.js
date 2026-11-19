@@ -597,7 +597,18 @@ function onPosition(p) {
     if (heading === null && d > 8) heading = bearingDeg(gps.last, cur);
   }
   if (!gps.last || distance(gps.last, cur) > 5) gps.last = cur;
-  if (heading !== null && (speed === null || speed > 0.8)) gps.heading = heading;
+  // Richtung beruhigen: im Stand nicht nachführen, kleine Wackler ignorieren, große Änderungen weich übernehmen
+  if (heading !== null && (speed === null || speed > 1.2)) {
+    if (gps.heading === null) gps.heading = heading;
+    else {
+      const diff = ((heading - gps.heading + 540) % 360) - 180;
+      if (Math.abs(diff) > 4) gps.heading = (gps.heading + diff * (Math.abs(diff) > 60 ? 0.8 : 0.45) + 360) % 360;
+    }
+  }
+  // Zeit seit dem letzten Standort: so lange gleitet das Fahrzeug zum neuen Punkt
+  const nowT = performance.now();
+  const dur = gps.fixAt ? Math.max(300, Math.min(1500, nowT - gps.fixAt)) : 0;
+  gps.fixAt = nowT;
   gps.speed = speed;
   gps.pos = cur;
   gps.alt = (c.altitude === null || c.altitude === undefined) ? null : c.altitude;
@@ -610,27 +621,54 @@ function onPosition(p) {
 
   if (!map) return;
   if (!meMarker) buildMeMarker();
-  meMarker.setLngLat([cur.lon, cur.lat]);
-  updateMeMarker();
+  let target = [cur.lon, cur.lat];
   if (typeof Nav !== 'undefined' && Nav.active) {
     Nav.update(cur);
     // auf der Route: Fahrzeug auf die Linie setzen, damit es nicht neben der Straße fährt
     const na = Nav.active;
-    if (na && na.mode === 'route' && na.joined && na.proj && na.off < 25) meMarker.setLngLat(na.proj);
+    if (na && na.mode === 'route' && na.joined && na.proj && na.off < 25) target = na.proj;
   }
+  moveMe(target, dur);
 
   if (!gps.hadFix) {
     gps.hadFix = true;
     if (gps.follow && !editor.open) map.jumpTo({ center: [cur.lon, cur.lat], zoom: Math.max(map.getZoom(), 14) });
   }
   const cam = gps.follow && !editor.open && typeof Nav !== 'undefined' ? Nav.camera(cur, speed) : null;
-  if (cam) { map.easeTo(cam); return; }
+  if (cam) {
+    // Kamera gleitet im selben Takt wie das Fahrzeug, gleichmäßig statt ruckweise
+    cam.duration = dur || 1000;
+    cam.easing = (t) => t;
+    gps.camBearing = cam.bearing;
+    map.easeTo(cam);
+    updateMeMarker();
+    return;
+  }
+  gps.camBearing = null;
   if (gps.follow && !editor.open) {
     const moving = speed !== null && speed > 1.5;
-    const opts = { center: [cur.lon, cur.lat], duration: 700, essential: true };
-    if (settings.headingUp && moving && gps.heading !== null) opts.bearing = gps.heading;
+    const opts = { center: target, duration: dur || 700, easing: (t) => t, essential: true };
+    if (settings.headingUp && moving && gps.heading !== null) { opts.bearing = gps.heading; gps.camBearing = gps.heading; }
     map.easeTo(opts);
   }
+  updateMeMarker();
+}
+
+/* Fahrzeug gleitet in „dur“ Millisekunden zum neuen Punkt statt zu springen */
+const meAnim = { raf: 0 };
+function moveMe(to, dur) {
+  if (!meMarker) return;
+  cancelAnimationFrame(meAnim.raf);
+  const from = meMarker.getLngLat();
+  const far = Math.abs(from.lng - to[0]) + Math.abs(from.lat - to[1]) > 0.02;   // > ~2 km: springen
+  if (!dur || far || document.hidden) { meMarker.setLngLat(to); return; }
+  const t0 = performance.now();
+  const step = (now) => {
+    const k = Math.min(1, (now - t0) / dur);
+    meMarker.setLngLat([from.lng + (to[0] - from.lng) * k, from.lat + (to[1] - from.lat) * k]);
+    if (k < 1) meAnim.raf = requestAnimationFrame(step);
+  };
+  meAnim.raf = requestAnimationFrame(step);
 }
 
 /* Eigene Position: Pfeil oder gewähltes Fahrzeug */
@@ -659,8 +697,16 @@ function updateMeMarker() {
   el.classList.toggle('nohead', gps.heading === null);
   if (gps.heading === null) return;
   if (!el.classList.contains('veh')) { meMarker.setRotation(gps.heading); return; }
-  const a = ((gps.heading - map.getBearing()) % 360 + 360) % 360;
-  el.querySelector('.me-dir').style.transform = `rotate(${a}deg)`;
+  // Beim Navigieren mit Karte in Fahrtrichtung zeigt es ohnehin nach oben: Richtungsring ausblenden statt wackeln lassen
+  const navUp = gps.follow && gps.camBearing !== null && gps.camBearing !== undefined && typeof Nav !== 'undefined' && Nav.active;
+  el.classList.toggle('nav-up', !!navUp);
+  const ref = gps.camBearing !== null && gps.camBearing !== undefined ? gps.camBearing : map.getBearing();
+  const a = ((gps.heading - ref) % 360 + 360) % 360;
+  // immer den kurzen Weg drehen (nicht von 359° rückwärts auf 1°)
+  const dirEl = el.querySelector('.me-dir');
+  const prev = dirEl._ang === undefined ? a : dirEl._ang;
+  dirEl._ang = prev + (((a - prev) % 360 + 540) % 360) - 180;
+  dirEl.style.transform = `rotate(${dirEl._ang}deg)`;
   const s = Math.sin(a * Math.PI / 180);
   if (s < -0.15) el.classList.add('left');
   else if (s > 0.15) el.classList.remove('left');
@@ -2701,11 +2747,15 @@ function setupSearchAndImport() {
 async function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   // Neue Version: einmal automatisch neu laden, damit Updates sofort greifen
+  // aber nie mitten im Navigieren, Zeichnen oder Herunterladen: dann erst, wenn die App im Hintergrund ist oder die Navigation endet
   let hadController = !!navigator.serviceWorker.controller;
+  const busy = () => downloads.size || (typeof Nav !== 'undefined' && Nav.active) || (typeof Draw !== 'undefined' && Draw.active);
+  window.reloadWhenIdle = () => { if (!window.pendingReload) return; if (busy()) return; window.pendingReload = false; location.reload(); };
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (hadController && !downloads.size) location.reload();
+    if (hadController) { window.pendingReload = true; if (!busy()) location.reload(); }
     hadController = true;
   });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) window.reloadWhenIdle(); });
   try {
     const reg = await navigator.serviceWorker.register('sw.js');
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });

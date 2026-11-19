@@ -358,7 +358,8 @@ html.dark .region-error { color: #FF8A8A; }
 .me.veh { width: 76px; height: 76px; }
 .me.veh::before { inset: 6px; }
 .me.veh::after { display: none; }
-.me.veh .me-dir { position: absolute; inset: 0; transition: transform .4s ease; }
+.me.veh .me-dir { position: absolute; inset: 0; transition: transform .8s ease-out; }
+.me.veh.nav-up .me-dir { display: none; }
 .me.veh .me-dir i { position: absolute; left: 50%; top: -1px; width: 0; height: 0; margin-left: -8px;
   border-left: 8px solid transparent; border-right: 8px solid transparent; border-bottom: 12px solid var(--accent);
   filter: drop-shadow(0 1px 2px rgba(0,0,0,.45)); }

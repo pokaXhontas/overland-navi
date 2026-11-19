@@ -856,6 +856,7 @@ const Nav = {
     this.draw();
     if (!silent) toast('Navigation beendet');
     if ('speechSynthesis' in window) speechSynthesis.cancel();
+    if (window.reloadWhenIdle) setTimeout(() => window.reloadWhenIdle(), 1500);   // aufgeschobenes Update jetzt laden
   },
 
   save() {
@@ -871,6 +872,10 @@ const Nav = {
       this.active = a;
       this.showUI(true);
       this.draw();
+      // Nach einem Neustart darf das iPhone erst nach einem Fingertipp wieder sprechen
+      if (this.voice) setTimeout(() => toast('Navigation läuft weiter. Einmal antippen, damit die Ansagen wieder klingen.', 30000, {
+        label: 'Ansagen an', run: () => { Pack.unlock(); this.say('Ansagen sind wieder an.', true); }
+      }), 1200);
     }
   },
 
