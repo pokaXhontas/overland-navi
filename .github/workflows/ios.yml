@@ -97,12 +97,24 @@ jobs:
           sips -s format jpeg "$ICON" --out /tmp/icon.jpg >/dev/null && sips -s format png /tmp/icon.jpg --out "$ICON" >/dev/null
           echo "Symbol: $ICON"
           plutil -p "$PL" | head -40
-          # Ton: Ansagen auch im Stummmodus hörbar, laufende Musik spielt weiter
+          # Ton: Ansagen auch im Stummmodus hörbar, laufende Musik spielt weiter (wird nur während einer Ansage leiser)
           AD=App/AppDelegate.swift
-          grep -q "import AVFoundation" "$AD" || sed -i '' 's/^import UIKit$/import UIKit\
-          import AVFoundation/' "$AD"
-          perl -0pi -e 's/(\/\/ Override point for customization after application launch\.\n)/$1        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .voicePrompt, options: [.mixWithOthers])\n/' "$AD"
-          grep -n "AVFoundation\|AVAudioSession" "$AD" || { echo "::error::AppDelegate nicht angepasst"; exit 1; }
+          sed -i '' 's/^import UIKit$/import UIKit\
+          import AVFoundation\
+          import CoreLocation/' "$AD"
+          perl -0pi -e 's/(\/\/ Override point for customization after application launch\.\n)/$1        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])\n/' "$AD"
+          # nativer Teil (Ansagen, Musik leiser, Navigation im Hintergrund) und eigener View-Controller, der ihn anmeldet
+          cat ../../ios-extra/OvlNative.swift >> "$AD"
+          SB=App/Base.lproj/Main.storyboard
+          sed -i '' 's/customClass="CAPBridgeViewController" customModule="Capacitor"/customClass="MainViewController" customModule="App" customModuleProvider="target"/' "$SB"
+          grep -q 'customClass="MainViewController"' "$SB" || { echo "::error::Main.storyboard nicht angepasst"; grep -n customClass "$SB"; exit 1; }
+          grep -n "^import\|AVAudioSession.sharedInstance().setCategory\|class MainViewController" "$AD" | head -12
+          # im Hintergrund weiter: Standort und Ton
+          $B -c "Delete :UIBackgroundModes" "$PL" 2>/dev/null || true
+          $B -c "Add :UIBackgroundModes array" "$PL"
+          $B -c "Add :UIBackgroundModes:0 string audio" "$PL"
+          $B -c "Add :UIBackgroundModes:1 string location" "$PL"
+          set_ NSLocationAlwaysAndWhenInUseUsageDescription "Damit die Navigation weiterläuft, wenn du kurz eine andere App öffnest oder der Bildschirm aus ist." string
 
       - name: Bauprobe für den Simulator (ohne Apple-Schlüssel)
         if: env.HAS_KEY != 'true'
@@ -132,7 +144,9 @@ jobs:
             -archivePath "$RUNNER_TEMP/App.xcarchive" archive \
             DEVELOPMENT_TEAM="$TEAM" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
             PRODUCT_BUNDLE_IDENTIFIER=io.github.pokaxhontas.overlandnavi \
-            MARKETING_VERSION=1.0 CURRENT_PROJECT_VERSION=$BUILD | tail -30
+            MARKETING_VERSION=1.0 CURRENT_PROJECT_VERSION=$BUILD > "$RUNNER_TEMP/build.log" 2>&1 \
+            || { grep -n -B2 -A4 "error:" "$RUNNER_TEMP/build.log" | head -120; tail -30 "$RUNNER_TEMP/build.log"; exit 1; }
+          tail -15 "$RUNNER_TEMP/build.log"
           cat > "$RUNNER_TEMP/export.plist" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

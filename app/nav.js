@@ -15,6 +15,7 @@ const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform 
 const Pack = {
   /* Stummschalter: „playback“ ist trotz Stummschalter hörbar (Musik pausiert kurz), „transient“ macht Musik nur leiser, schweigt aber im Stummmodus */
   session() {
+    if (typeof Native !== 'undefined' && Native.avail) return;   // die iPhone-App regelt den Ton selbst
     try { if (navigator.audioSession) navigator.audioSession.type = store.get('voiceSilent', true) ? 'playback' : 'transient'; } catch (e) { /* älteres iOS */ }
   },
   index: null, ctx: null, raw: new Map(), dec: new Map(), playing: [], el: null, elReady: false,
@@ -192,6 +193,54 @@ const Pack = {
   }
 };
 for (const ev of ['touchend', 'click', 'keydown']) document.addEventListener(ev, () => Pack.unlock(), { capture: true, passive: true });
+
+/* iPhone-App: eigener nativer Teil (OvlNative). Er spielt die Ansagen ab und dreht dabei Musik anderer Apps leiser,
+ * und er übernimmt während einer Route Standort und Ansagen – auch wenn die App im Hintergrund ist oder der Bildschirm aus.
+ * Im Browser und in älteren App-Versionen ohne diesen Teil bleibt alles wie bisher. */
+const Native = {
+  avail: false, sent: null, sig: '', err: '',
+  async init() {
+    const C = window.Capacitor;
+    if (!C || !C.nativePromise || !(C.isNativePlatform && C.isNativePlatform())) return;
+    try { this.info = await C.nativePromise('OvlNative', 'info', {}); this.avail = true; } catch (e) { this.err = (e && e.message) || String(e); }
+  },
+  call(method, opts) { return window.Capacitor.nativePromise('OvlNative', method, opts || {}); },
+  voiceOpts(nav) {
+    const pv = nav.packVoice();
+    return { on: !!nav.voice, voice: pv || '', voiceId: pv ? '' : store.get('navVoiceURI', ''), rate: +store.get('navRate', 1) || 1 };
+  },
+  /* Route an den nativen Teil geben (nur wenn sie neu ist oder sich die Stimme geändert hat) */
+  sync(nav) {
+    const a = nav.active;
+    if (!this.avail || !a || a.mode !== 'route') return false;
+    const v = this.voiceOpts(nav);
+    const sig = JSON.stringify(v);
+    if (this.sent === a) {
+      if (this.sig !== sig) { this.sig = sig; this.call('navVoice', v).catch(() => {}); }
+      return true;
+    }
+    this.sent = a; this.sig = sig;
+    const mans = a.maneuvers.filter((m) => m.type !== 1 && m.type !== 2 && m.type !== 3).map((m) => ({
+      at: m.at, act: nav.actKey(m), alert: m.alert || '', verbal: m.verbal || '', tts: !!m.tts, t41: m.type === 41, skip: m.type === 27,
+      st: a.spoken[m.idx + ':' + m.at] || 0
+    }));
+    const tolls = (a.tolls || []).map((t) => ({ at: t.at, st: a.spoken['toll:' + Math.round(t.at)] ? 1 : 0 }));
+    this.call('startNav', {
+      ...v,
+      coords: a.coords.map((c) => [+c[0].toFixed(6), +c[1].toFixed(6)]),
+      cum: a.cum.map((x) => Math.round(x * 10) / 10),
+      total: a.total, mans, tolls, joined: !!a.joined, foot: a.travel === 'foot',
+      target: { lat: a.target.lat, lon: a.target.lon }
+    }).catch((e) => { this.sent = null; this.err = (e && e.message) || String(e); });
+    return true;
+  },
+  stop() {
+    if (!this.avail || !this.sent) return;
+    this.sent = null; this.sig = '';
+    this.call('stopNav').catch(() => {});
+  }
+};
+Native.init();
 
 /* Straßennetz-Dateien für das Offline-Routing (eine pro Land, im gleichen Download-Bereich wie die Wanderwege) */
 const RouteData = {
@@ -935,6 +984,7 @@ const Nav = {
     if (!silent) toast('Navigation beendet');
     if ('speechSynthesis' in window) speechSynthesis.cancel();
     Pack.stop();
+    Native.stop();
     if (window.reloadWhenIdle) setTimeout(() => window.reloadWhenIdle(), 1500);   // aufgeschobenes Update jetzt laden
   },
 
@@ -1031,7 +1081,7 @@ const Nav = {
   esc(s) { return String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c])); },
 
   /* Hinweis vor Maut-Abschnitten (Brücken, Tunnel, Autobahnen) */
-  tollAlert() {
+  tollAlert(silent) {
     const a = this.active;
     for (const t of a.tolls || []) {
       const d = t.at - a.along;
@@ -1040,12 +1090,13 @@ const Nav = {
         a.spoken[key] = 1;
         const what = t.names.length ? ': ' + t.names.slice(0, 2).join(', ') : '';
         toast('€ Mautpflichtiger Abschnitt in ' + fmtDist(d) + what, 6000);
-        this.say('In ' + this.speakDist(d) + ' beginnt ein mautpflichtiger Abschnitt.', false, [this.distKey(d), 'toll']);
+        if (!silent) this.say('In ' + this.speakDist(d) + ' beginnt ein mautpflichtiger Abschnitt.', false, [this.distKey(d), 'toll']);
       }
     }
   },
 
   announce() {
+    if (Native.sync(this)) { this.tollAlert(true); return; }   // iPhone-App: Ansagen macht der native Teil (auch im Hintergrund)
     this.tollAlert();
     const a = this.active, m = this.next();
     if (!m || m.type === 27) return;
@@ -1069,7 +1120,7 @@ const Nav = {
   },
 
   arrive() {
-    this.say('Du hast dein Ziel erreicht.', false, ['arrived']);
+    if (!Native.sent) this.say('Du hast dein Ziel erreicht.', false, ['arrived']);
     toast('Ziel erreicht: ' + (this.active.target.name || ''), 4000);
     this.stop(true);
   },
@@ -1344,6 +1395,19 @@ const Nav = {
 
   say(text, force, keys) {
     if ((!this.voice && !force) || !text) return Promise.resolve(false);
+    if (Native.avail) {
+      // iPhone-App: nativ abspielen, Musik wird dabei leiser; klappt das nicht, wie bisher über die Webseite
+      const v = Native.voiceOpts(this);
+      return Native.call('speak', { voice: keys && keys.length ? v.voice : '', voiceId: v.voiceId, keys: keys || [], text, rate: v.rate }).then((r) => {
+        Pack.how = 'nativ' + (r && r.how ? ' (' + r.how + ')' : '');
+        Pack.endsAt = Date.now() + ((r && r.dur) || 1.8) * 1000;
+        return true;
+      }).catch((e) => { Native.err = (e && e.message) || String(e); return this.sayWeb(text, force, keys); });
+    }
+    return this.sayWeb(text, force, keys);
+  },
+
+  sayWeb(text, force, keys) {
     const pv = this.packVoice();
     if (pv && keys && keys.length) {
       return Pack.play(pv, keys, store.get('navRate', 1)).then(() => true).catch(() => {
@@ -1438,6 +1502,8 @@ const Nav = {
       el.checked = store.get(key, true);
       el.onchange = () => { store.set(key, el.checked); if (this.active && gps.pos) this.follow(); };
     }
+    // iPhone-App: Musik wird nur leiser, nicht angehalten
+    setTimeout(() => { if (Native.avail) { const sm = $('#voice-silent').closest('label').querySelector('small'); if (sm) sm.textContent = 'Am iPhone trotz Stummschalter hörbar. Läuft Musik, wird sie während der Ansage leiser.'; } }, 1500);
     const silent = $('#voice-silent');
     silent.checked = store.get('voiceSilent', true);
     silent.onchange = () => { store.set('voiceSilent', silent.checked); Pack.unlock(); };
