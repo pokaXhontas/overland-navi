@@ -362,6 +362,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   console.log('Menü nach Wischen nach rechts (Bereich):', await page.evaluate(() => (!$('#sec-look').hidden ? 'Bereich offen' : 'Übersicht') + ', ' + ($('#sheet').hidden ? 'zu' : 'offen')));
   await drag('#sheet', 300, 0);
   console.log('Menü nach Wischen nach rechts (Übersicht):', await page.evaluate(() => $('#sheet').hidden ? 'zu' : 'offen'));
+  console.log('Land ohne Internet:', await page.evaluate(async () => {
+    const cc = await Lists.countryCoder();
+    if (!cc) return 'FEHLER: Ländergrenzen nicht geladen';
+    return [[77.1, 42.6], [-21.9, 64.1], [9.0, 40.0], [13.4, 52.5]].map((c) => cc.iso1A2Code(c)).join(' ');
+  }));
   console.log('Papierkorb:', await page.evaluate(async () => {
     const n0 = places.length;
     const p = { id: 990001, name: 'Probe-Papierkorb', lat: 42.5, lon: 74.6, cat: 'wild', list: 'mine', photos: [], time: new Date().toISOString(), updated: new Date().toISOString() };
