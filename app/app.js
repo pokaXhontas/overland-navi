@@ -2215,6 +2215,7 @@ function updateTracksSource() {
   const src = map && map.getSource('tracks');
   if (src) src.setData(tracksGeoJSON());
   renderTrackList();
+  if (typeof Lists !== 'undefined') Lists.renderChips();
 }
 async function saveTrack(t) { t.updated = new Date().toISOString(); await DB.run('tracks', 'readwrite', (s) => s.put(t)); if (typeof Sync !== 'undefined') Sync.soon(); }
 
@@ -2322,6 +2323,50 @@ function setCatHidden(id, hidden) {
   const ts = map && map.getSource('tracks');
   if (ts) ts.setData(tracksGeoJSON());
   renderDataCats();
+  if (typeof Lists !== 'undefined') Lists.renderChips();
+}
+
+/* Leiste „x von y an · Alle an · Alle aus“ über einer Reihe von Schaltern.
+ * count() → [an, gesamt]; setAll(true/false) schaltet alle. Einzelne Schalter darunter aktualisieren die Zählung mit. */
+function bulkBar(box, { count, setAll, noun, before = null }) {
+  const [, total0] = count();
+  box._bulkUpd = null;
+  if (total0 < 2) return null;
+  const bar = document.createElement('div');
+  bar.className = 'bulk-bar';
+  bar.innerHTML = '<span class="bulk-n"></span><button type="button" class="bulk-btn" data-on="1">Alle an</button><button type="button" class="bulk-btn" data-on="0">Alle aus</button>';
+  const upd = () => {
+    const [on, total] = count();
+    bar.querySelector('.bulk-n').textContent = `${on} von ${total}${noun ? ' ' + noun : ''} an`;
+    bar.querySelector('[data-on="1"]').disabled = on === total;
+    bar.querySelector('[data-on="0"]').disabled = on === 0;
+  };
+  for (const b of bar.querySelectorAll('.bulk-btn')) b.onclick = async (e) => { e.stopPropagation(); await setAll(b.dataset.on === '1'); upd(); };
+  box._bulkUpd = upd;
+  if (!box._bulkL) { box._bulkL = true; box.addEventListener('change', () => setTimeout(() => box._bulkUpd && box._bulkUpd(), 0)); }
+  upd();
+  box.insertBefore(bar, before || box.firstChild);
+  return bar;
+}
+
+/* Alle Tracks auf einmal ein- oder ausblenden („Alle an“ schaltet auch den Hauptschalter ein) */
+async function setAllTracks(on) {
+  for (const t of tracks) if (!!t.visible !== on) { t.visible = on; await saveTrack(t); }
+  if (on && settings.hidden.includes('tracks')) setCatHidden('tracks', false);
+  updateTracksSource();
+  renderDataCats();
+}
+
+/* Alle Kategorien auf einmal ein- oder ausblenden */
+function setAllCats(on, ids) {
+  const set = new Set(settings.hidden);
+  for (const id of ids) { if (on) set.delete(id); else set.add(id); }
+  settings.hidden = [...set];
+  store.set('hiddenCats', settings.hidden);
+  const ps = map && map.getSource('places');
+  if (ps) ps.setData(placesGeoJSON());
+  renderDataCats();
+  if (typeof Lists !== 'undefined') Lists.renderChips();
 }
 
 function renderDataCats() {
@@ -2343,7 +2388,9 @@ function renderDataCats() {
     sw.onchange = () => setCatHidden('tracks', !sw.checked);
     tbox.appendChild(all);
     renderTracksByCountry(tbox);
+    bulkBar(tbox, { count: () => [tracks.filter((t) => t.visible).length, tracks.length], setAll: setAllTracks, noun: 'Tracks', before: all.nextSibling });
   }
+  const shownCats = [];
   for (const c of CATS) {
     const n = catItems(c.id).length;
     if (!n && !c.custom && c.id !== 'tracks' && ['natur', 'gewaesser', 'strand', 'kultur', 'ort', 'unterkunft', 'essen', 'einkauf'].includes(c.id)) continue;   // neue feste Kategorien erst zeigen, wenn etwas drin ist
@@ -2359,7 +2406,9 @@ function renderDataCats() {
     sw.setAttribute('aria-label', c.label + ' auf der Karte zeigen');
     sw.onchange = () => setCatHidden(c.id, !sw.checked);
     box.appendChild(c.custom ? Swipe.row(row, { onDelete: () => Trash.catDel(c.id) }) : row);
+    shownCats.push(c.id);
   }
+  bulkBar(box, { count: () => [shownCats.filter((id) => !settings.hidden.includes(id)).length, shownCats.length], setAll: (on) => setAllCats(on, shownCats), noun: 'Kategorien' });
 }
 
 function openCatPage(id) {

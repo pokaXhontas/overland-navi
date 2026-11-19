@@ -1064,3 +1064,11 @@ a.add-region { text-decoration: none; color: inherit; box-sizing: border-box; }
 #track-list .sw-row.in-cc { margin-left: 14px; }
 
 .diag{white-space:pre-wrap;font-size:12px;line-height:1.45;background:var(--line);border-radius:12px;padding:10px 12px;margin:8px 0 0;user-select:text;-webkit-user-select:text}
+
+/* „Alle an / Alle aus“ über einer Reihe von Schaltern */
+.bulk-bar { display: flex; align-items: center; gap: 8px; flex: 1 0 100%; padding: 6px 0 8px; }
+.bulk-n { flex: 1; min-width: 0; color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bulk-btn { height: 32px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel-solid); color: var(--text); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.bulk-btn:disabled { opacity: .4; }
+.bulk-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lp-row small { display: block; color: var(--muted); font-size: 12px; }

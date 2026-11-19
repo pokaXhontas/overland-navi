@@ -371,6 +371,15 @@ const Hike = {
         };
         box.appendChild(b);
       }
+      const keys = Object.entries(HK_PTS).filter(([, c]) => c.g === grp && c.g !== 'water' && c.g !== 'service').map(([k]) => k);
+      bulkBar(box, { count: () => [keys.filter((k) => this.pts().includes(k)).length, keys.length], noun: '', setAll: (on) => {
+        const set = new Set(this.pts());
+        for (const k of keys) { if (on) set.add(k); else set.delete(k); }
+        store.set('hikePts', Object.keys(HK_PTS).filter((x) => set.has(x)));
+        store.set('hikePtsKnown', Object.keys(HK_PTS));
+        this.renderSheet();
+        refreshStyle();
+      } });
     }
     document.querySelectorAll('[data-hkmax]').forEach((b) => b.setAttribute('aria-checked', String(+b.dataset.hkmax === this.max())));
     const legend = $('#hk-legend');

@@ -122,25 +122,28 @@ const Lists = {
   /* ---------- Schnellschalter: Knopf in der rechten Leiste, daneben ein kleines Fenster ----------
    * Nur zum schnellen Ein- und Ausblenden unterwegs; verwaltet werden Listen im Menü → Listen. */
   usedLists() { return this.all.filter((l) => places.some((p) => (p.list || 'mine') === l.id)); },
+  tracksOn() { return typeof tracks !== 'undefined' && tracks.length > 0 && !settings.hidden.includes('tracks') && tracks.some((t) => t.visible); },
   renderChips() {
     const btn = $('#btn-lists');
     if (!btn) return;
-    const used = this.usedLists();
-    btn.hidden = used.length < 2;
+    const hasT = typeof tracks !== 'undefined' && tracks.length > 0;
+    // Punkte im Knopf: Listen, dazu Tracks als eigener Eintrag
+    const items = [...this.usedLists().map((l) => ({ color: l.color, on: !!l.on })), ...(hasT ? [{ color: TRACK_CAT.color, on: this.tracksOn() }] : [])];
+    btn.hidden = items.length < 2;
     if (btn.hidden) { this.closeQuick(); return; }
     const g = $('#lq-grid');
     g.innerHTML = '';
-    const show = used.length > 4 ? used.slice(0, 3) : used;
-    for (const l of show) {
+    const show = items.length > 4 ? items.slice(0, 3) : items;
+    for (const it of show) {
       const d = document.createElement('span');
-      d.style.background = l.color;
-      if (!l.on) d.className = 'off';
+      d.style.background = it.color;
+      if (!it.on) d.className = 'off';
       g.appendChild(d);
     }
-    if (used.length > 4) { const m = document.createElement('span'); m.className = 'more'; m.textContent = '+'; g.appendChild(m); }
-    const n = used.filter((l) => l.on).length;
-    btn.setAttribute('aria-label', `Listen auf der Karte: ${n} von ${used.length} sichtbar`);
-    btn.classList.toggle('some-off', n < used.length);
+    if (items.length > 4) { const m = document.createElement('span'); m.className = 'more'; m.textContent = '+'; g.appendChild(m); }
+    const n = items.filter((it) => it.on).length;
+    btn.setAttribute('aria-label', `Listen und Tracks auf der Karte: ${n} von ${items.length} sichtbar`);
+    btn.classList.toggle('some-off', n < items.length);
     if (!$('#list-pop').hidden) this.renderQuick();
   },
   renderQuick() {
@@ -157,7 +160,36 @@ const Lists = {
       sw.onchange = () => { l.on = sw.checked; this.saveMeta(); this.refresh(); };
       box.appendChild(row);
     }
-    $('#lp-all').hidden = this.usedLists().every((l) => l.on);
+    if (tracks.length) {
+      // Tracks: ein Schalter für alle Tracks (wie im Menü „Tracks auf der Karte“)
+      const row = document.createElement('label');
+      row.className = 'row lp-row';
+      row.innerHTML = '<span class="lp-dot"></span><span><b>Tracks</b><small></small></span><input type="checkbox" class="switch">';
+      row.querySelector('.lp-dot').style.background = TRACK_CAT.color;
+      const vis = tracks.filter((t) => t.visible).length;
+      row.querySelector('small').textContent = vis === tracks.length ? `${tracks.length}` : `${vis} von ${tracks.length}`;
+      const sw = row.querySelector('.switch');
+      sw.checked = this.tracksOn();
+      sw.onchange = async () => {
+        if (sw.checked && !tracks.some((t) => t.visible)) await setAllTracks(true);
+        else setCatHidden('tracks', !sw.checked);
+        this.renderChips();
+      };
+      box.appendChild(row);
+    }
+    const used = this.usedLists();
+    bulkBar(box, {
+      count: () => [used.filter((l) => l.on).length + (tracks.length && this.tracksOn() ? 1 : 0), used.length + (tracks.length ? 1 : 0)],
+      noun: '',
+      setAll: async (on) => {
+        for (const l of used) l.on = on;
+        this.saveMeta();
+        if (tracks.length) { if (on) await setAllTracks(true); else setCatHidden('tracks', true); }
+        this.refresh();
+        this.renderLists();
+      }
+    });
+    $('#lp-all').hidden = true;
     this.placeQuick();
   },
   placeQuick() {
@@ -244,6 +276,15 @@ const Lists = {
       sw.onchange = () => { l.on = sw.checked; this.saveMeta(); this.refresh(); };
       box.appendChild(own ? row : Swipe.row(row, { onDelete: () => Trash.listDel(l.id) }));
     }
+    bulkBar(box, { count: () => [this.all.filter((l) => l.on).length, this.all.length], setAll: (on) => this.setAllLists(on, this.all), noun: 'Listen' });
+  },
+  /* alle (gezeigten) Listen auf einmal ein- oder ausblenden */
+  setAllLists(on, lists) {
+    for (const l of lists) l.on = on;
+    this.saveMeta();
+    this.refresh();
+    this.renderLists();
+    if (typeof Menu !== 'undefined') Menu.refresh();
   },
   openList(id) {
     this.open = id;
@@ -320,6 +361,13 @@ const Lists = {
         box.appendChild(list);
       }
     }
+    bulkBar(box, { count: () => [ccs.filter(([cc]) => !l.hidden.includes(cc)).length, ccs.length], noun: 'Länder', setAll: (on) => {
+      l.hidden = on ? [] : ccs.map(([cc]) => cc);
+      if (on) l.on = true;   // „Alle an“ zeigt die Liste auch wieder
+      this.saveMeta();
+      this.refresh();
+      this.renderLists();
+    } });
   },
   /* eine Zeile für einen Ort (in Listen- und Kategorieseite), mit Haken im Auswahlmodus */
   itemRow(p) {

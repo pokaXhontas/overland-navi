@@ -412,9 +412,12 @@ const Sync = {
     } else if (d.scope.type === 'all') {
       tick('Tracks mit abgleichen', d.withTracks, (v) => { d.withTracks = v; });
     } else if (d.scope.type === 'lists') {
+      bulkBar(box, { count: () => [d.scope.lists.length, Lists.all.length], noun: 'Listen', setAll: (on) => { d.scope.lists = on ? Lists.all.map((l) => l.id) : []; this.renderNew(); } });
       for (const l of Lists.all) tick(`${l.name} (${places.filter((p) => (p.list || 'mine') === l.id).length})`, d.scope.lists.includes(l.id), (v) => { d.scope.lists = v ? [...d.scope.lists, l.id] : d.scope.lists.filter((x) => x !== l.id); },
         `<span class="pi-icon${l.id === 'mine' ? ' own' : ' sq'} mini" style="background:${l.color}"></span>`);
     } else if (d.scope.type === 'cats') {
+      const cs = CATS.filter((c) => c.custom || places.some((p) => p.cat === c.id)).map((c) => c.id);
+      bulkBar(box, { count: () => [d.scope.cats.filter((id) => cs.includes(id)).length, cs.length], noun: 'Kategorien', setAll: (on) => { d.scope.cats = on ? [...cs] : []; this.renderNew(); } });
       for (const c of CATS) { const n = places.filter((p) => p.cat === c.id).length; if (n || c.custom) tick(`${c.label} (${n})`, d.scope.cats.includes(c.id), (v) => { d.scope.cats = v ? [...d.scope.cats, c.id] : d.scope.cats.filter((x) => x !== c.id); }, `<span class="pi-icon own mini" style="background:${c.color}"></span>`); }
     }
     for (const b of $('#sn-rights').querySelectorAll('button')) { b.setAttribute('aria-checked', String((b.dataset.w === '1') === d.write)); b.onclick = () => { d.write = b.dataset.w === '1'; this.renderNew(); }; }
