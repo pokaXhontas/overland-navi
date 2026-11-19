@@ -95,7 +95,7 @@ jobs:
         run: |
           if [ -d App.xcworkspace ]; then T="-workspace App.xcworkspace"; else T="-project App.xcodeproj"; fi
           xcodebuild $T -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO build | tail -30
+            CODE_SIGNING_ALLOWED=NO build 2>&1 | tail -30; test ${PIPESTATUS[0]} -eq 0
           echo "Bauprobe erfolgreich. Für TestFlight fehlen noch die Apple-Secrets (siehe native/README.md)."
 
       - name: Signieren und zu TestFlight hochladen
@@ -107,14 +107,15 @@ jobs:
           ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
           TEAM: ${{ secrets.APPLE_TEAM_ID }}
         run: |
+          set -o pipefail
           KEY="$RUNNER_TEMP/AuthKey.p8"
           printf '%s\n' "$ASC_KEY_P8" > "$KEY"
           AUTH="-allowProvisioningUpdates -authenticationKeyPath $KEY -authenticationKeyID $ASC_KEY_ID -authenticationKeyIssuerID $ASC_ISSUER_ID"
           if [ -d App.xcworkspace ]; then T="-workspace App.xcworkspace"; else T="-project App.xcodeproj"; fi
           BUILD=$(( ${{ github.run_number }} + 100 ))
           xcodebuild $T -scheme App -configuration Release -destination 'generic/platform=iOS' \
-            -archivePath "$RUNNER_TEMP/App.xcarchive" archive $AUTH \
-            DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" archive \
+            DEVELOPMENT_TEAM="$TEAM" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
             PRODUCT_BUNDLE_IDENTIFIER=io.github.pokaxhontas.overlandnavi \
             MARKETING_VERSION=1.0 CURRENT_PROJECT_VERSION=$BUILD | tail -30
           cat > "$RUNNER_TEMP/export.plist" <<EOF
@@ -128,6 +129,7 @@ jobs:
             <key>manageAppVersionAndBuildNumber</key><false/>
           </dict></plist>
           EOF
+          # erst beim Export signieren: Apple erstellt das Verteilungszertifikat selbst (ohne registrierte Geräte)
           xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" -exportOptionsPlist "$RUNNER_TEMP/export.plist" \
             -exportPath "$RUNNER_TEMP/out" $AUTH | tail -30
           echo "Hochgeladen: Version 1.0 ($BUILD). In App Store Connect → TestFlight erscheint sie nach der Verarbeitung (meist 5–30 Minuten)."
