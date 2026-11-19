@@ -239,6 +239,14 @@ const BKK = { lat: 42.8746, lon: 74.5698 };
     P('Bergbäckerei Karakol', 42.49, 78.39, 'essen', F, 'kg');
     P('Strand Bosteri', 42.64, 77.17, 'strand', F, 'kg');
     savePlaces();
+    // Beispiel-Tracks, damit sie im Schnellmenü und unter „Tracks“ auftauchen
+    for (const [name, pts] of [['Kochkor–Song-Köl', [[75.12, 42.21], [75.3, 42.05], [75.12, 41.9]]], ['Barskoon-Pass', [[77.6, 42.1], [77.7, 41.9], [77.75, 41.75]]]]) {
+      if (tracks.some((t) => t.name === name)) continue;
+      const t = { id: 'trk-demo-' + name, name, color: TRACK_COLORS[tracks.length % TRACK_COLORS.length], segments: [pts], visible: true, created: Date.now(), source: 'Beispiel' };
+      t.length = trackLength(pts);
+      tracks.push(t);
+    }
+    updateTracksSource();
     Lists.refresh();
   });
 

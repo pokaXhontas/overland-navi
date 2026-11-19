@@ -1072,3 +1072,6 @@ a.add-region { text-decoration: none; color: inherit; box-sizing: border-box; }
 .bulk-btn:disabled { opacity: .4; }
 .bulk-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .lp-row small { display: block; color: var(--muted); font-size: 12px; }
+/* im schmalen Schnellfenster nur die beiden Knöpfe, die Schalter zeigen den Stand selbst */
+.list-pop .bulk-n { display: none; }
+.list-pop .bulk-btn { flex: 1; }
