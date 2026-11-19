@@ -219,6 +219,9 @@ const Native = {
     }
     const heads = (C.PluginHeaders || []).map((h) => h.name).join(', ');
     this.err = (errs.join(' | ') || 'kein Weg (' + Object.keys(C).join(', ') + ')') + (heads ? ' · bekannt: ' + heads : '');
+    // der native Teil wird evtl. erst kurz nach dem Start angemeldet: später noch einmal fragen
+    this.tries = (this.tries || 0) + 1;
+    if (this.tries < 4) setTimeout(() => { if (!this.avail) this.init(); }, 2500 * this.tries);
   },
   call(method, opts) { return this.fn(method, opts || {}); },
   voiceOpts(nav) {

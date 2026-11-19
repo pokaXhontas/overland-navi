@@ -1651,7 +1651,8 @@ async function runDiag() {
   L.push('Mitgelieferte Stimmen: ' + ((Pack.index && Pack.index.voices.length) || 0) + (Pack.loadError ? ' (' + Pack.loadError + ')' : ''));
   L.push('Gewählte Stimme: ' + (store.get('navVoiceURI', '') || 'Standard') + ' → ' + (Nav.packVoice() || 'Gerätestimme'));
   L.push('Audio-Sitzung (Stummschalter): ' + (navigator.audioSession ? navigator.audioSession.type : 'nicht vorhanden'));
-  L.push('Nativer Teil (Ansagen, Hintergrund): ' + (Native.avail ? 'ja (' + Native.via + ') · Hintergrund: ' + (((Native.info || {}).background || []).join(', ') || 'nein') : 'nein' + (Native.err ? ' (' + Native.err + ')' : '')));
+  if (!Native.avail && window.Capacitor) { Native.tries = 3; await Native.init(); }
+  L.push('Nativer Teil (Ansagen, Hintergrund): ' + (Native.avail ? 'ja (' + Native.via + ((Native.info || {}).by ? ', ' + Native.info.by : '') + ') · Hintergrund: ' + (((Native.info || {}).background || []).join(', ') || 'nein') : 'nein' + (Native.err ? ' (' + Native.err + ')' : '')));
   if (Native.avail) {
     try { const r = await Native.call('speak', { voice: Nav.packVoice() || '', keys: ['voice_on'], text: 'Sprachansagen an.', rate: 1 }); L.push('  Nativ abspielen: ok (' + (r.how || '') + ', ' + (r.dur || 0).toFixed(1) + ' s)'); await new Promise((res) => setTimeout(res, 1600)); }
     catch (e) { L.push('  Nativ abspielen: FEHLER ' + ((e && e.message) || e)); }

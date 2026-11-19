@@ -95,7 +95,7 @@ public class OvlNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDele
     }
 
     @objc func info(_ call: CAPPluginCall) {
-        call.resolve(["version": 1, "background": Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String] ?? []])
+        call.resolve(["version": 2, "by": OvlNativeBoot.registeredBy, "background": Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String] ?? []])
     }
 
     @objc func speak(_ call: CAPPluginCall) {
@@ -301,5 +301,35 @@ public class OvlNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDele
 class MainViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         bridge?.registerPluginInstance(OvlNativePlugin())
+        OvlNativeBoot.registeredBy = "beim Start"
+    }
+}
+
+/// Zweiter Weg: nach dem Start den Capacitor-View-Controller suchen und den nativen Teil dort anmelden,
+/// falls der eigene View-Controller nicht benutzt wird (je nach Capacitor-Version)
+enum OvlNativeBoot {
+    nonisolated(unsafe) static var registeredBy = ""
+    nonisolated(unsafe) static var observer: NSObjectProtocol?
+    static func start() {
+        observer = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in tryRegister() }
+        for t in [0.3, 1.0, 3.0] { DispatchQueue.main.asyncAfter(deadline: .now() + t) { tryRegister() } }
+    }
+    static func tryRegister() {
+        for scene in UIApplication.shared.connectedScenes {
+            guard let ws = scene as? UIWindowScene else { continue }
+            for w in ws.windows {
+                guard let vc = find(w.rootViewController), let b = vc.bridge else { continue }
+                if b.plugin(withName: "OvlNative") == nil {
+                    b.registerPluginInstance(OvlNativePlugin())
+                    registeredBy = "nachträglich (" + String(describing: type(of: vc)) + ")"
+                }
+            }
+        }
+    }
+    static func find(_ vc: UIViewController?) -> CAPBridgeViewController? {
+        guard let vc = vc else { return nil }
+        if let b = vc as? CAPBridgeViewController { return b }
+        for c in vc.children { if let f = find(c) { return f } }
+        return find(vc.presentedViewController)
     }
 }

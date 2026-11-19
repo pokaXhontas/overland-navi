@@ -102,13 +102,14 @@ jobs:
           sed -i '' 's/^import UIKit$/import UIKit\
           import AVFoundation\
           import CoreLocation/' "$AD"
-          perl -0pi -e 's/(\/\/ Override point for customization after application launch\.\n)/$1        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])\n/' "$AD"
+          perl -0pi -e 's/(\/\/ Override point for customization after application launch\.\n)/$1        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])\n        OvlNativeBoot.start()\n/' "$AD"
           # nativer Teil (Ansagen, Musik leiser, Navigation im Hintergrund) und eigener View-Controller, der ihn anmeldet
           cat ../../ios-extra/OvlNative.swift >> "$AD"
           SB=App/Base.lproj/Main.storyboard
           sed -i '' 's/customClass="CAPBridgeViewController" customModule="Capacitor"/customClass="MainViewController" customModule="App" customModuleProvider="target"/' "$SB"
           grep -q 'customClass="MainViewController"' "$SB" || { echo "::error::Main.storyboard nicht angepasst"; grep -n customClass "$SB"; exit 1; }
-          grep -n "^import\|AVAudioSession.sharedInstance().setCategory\|class MainViewController" "$AD" | head -12
+          grep -n "^import\|AVAudioSession.sharedInstance().setCategory\|OvlNativeBoot.start\|class MainViewController" "$AD" | head -12
+          grep -q "OvlNativeBoot.start()" "$AD" || { echo "::error::Startaufruf fehlt"; exit 1; }
           # im Hintergrund weiter: Standort und Ton
           $B -c "Delete :UIBackgroundModes" "$PL" 2>/dev/null || true
           $B -c "Add :UIBackgroundModes array" "$PL"
