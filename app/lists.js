@@ -67,6 +67,14 @@ const Lists = {
     if (!l.on || settings.hidden.includes(p.cat)) return false;
     return !(l.hidden.length && l.hidden.includes(p.cc || '-'));
   },
+  hiddenWhy(p) {
+    const l = this.get(p.list || 'mine');
+    if (p.lat === null || p.lat === undefined) return 'keine Position';
+    if (!l.on) return `Liste „${l.name}“ ist ausgeblendet`;
+    if (settings.hidden.includes(p.cat)) return `Kategorie „${(CAT[p.cat] || CAT.other).label}“ ist ausgeblendet`;
+    if (l.hidden.length && l.hidden.includes(p.cc || '-')) return 'dieses Land ist in der Liste ausgeblendet';
+    return '';
+  },
   icon(p) { return this.isOwn(p) ? 'cat-' + p.cat : `sq-${p.list}-${p.cat}`; },
   sqImage(id) {
     const m = id.match(/^sq-(.+)-([^-]+)$/);
@@ -323,6 +331,15 @@ const Lists = {
     b.innerHTML = (this.sel.active ? `<span class="sel-box" aria-hidden="true">${svgPath('m5 12 5 5 9-10')}</span>` : '') + ic + '<span class="pi-txt"><b></b><small></small></span>';
     b.querySelector('b').textContent = p.name;
     b.querySelector('small').textContent = [c.label, own ? '' : l.name, p.note ? p.note.slice(0, 50) : ''].filter(Boolean).join(' · ') || ' ';
+    // in der Liste, aber nicht auf der Karte: sagen, warum
+    const why = this.hiddenWhy(p);
+    if (why) {
+      b.classList.add('off-map');
+      const w = document.createElement('em');
+      w.className = 'pi-why';
+      w.textContent = 'Nicht auf der Karte: ' + why;
+      b.querySelector('.pi-txt').appendChild(w);
+    }
     b.setAttribute('aria-pressed', this.sel.active ? String(this.sel.ids.has(p.id)) : 'false');
     b.onclick = () => {
       if (this.sel.active) { this.toggleSel(p.id); b.classList.toggle('selected', this.sel.ids.has(p.id)); b.setAttribute('aria-pressed', String(this.sel.ids.has(p.id))); return; }
