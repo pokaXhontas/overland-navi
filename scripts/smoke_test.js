@@ -19,13 +19,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   page.on('pageerror', (e) => errors.push('Seitenfehler: ' + e.message));
   page.on('console', (m) => { if (m.type() === 'error') errors.push('Konsole: ' + m.text().slice(0, 200)); });
   await page.setGeolocation({ latitude: 42.8746, longitude: 74.5698, accuracy: 10 });
-  await page.goto(SITE, { waitUntil: 'networkidle2', timeout: 60000 });
+  await page.goto(SITE, { waitUntil: 'load', timeout: 90000 });
   await page.waitForFunction(() => typeof map !== 'undefined' && map && map.loaded(), { timeout: 60000 });
   await sleep(4000);
   const shot = async (name) => { await sleep(2500); await page.screenshot({ path: `shots/${name}.png` }); console.log('Foto:', name); };
 
   // Stimmen
-  console.log('Stimmen:', await page.evaluate(async () => { await Pack.load(); const v = Nav.packVoice(); let ok = 'nicht gespielt'; try { await Pack.play(v, ['d300', 'right'], 1); ok = 'abgespielt'; } catch (e) { ok = 'Fehler ' + e.message; } return Pack.index.voices.map((x) => x.name).join(', ') + ' | Standard: ' + v + ' | Probe: ' + ok + ' | Auswahl: ' + document.querySelectorAll('#voice-select option').length + ' Einträge'; }));
+  console.log('Stimmen:', await page.evaluate(async () => { await Pack.load(); const v = Nav.packVoice(); let ok = 'nicht gespielt'; try { await Pack.play(v, ['d300', 'right'], 1); ok = 'abgespielt über ' + Pack.how; } catch (e) { ok = 'Fehler ' + e.message; } return Pack.index.voices.map((x) => x.name).join(', ') + ' | Standard: ' + v + ' | Probe: ' + ok + ' | Auswahl: ' + document.querySelectorAll('#voice-select option').length + ' Einträge'; }));
 
   // Fahrzeug als Positionssymbol
   await page.evaluate(() => {
@@ -431,4 +431,4 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const real = errors.filter((e) => !/Failed to load resource|ERR_|404|tiles\/dem/.test(e));
   console.log(real.length ? 'Fehler:\n' + real.join('\n') : 'Keine Fehler im Browser');
   process.exit(real.length || !veh || info.mode !== 'route' ? 1 : 0);
-})().catch((e) => { console.error(e); process.exit(1); });
+})().catch((e) => { console.error(e); if (errors.length) console.log('Fehler bis dahin:\n' + errors.join('\n')); process.exit(1); });

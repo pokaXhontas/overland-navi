@@ -76,42 +76,92 @@ const Pack = {
   stop() {
     for (const s of this.playing) { try { s.stop(); } catch (e) { /* schon fertig */ } }
     this.playing = [];
-    if (this.el && !this.el.paused) { try { this.el.pause(); } catch (e) { /* egal */ } }
+    if (this.el) { this.el.onended = null; if (!this.el.paused) { try { this.el.pause(); } catch (e) { /* egal */ } } }
+    if (this.waitEnd) { const r = this.waitEnd; this.waitEnd = null; r(); }
   },
+  /* Drei Wege, nacheinander probiert: Web-Audio (lückenlos), Audio-Player mit einer zusammengesetzten MP3,
+   * Audio-Player Baustein für Baustein direkt aus den Dateien (klappt auch dort, wo Blob-Adressen nicht spielen).
+   * Erst wenn alle scheitern, gibt es einen Fehler (dann spricht die Gerätestimme). */
+  lastError: '',
+  native: !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()),
   async play(voice, keys, rate) {
     this.session();
-    // älteres iOS ohne audioSession: nur der Audio-Player ist trotz Stummschalter hörbar
-    const htmlOnly = IOS && !navigator.audioSession && store.get('voiceSilent', true);
-    if (!htmlOnly && await this.running()) {
-      const bufs = await Promise.all(keys.map((k) => this.decoded(voice, k)));
-      this.stop();
-      const ctx = this.ctx;
-      let t = ctx.currentTime + 0.05;
-      for (const b of bufs) {
-        const s = ctx.createBufferSource();
-        s.buffer = b;
-        s.playbackRate.value = rate;
-        s.connect(ctx.destination);
-        s.start(t);
-        t += b.duration / rate + 0.05;
-        this.playing.push(s);
-      }
-      this.how = 'webaudio';
-      return;
+    this.token = (this.token || 0) + 1;
+    const my = this.token, errs = [];
+    // älteres iOS im Browser ohne audioSession: nur der Audio-Player ist trotz Stummschalter hörbar
+    const htmlFirst = IOS && !this.native && !navigator.audioSession && store.get('voiceSilent', true);
+    const ways = htmlFirst ? ['blob', 'files', 'webaudio'] : ['webaudio', 'blob', 'files'];
+    for (const w of ways) {
+      if (my !== this.token) return;   // inzwischen kam eine neuere Ansage
+      try {
+        await this['via_' + w](voice, keys, rate, my);
+        this.how = w; this.lastError = '';
+        return;
+      } catch (e) { errs.push(w + ': ' + ((e && (e.name + ' ' + e.message)) || e)); }
     }
-    // Ersatzweg: Bausteine hintereinander als eine MP3 über den normalen Audio-Player
-    const parts = await Promise.all(keys.map((k) => this.bytes(voice, k)));
-    if (!this.el) { this.el = new Audio(); this.el.setAttribute('playsinline', ''); }
-    this.stop();
-    if (this.el.dataset.url) URL.revokeObjectURL(this.el.dataset.url);
-    const url = URL.createObjectURL(new Blob(parts, { type: 'audio/mpeg' }));
-    this.el.dataset.url = url;
-    this.el.src = url;
-    this.el.playbackRate = rate;
-    await this.el.play();
-    this.how = 'audio';
+    this.lastError = errs.join(' | ');
+    throw new Error(this.lastError);
   },
-  preload(voice) { for (const k of (this.index && this.index.keys) || []) this.bytes(voice, k).catch(() => {}); }
+  async via_webaudio(voice, keys, rate) {
+    if (!await this.running()) throw new Error('Ton gesperrt (' + (this.ctx ? this.ctx.state : 'kein Web-Audio') + ')');
+    const bufs = await Promise.all(keys.map((k) => this.decoded(voice, k)));
+    this.stop();
+    const ctx = this.ctx;
+    let t = ctx.currentTime + 0.03;
+    for (const b of bufs) {
+      const s = ctx.createBufferSource();
+      s.buffer = b;
+      s.playbackRate.value = rate;
+      s.connect(ctx.destination);
+      s.start(t);
+      t += b.duration / rate;
+      this.playing.push(s);
+    }
+    this.endsAt = Date.now() + (t - ctx.currentTime) * 1000;
+  },
+  player() {
+    if (!this.el) { this.el = new Audio(); this.el.setAttribute('playsinline', ''); this.el.preload = 'auto'; }
+    return this.el;
+  },
+  async via_blob(voice, keys, rate) {
+    const parts = await Promise.all(keys.map((k) => this.bytes(voice, k)));
+    const el = this.player();
+    this.stop();
+    if (el.dataset.url) URL.revokeObjectURL(el.dataset.url);
+    const url = URL.createObjectURL(new Blob(parts, { type: 'audio/mpeg' }));
+    el.dataset.url = url;
+    el.src = url;
+    el.playbackRate = rate;
+    await this.started(el);
+  },
+  async via_files(voice, keys, rate, my) {
+    const el = this.player();
+    this.stop();
+    for (let i = 0; i < keys.length; i++) {
+      if (my !== this.token) return;
+      el.src = new URL(`voices/${voice}/${keys[i]}.mp3`, location.href).href;
+      el.playbackRate = rate;
+      await this.started(el);
+      if (i < keys.length - 1) await new Promise((res) => { this.waitEnd = res; el.onended = () => { el.onended = null; this.waitEnd = null; res(); }; });
+    }
+  },
+  /* wartet, bis der Player wirklich spielt (manche Geräte lösen play() auf, ohne zu spielen) */
+  started(el) {
+    return new Promise((res, rej) => {
+      const t = setTimeout(() => { done(); rej(new Error('spielt nicht')); }, 2500);
+      const ok = () => { done(); this.endsAt = Date.now() + ((el.duration || 2) / (el.playbackRate || 1)) * 1000; res(); };
+      const bad = () => { done(); rej(new Error('Datei nicht abspielbar')); };
+      const done = () => { clearTimeout(t); el.removeEventListener('playing', ok); el.removeEventListener('error', bad); };
+      el.addEventListener('playing', ok);
+      el.addEventListener('error', bad);
+      const p = el.play();
+      if (p) p.catch((e) => { done(); rej(e); });
+    });
+  },
+  preload(voice) {
+    for (const k of (this.index && this.index.keys) || []) this.bytes(voice, k).catch(() => {});
+    if (this.ac()) for (const k of ['d300', 'right', 'hello']) this.decoded(voice, k).catch(() => {});
+  }
 };
 for (const ev of ['touchend', 'click', 'keydown']) document.addEventListener(ev, () => Pack.unlock(), { capture: true, passive: true });
 
@@ -856,6 +906,7 @@ const Nav = {
     this.draw();
     if (!silent) toast('Navigation beendet');
     if ('speechSynthesis' in window) speechSynthesis.cancel();
+    Pack.stop();
     if (window.reloadWhenIdle) setTimeout(() => window.reloadWhenIdle(), 1500);   // aufgeschobenes Update jetzt laden
   },
 
@@ -874,7 +925,7 @@ const Nav = {
       this.draw();
       // Nach einem Neustart darf das iPhone erst nach einem Fingertipp wieder sprechen
       if (this.voice) setTimeout(() => toast('Navigation läuft weiter. Einmal antippen, damit die Ansagen wieder klingen.', 30000, {
-        label: 'Ansagen an', run: () => { Pack.unlock(); this.say('Ansagen sind wieder an.', true); }
+        label: 'Ansagen an', run: () => { Pack.unlock(); this.say('Sprachansagen an.', true, ['voice_on']); }
       }), 1200);
     }
   },
@@ -1267,7 +1318,11 @@ const Nav = {
     if ((!this.voice && !force) || !text) return Promise.resolve(false);
     const pv = this.packVoice();
     if (pv && keys && keys.length) {
-      return Pack.play(pv, keys, store.get('navRate', 1)).then(() => true).catch(() => this.sayTTS(text));
+      return Pack.play(pv, keys, store.get('navRate', 1)).then(() => true).catch(() => {
+        // beim Ausprobieren sagen, warum die gewählte Stimme nicht klingt, statt still die Gerätestimme zu nehmen
+        if (force) toast('Die gewählte Stimme ließ sich nicht abspielen, ersatzweise spricht die Gerätestimme. (' + Pack.lastError.slice(0, 160) + ')', 9000);
+        return this.sayTTS(text);
+      });
     }
     return Promise.resolve(this.sayTTS(text));
   },
@@ -1339,8 +1394,9 @@ const Nav = {
     test.onclick = async () => {
       Pack.unlock();
       test.textContent = 'Spielt …';
+      Pack.endsAt = 0;
       const ok = await this.say('In 300 Metern rechts abbiegen.', true, ['d300', 'right']);
-      setTimeout(() => { test.textContent = 'Probe hören'; }, 1800);
+      setTimeout(() => { test.textContent = 'Probe hören'; }, Math.max(600, Math.min(5000, (Pack.endsAt || Date.now() + 1800) - Date.now())));
       if (!ok) toast('Kein Ton möglich. Ist das iPad stumm oder ganz leise gestellt?', 4500);
     };
     for (const [id, key] of [['#t-navcam', 'navCam'], ['#t-navpitch', 'navPitch']]) {
