@@ -125,6 +125,7 @@ async function notify(db, where, args, msg) {
 
 /* ---------- Zugang ---------- */
 const ADMIN_HASH = 'aa589afaca59eb6e8cd6d17e06acd21bcab19bda712b0210ac9a24988d0f0975';   // Hash des Verwalter-Codes (der Code selbst steht nirgends)
+const REVIEW_HASH = '9314d300d8778e2e827795f3b33fd065ccd3daf7ebab8680b93eeaa294ffb666';   // Hash des Prüfer-Codes für Apples App-Prüfung (gibt normalen Zugang, keinen Verwalter)
 const CI_HASH = '3a078d0c6bb72b7de96caa4b4437e5ecd79c4e025dbfd9cde8a5507d6d257f7b';      // Hash des Schlüssels für die automatischen Prüfläufe
 let devReady = false;
 const seenOk = new Map();   // kurzer Zwischenspeicher: Schlüssel-Hash → Zeit der letzten erfolgreichen Prüfung
@@ -186,7 +187,17 @@ async function auth(request, env, what, ctx) {
   }
   if (what === 'admin' && request.method === 'POST') {
     const code = String(body.code || '').trim().toUpperCase();
-    if (!code || await sha(code) !== ADMIN_HASH) return json({ status: d.status, error: 'falscher Code' }, 403);
+    const h = code ? await sha(code) : '';
+    if (h && h === REVIEW_HASH) {
+      // Prüfer-Code: sofort normaler Zugang; das Gerät steht in „Zugänge“ und lässt sich dort jederzeit sperren
+      await db.prepare('INSERT INTO dev (id, name, model, status, admin, created, seen) VALUES (?, ?, ?, ?, 0, ?, ?) ON CONFLICT (id) DO UPDATE SET status = CASE WHEN dev.status = \'blocked\' THEN \'blocked\' ELSE \'ok\' END')
+        .bind(d.id, 'App-Prüfung · ' + String(body.name || '').slice(0, 30), String(body.model || '').slice(0, 40), 'ok', now, now).run();
+      const job = notify(db, "d.admin = 1 AND d.status = 'ok'", [], { title: 'Prüfer-Code benutzt', body: 'Ein Gerät hat sich mit dem Prüfer-Code angemeldet.', url: '#zugaenge' });
+      if (ctx) ctx.waitUntil(job); else await job;
+      const st = await db.prepare('SELECT status FROM dev WHERE id = ?').bind(d.id).first();
+      return st && st.status === 'blocked' ? json({ status: 'blocked', error: 'gesperrt' }, 403) : json({ status: 'ok', admin: false });
+    }
+    if (!h || h !== ADMIN_HASH) return json({ status: d.status, error: 'falscher Code' }, 403);
     await db.prepare('INSERT INTO dev (id, name, model, status, admin, created, seen) VALUES (?, ?, ?, ?, 1, ?, ?) ON CONFLICT (id) DO UPDATE SET status = excluded.status, admin = 1, name = COALESCE(NULLIF(excluded.name, \'\'), dev.name)')
       .bind(d.id, String(body.name || '').slice(0, 40), String(body.model || '').slice(0, 40), 'ok', now, now).run();
     return json({ status: 'ok', admin: true });

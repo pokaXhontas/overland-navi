@@ -106,7 +106,7 @@ const Access = {
     if (!code) return;
     try {
       const s = await this.call('admin', { code, name: $('#gate-name').value.trim() || 'Verwalter', model: this.model() });
-      if (s.error) { toast(s.error === 'falscher Code' ? 'Der Verwalter-Code stimmt nicht.' : s.error); return; }
+      if (s.error) { toast(s.error === 'falscher Code' ? 'Der Code stimmt nicht.' : s.error === 'gesperrt' ? 'Dieser Zugang ist gesperrt.' : s.error); return; }
       await this.check();
     } catch (e) { toast('Ging nicht – Internet da?'); }
   },
