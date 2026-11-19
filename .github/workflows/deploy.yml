@@ -32,7 +32,9 @@ jobs:
           mkdir -p vendor-tmp
           cd vendor-tmp
           npm init -y > /dev/null
-          npm install --no-audit --no-fund maplibre-gl@5 pmtiles@4 @protomaps/basemaps@5 maplibre-contour@0.1 qrcode-generator@1 jsqr@1
+          npm install --no-audit --no-fund maplibre-gl@5 pmtiles@4 @protomaps/basemaps@5 maplibre-contour@0.1 qrcode-generator@1 jsqr@1 esbuild@0
+          # Länder aus Koordinaten bestimmen, ganz ohne Internet (Grenzen eingebaut)
+          npm install --no-audit --no-fund @rapideditor/country-coder@5 || npm install --no-audit --no-fund @ideditor/country-coder@5
 
       - name: pmtiles-Werkzeug installieren
         env:
@@ -149,6 +151,12 @@ jobs:
           pick site/vendor/maplibre-contour.js $N/maplibre-contour/dist/index.min.js $N/maplibre-contour/dist/index.js
           pick site/vendor/qrcode.js       $N/qrcode-generator/dist/qrcode.js $N/qrcode-generator/qrcode.js
           pick site/vendor/jsqr.js         $N/jsqr/dist/jsQR.js
+          ( cd vendor-tmp
+            if [ -d node_modules/@rapideditor/country-coder ]; then P=@rapideditor/country-coder; else P=@ideditor/country-coder; fi
+            echo "import * as cc from '$P'; self.countryCoder = cc;" > cc-entry.mjs
+            npx --no-install esbuild cc-entry.mjs --bundle --minify --format=iife --outfile=cc.js )
+          cp vendor-tmp/cc.js site/vendor/country-coder.js
+          ls -la site/vendor/country-coder.js
           cp -r assets-tmp/fonts site/fonts
           cp -r assets-tmp/sprites site/sprites
           python3 - << 'PY'

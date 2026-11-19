@@ -798,8 +798,32 @@ const Lists = {
     if (key === 'shop' || key === 'craft' || key === 'office') return 'einkauf';
     return '';
   },
+  /* Land aus der Position bestimmen – sofort und ohne Internet (Ländergrenzen sind in der App) */
+  async countryCoder() {
+    if (typeof countryCoder === 'undefined') { try { await loadScript('vendor/country-coder.js'); } catch (e) { return null; } }
+    return typeof countryCoder !== 'undefined' ? countryCoder : null;
+  },
+  async localCountries() {
+    const need = places.filter((p) => !p.cc && p.lat !== null && p.lat !== undefined);
+    if (!need.length) return 0;
+    const cc = await this.countryCoder();
+    if (!cc) return 0;
+    const now = new Date().toISOString();
+    let k = 0;
+    for (const p of need) {
+      let c = null;
+      try { c = cc.iso1A2Code([p.lon, p.lat]); } catch (e) { /* egal */ }
+      if (c) { p.cc = c.toLowerCase(); p.updated = now; k++; }   // „updated“: damit die Zuordnung auch zu den anderen Geräten geht
+    }
+    if (k) { savePlaces(); this.refresh(); renderDataCats(); }
+    return k;
+  },
   async enrich() {
-    if (this.running || !navigator.onLine) return;
+    if (this.running) return;
+    this.running = true;
+    try { await this.localCountries(); } catch (e) { /* weiter online */ }
+    this.running = false;
+    if (!navigator.onLine) return;
     const todo = places.filter((p) => p.pend || (!p.cc && p.lat !== null && p.lat !== undefined));
     if (!todo.length) return;
     this.running = true;
@@ -836,6 +860,7 @@ const Lists = {
         p.cc = cc;
         if (wantCat) { const c = this.osmCat(key, val); if (c && CAT[c]) p.cat = c; }
         p.pend = false;
+        p.updated = new Date().toISOString();
         streak = 0;
       } catch (e) {
         fails++;
@@ -844,17 +869,17 @@ const Lists = {
       }
       n++;
       show();
-      if (n % 25 === 0) savePlaces();
+      if (n % 10 === 0) savePlaces();
     };
     let streak = 0, pause = 0;
     const pill = $('#enrich-pill');
     const show = () => {
       if (!pill || todo.length <= 10) return;
       pill.hidden = false;
-      pill.querySelector('span').textContent = `Orte zuordnen ${n} / ${todo.length}` + (pause > Date.now() ? ' · Pause' : '');
+      pill.querySelector('span').textContent = `Orte zuordnen · noch ${(todo.length - n).toLocaleString('de-DE')}` + (pause > Date.now() ? ' · Pause' : '');
       pill.querySelector('i').style.width = Math.round(n / todo.length * 100) + '%';
     };
-    if (pill) pill.onclick = () => toast('Die App fragt für jeden Google-Ort online nach Land und Art. Das läuft nur, solange die App offen ist und Internet hat, und macht beim nächsten Öffnen weiter.', 7000);
+    if (pill) pill.onclick = () => toast('Das Land kennt die App sofort. Online fragt sie noch nach der Art (Campingplatz, See …) bei importierten Google-Orten. Das läuft, solange die App offen ist und Internet hat, und macht beim nächsten Öffnen dort weiter.', 8000);
     show();
     let k = 0;
     await Promise.all(Array.from({ length: 3 }, async () => {
@@ -873,7 +898,7 @@ const Lists = {
     this.refresh();
     renderDataCats();
     const left = places.filter((p) => p.pend).length;
-    if (todo.length > 10) toast(left ? `${left} Orte noch ohne Land – geht beim nächsten Start mit Internet weiter.` : `Fertig: ${todo.length} Orte zugeordnet ✓`, 5000);
+    if (todo.length > 10) toast(left ? `${left} Orte noch nicht fertig zugeordnet – geht beim nächsten Start mit Internet weiter.` : `Fertig: ${todo.length} Orte zugeordnet ✓`, 5000);
   },
 
   setup() {

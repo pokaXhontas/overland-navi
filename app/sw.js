@@ -39,6 +39,7 @@ const SHELL = [
   'vendor/basemaps.js',
   'vendor/maplibre-contour.js',
   'vendor/qrcode.js',
+  'vendor/country-coder.js',
   'vendor/jsqr.js'
 ];
 
