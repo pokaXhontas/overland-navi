@@ -35,7 +35,8 @@ jobs:
   app:
     needs: check
     if: needs.check.outputs.go == 'true'
-    runs-on: macos-latest
+    # Intel-Mac: die arm64-Macs von GitHub sind gerade oft ausgebucht
+    runs-on: macos-15-intel
     timeout-minutes: 75
     env:
       GH_TOKEN: ${{ github.token }}
