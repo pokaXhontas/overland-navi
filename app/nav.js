@@ -64,7 +64,17 @@ const Pack = {
   bytes(voice, key) {
     const k = voice + '/' + key;
     if (!this.raw.has(k)) {
-      const p = fetch(`voices/${voice}/${key}.mp3`).then((r) => { if (!r.ok) throw new Error('Ansage fehlt'); return r.arrayBuffer(); });
+      const url = `voices/${voice}/${key}.mp3`;
+      // In der iPhone-App liefert fetch() die Dateien teils nicht aus; dann über XMLHttpRequest versuchen
+      const xhr = (why) => new Promise((res, rej) => {
+        const x = new XMLHttpRequest();
+        x.open('GET', url);
+        x.responseType = 'arraybuffer';
+        x.onload = () => (x.response && x.response.byteLength ? res(x.response) : rej(new Error('Ansage fehlt (' + why + ', XHR ' + x.status + ')')));
+        x.onerror = () => rej(new Error('Ansage fehlt (' + why + ', XHR Fehler)'));
+        x.send();
+      });
+      const p = fetch(url).then((r) => (r.ok ? r.arrayBuffer() : xhr('Status ' + r.status)), (e) => xhr(e.message));
       this.raw.set(k, p);
       p.catch(() => this.raw.delete(k));
     }
@@ -96,12 +106,16 @@ const Pack = {
     const my = this.token, errs = [];
     // älteres iOS im Browser ohne audioSession: nur der Audio-Player ist trotz Stummschalter hörbar
     const htmlFirst = IOS && !this.native && !navigator.audioSession && store.get('voiceSilent', true);
-    const ways = htmlFirst ? ['blob', 'files', 'webaudio'] : ['webaudio', 'blob', 'files'];
+    let ways = htmlFirst ? ['blob', 'files', 'webaudio'] : ['webaudio', 'blob', 'files'];
+    // der Weg, der auf diesem Gerät zuletzt geklappt hat, zuerst (spart die Verzögerung durch Fehlversuche)
+    const good = store.get('voiceWay', '');
+    if (ways.includes(good)) ways = [good, ...ways.filter((w) => w !== good)];
     for (const w of ways) {
       if (my !== this.token) return;   // inzwischen kam eine neuere Ansage
       try {
         await this['via_' + w](voice, keys, rate, my);
         this.how = w; this.lastError = '';
+        if (good !== w) store.set('voiceWay', w);
         return;
       } catch (e) { errs.push(w + ': ' + ((e && (e.name + ' ' + e.message)) || e)); }
     }
@@ -153,6 +167,8 @@ const Pack = {
       if (my !== this.token) return;
       el.src = new URL(`voices/${voice}/${keys[i]}.mp3`, location.href).href;
       el.playbackRate = rate;
+      // nächsten Baustein schon vorladen, damit zwischen den Teilen keine Lücke entsteht
+      if (keys[i + 1]) { const n = new Audio(); n.preload = 'auto'; n.src = new URL(`voices/${voice}/${keys[i + 1]}.mp3`, location.href).href; this.next = n; }
       await this.started(el);
       if (i < keys.length - 1) await new Promise((res) => { this.waitEnd = res; el.onended = () => { el.onended = null; this.waitEnd = null; res(); }; });
     }

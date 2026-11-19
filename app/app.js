@@ -1652,7 +1652,7 @@ async function runDiag() {
   L.push('Gewählte Stimme: ' + (store.get('navVoiceURI', '') || 'Standard') + ' → ' + (Nav.packVoice() || 'Gerätestimme'));
   L.push('Audio-Sitzung (Stummschalter): ' + (navigator.audioSession ? navigator.audioSession.type : 'nicht vorhanden'));
   const ctx = Pack.ac();
-  L.push('Web-Audio: ' + (ctx ? ctx.state : 'nicht vorhanden'));
+  L.push('Web-Audio: ' + (ctx ? ctx.state : 'nicht vorhanden') + ' · bevorzugter Weg: ' + (store.get('voiceWay', '') || 'noch keiner'));
   const pv = Nav.packVoice();
   if (pv) {
     for (const w of ['webaudio', 'blob', 'files']) {
