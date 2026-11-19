@@ -439,7 +439,7 @@ const Sync = {
     this.open = c.id;
     const code = this.code(c, write);
     await this.codePage({ title: c.name, rights: write ? 'Gemeinsam bearbeiten' : 'Nur ansehen', code,
-      text: `Overland-Navi: „${c.name}“ (${write ? 'gemeinsam bearbeiten' : 'nur ansehen'}).\nDen Code kopieren, dann in der App: Menü → Verbindungen → Code eingeben → Einfügen.\n\n${code}\n\nOhne App: Link öffnen`,
+      text: `Overland-Navi: „${c.name}“ (${write ? 'gemeinsam bearbeiten' : 'nur ansehen'}).\nSo geht’s: Den Code unten kopieren, die Overland-Navi-App öffnen und den Code ins Suchfeld einfügen (oder Menü → Verbindungen → Code eingeben).\n\n${code}\n\nOhne App: Link öffnen`,
       back: () => this.openConn(c.id) });
   },
   /* QR, Link und Code zeigen (auch für Standort teilen) */
@@ -566,6 +566,7 @@ const Sync = {
     this.init();
     $('#btn-sync-new').onclick = () => this.openNew(null);
     $('#btn-sync-join').onclick = () => this.openJoin('');
+    if ($('#btn-live-join')) $('#btn-live-join').onclick = () => this.openJoin('');
     $('#sn-back').onclick = () => this.page(null);
     $('#sn-create').onclick = () => this.createFromDraft();
     $('#sc-back').onclick = () => { if (this._codeBack) this._codeBack(); else this.page(null); };

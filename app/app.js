@@ -2020,6 +2020,18 @@ async function runSearch() {
   else if (!local.length) renderSearchResults([], 'Nichts gefunden.');
 }
 
+/* Ein eingefügter Code (Verbindung OVL1 oder Standort OVL2) im Suchfeld: gleich verbinden */
+function joinCodeIn(input) {
+  const m = String(input.value || '').match(/OVL[12]\.[0-9a-f]{32}\.[A-Za-z0-9_-]{43}(\.[A-Za-z0-9_-]{22})?/);
+  if (!m) return false;
+  input.value = '';
+  input.blur();
+  if (typeof closeSearch === 'function' && input.id === 'search-input') closeSearch();
+  if (input.id === 'menu-q') { Menu.search(); closeSheet(); }
+  Sync.join(m[0]);
+  return true;
+}
+
 /* Reihenfolge der Treffer, immer nach derselben Logik:
  * 1. Koordinaten  2. Name genau wie die Eingabe  3. Name fängt so an  4. ein Wort im Namen fängt so an  5. Rest.
  * Innerhalb davon: eigene Orte zuerst, dann vom Großen zum Kleinen (Land/Insel/Region → Stadt → Dorf, Gipfel, See → Einzelnes),
@@ -2673,7 +2685,7 @@ async function importFiles(fileList) {
 function setupSearchAndImport() {
   $('#btn-search').onclick = openSearch;
   $('#search-close').onclick = closeSearch;
-  $('#search-input').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(runSearch, 220); });
+  $('#search-input').addEventListener('input', () => { if (joinCodeIn($('#search-input'))) return; clearTimeout(searchTimer); searchTimer = setTimeout(runSearch, 220); });
   $('#search-input').addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeSearch();
     if (e.key === 'Enter') { const first = $('#search-results .place-item'); if (first) first.click(); }

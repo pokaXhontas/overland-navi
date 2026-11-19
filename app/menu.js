@@ -152,7 +152,7 @@ const Menu = {
     for (const b of document.querySelectorAll('[data-menu-back]')) b.onclick = () => this.back(b.closest('.sec-page'));
     for (const b of document.querySelectorAll('[data-menu-close]')) b.onclick = () => closeSheet();
     const q = $('#menu-q');
-    q.addEventListener('input', () => this.search());
+    q.addEventListener('input', () => { if (!joinCodeIn(q)) this.search(); });
     $('#menu-q-clear').onclick = () => { q.value = ''; this.search(); q.focus(); };
     // Kurzinfos aktuell halten, wenn sich in einem Bereich etwas ändert
     $('#sheet').addEventListener('change', () => setTimeout(() => this.refresh(), 0));

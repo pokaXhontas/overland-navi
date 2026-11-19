@@ -295,7 +295,7 @@ const Live = {
     const code = this.code(g, write);
     Sync.codePage({ title: 'Standort von ' + this.myName(), rights: write ? 'Gegenseitig' : 'Nur ansehen', code,
       hint: write ? 'Wer den Code scannt, sieht dich auf der Karte und kann seinen Standort zurück teilen.' : 'Wer den Code scannt, sieht dich auf der Karte. Nur an Leute geben, denen du vertraust.',
-      text: `${this.myName()} teilt den Standort mit dir (Overland-Navi).\nDen Code kopieren, dann in der App: Menü → Verbindungen → Code eingeben → Einfügen.\n\n${code}\n\nOhne App: Link öffnen`,
+      text: `${this.myName()} teilt den Standort mit dir (Overland-Navi).\nSo geht’s: Den Code unten kopieren, die Overland-Navi-App öffnen und den Code ins Suchfeld einfügen (oder Menü → Standort teilen → Code eingeben).\n\n${code}\n\nOhne App: Link öffnen`,
       back: () => this.openGroup(g.id) });
   },
   async join(text) {
