@@ -522,7 +522,7 @@ body.drawing .fab, body.drawing .hud { display: none; }
   .sheet-grab { display: block; margin: 4px auto 0; }
   .sheet-head { padding-top: 10px; }
 }
-.toast.show { pointer-events: auto; }
+.toast.show.has-act { pointer-events: auto; }   /* nur mit Knopf (z. B. „Rückgängig“) – sonst tippt man durch den Hinweis hindurch */
 /* Routenauswahl klein */
 .na-peek { display: none; align-items: center; gap: 12px; }
 .na-peek-txt { flex: 1; display: flex; flex-direction: column; }
