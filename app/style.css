@@ -1060,3 +1060,4 @@ body.card-open .maplibregl-ctrl-bottom-right, body.selecting .maplibregl-ctrl-bo
 /* Ort in der Liste, aber auf der Karte ausgeblendet */
 .place-item.off-map .pi-icon { opacity: .45; }
 .pi-why { display: block; font-style: normal; font-size: 12px; color: var(--accent-text); margin-top: 2px; }
+a.add-region { text-decoration: none; color: inherit; box-sizing: border-box; }
