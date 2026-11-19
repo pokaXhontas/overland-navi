@@ -39,6 +39,9 @@
   <button class="ctl panel" id="btn-layers" aria-label="Menü">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/></svg>
   </button>
+  <button class="ctl panel" id="btn-lists" aria-label="Listen auf der Karte" aria-expanded="false" hidden>
+    <span class="lq-grid" id="lq-grid" aria-hidden="true"></span>
+  </button>
   <button class="ctl panel" id="btn-route" aria-label="Route planen">
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M6 16V10a4 4 0 0 1 4-4h2M18 8v6a4 4 0 0 1-4 4h-2"/></svg>
   </button>
@@ -524,6 +527,11 @@
   </div>
 </div>
 
+<div class="list-pop panel" id="list-pop" role="dialog" aria-label="Listen auf der Karte" hidden>
+  <div class="lp-head"><b>Auf der Karte</b><button class="round" id="lp-close" aria-label="Schließen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+  <div id="lp-rows"></div>
+  <div class="lp-foot"><button type="button" class="btn" id="lp-all">Alle zeigen</button><button type="button" class="btn" id="lp-manage">Listen verwalten</button></div>
+</div>
 <div class="floats" id="floats">
   <div class="list-chips" id="list-chips" hidden></div>
   <button type="button" class="live-pill" id="live-pill" hidden><i></i><span></span></button>

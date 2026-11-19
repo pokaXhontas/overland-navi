@@ -111,23 +111,76 @@ const Lists = {
     try { return new Intl.DisplayNames(['de'], { type: 'region' }).of(cc.toUpperCase()); } catch (e) { return cc.toUpperCase(); }
   },
 
-  /* ---------- Schnellschalter auf der Karte ---------- */
+  /* ---------- Schnellschalter: Knopf in der rechten Leiste, daneben ein kleines Fenster ----------
+   * Nur zum schnellen Ein- und Ausblenden unterwegs; verwaltet werden Listen im Menü → Listen. */
+  usedLists() { return this.all.filter((l) => places.some((p) => (p.list || 'mine') === l.id)); },
   renderChips() {
-    const box = $('#list-chips');
-    if (!box) return;
-    const used = this.all.filter((l) => places.some((p) => (p.list || 'mine') === l.id));
-    box.innerHTML = '';
-    box.hidden = used.length < 2;
-    for (const l of used) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'lchip' + (l.on ? ' on' : '');
-      b.setAttribute('aria-pressed', String(!!l.on));
-      if (l.on) { b.style.background = l.color; b.style.color = this.inkFor(l.color); b.style.borderColor = l.color; }
-      b.textContent = l.name;
-      b.onclick = () => { l.on = !l.on; this.saveMeta(); this.refresh(); };
-      box.appendChild(b);
+    const btn = $('#btn-lists');
+    if (!btn) return;
+    const used = this.usedLists();
+    btn.hidden = used.length < 2;
+    if (btn.hidden) { this.closeQuick(); return; }
+    const g = $('#lq-grid');
+    g.innerHTML = '';
+    const show = used.length > 4 ? used.slice(0, 3) : used;
+    for (const l of show) {
+      const d = document.createElement('span');
+      d.style.background = l.color;
+      if (!l.on) d.className = 'off';
+      g.appendChild(d);
     }
+    if (used.length > 4) { const m = document.createElement('span'); m.className = 'more'; m.textContent = '+'; g.appendChild(m); }
+    const n = used.filter((l) => l.on).length;
+    btn.setAttribute('aria-label', `Listen auf der Karte: ${n} von ${used.length} sichtbar`);
+    btn.classList.toggle('some-off', n < used.length);
+    if (!$('#list-pop').hidden) this.renderQuick();
+  },
+  renderQuick() {
+    const box = $('#lp-rows');
+    box.innerHTML = '';
+    for (const l of this.usedLists()) {
+      const row = document.createElement('label');
+      row.className = 'row lp-row';
+      row.innerHTML = '<span class="lp-dot"></span><span><b></b></span><input type="checkbox" class="switch">';
+      row.querySelector('.lp-dot').style.background = l.color;
+      row.querySelector('b').textContent = l.name;
+      const sw = row.querySelector('.switch');
+      sw.checked = !!l.on;
+      sw.onchange = () => { l.on = sw.checked; this.saveMeta(); this.refresh(); };
+      box.appendChild(row);
+    }
+    $('#lp-all').hidden = this.usedLists().every((l) => l.on);
+    this.placeQuick();
+  },
+  placeQuick() {
+    const pop = $('#list-pop'), r = $('#btn-lists').getBoundingClientRect();
+    const w = Math.min(270, r.left - 20);
+    pop.style.width = w + 'px';
+    pop.style.right = Math.round(innerWidth - r.left + 10) + 'px';
+    const h = pop.offsetHeight;
+    pop.style.top = Math.round(Math.max(12, Math.min(r.top, innerHeight - h - 16))) + 'px';
+  },
+  openQuick() {
+    const pop = $('#list-pop');
+    pop.hidden = false;
+    $('#btn-lists').setAttribute('aria-expanded', 'true');
+    this.renderQuick();
+  },
+  closeQuick() {
+    const pop = $('#list-pop');
+    if (!pop || pop.hidden) return;
+    pop.hidden = true;
+    $('#btn-lists').setAttribute('aria-expanded', 'false');
+  },
+  setupQuick() {
+    $('#list-chips').hidden = true;
+    $('#btn-lists').onclick = () => ($('#list-pop').hidden ? this.openQuick() : this.closeQuick());
+    $('#lp-close').onclick = () => this.closeQuick();
+    $('#lp-all').onclick = () => { for (const l of this.usedLists()) l.on = true; this.saveMeta(); this.refresh(); };
+    $('#lp-manage').onclick = () => { this.closeQuick(); $('#btn-layers').click(); Menu.open('listen'); };
+    // woanders hintippen schließt das Fenster
+    document.addEventListener('pointerdown', (e) => { if (!e.target.closest('#list-pop, #btn-lists')) this.closeQuick(); }, true);
+    addEventListener('resize', () => { if (!$('#list-pop').hidden) this.placeQuick(); });
   },
 
   /* ---------- Kärtchen beim Antippen eines Merklisten-Orts ---------- */
@@ -824,6 +877,7 @@ const Lists = {
   },
 
   setup() {
+    this.setupQuick();
     map.on('styleimagemissing', (e) => {
       if (!e.id || !e.id.startsWith('sq-') || map.hasImage(e.id)) return;
       const { image, ratio } = this.sqImage(e.id);
