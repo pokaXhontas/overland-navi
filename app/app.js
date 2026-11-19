@@ -2205,6 +2205,68 @@ function buildTrackRow(t) {
   row.querySelector('.ti-del').onclick = () => Trash.track(t);
   return row;
 }
+/* ---------- Tracks nach Ländern: Land aus den Punkten des Tracks (ohne Internet) ---------- */
+const trackCc = new Map();
+let trackCcBusy = false, openTrackCc = null;
+async function ensureTrackCountries() {
+  if (trackCcBusy || tracks.every((t) => trackCc.has(t.id))) return;
+  trackCcBusy = true;
+  let cc = null;
+  try { cc = await Lists.countryCoder(); } catch (e) { /* ohne Grenzen: „Ohne Land“ */ }
+  for (const t of tracks) {
+    if (trackCc.has(t.id)) continue;
+    const pts = (t.segments || []).flat();
+    const step = Math.max(1, Math.floor(pts.length / 40));
+    const votes = {};
+    for (let i = 0; i < pts.length; i += step) {
+      let c = null;
+      try { c = cc ? cc.iso1A2Code([pts[i][0], pts[i][1]]) : null; } catch (e) { /* egal */ }
+      const k = c ? c.toLowerCase() : '-';
+      votes[k] = (votes[k] || 0) + 1;
+    }
+    const best = Object.entries(votes).sort((a, b) => b[1] - a[1])[0];   // das Land, durch das der Track am längsten führt
+    trackCc.set(t.id, best ? best[0] : '-');
+  }
+  trackCcBusy = false;
+  renderDataCats();
+}
+function renderTracksByCountry(box) {
+  if (!tracks.every((t) => trackCc.has(t.id))) {
+    ensureTrackCountries();
+    for (const t of tracks) box.appendChild(swipeTrackRow(t));
+    return;
+  }
+  const by = new Map();
+  for (const t of tracks) { const k = trackCc.get(t.id); if (!by.has(k)) by.set(k, []); by.get(k).push(t); }
+  const ccs = [...by.keys()].sort((a, b) => (a === '-') - (b === '-') || Lists.countryName(a).localeCompare(Lists.countryName(b), 'de'));
+  if (ccs.length === 1 && openTrackCc === null) openTrackCc = ccs[0];
+  for (const cc of ccs) {
+    const list = by.get(cc), on = list.filter((t) => t.visible).length, open = openTrackCc === cc;
+    const row = document.createElement('div');
+    row.className = 'cat-row';
+    row.innerHTML = `<button type="button" class="cat-open"><span class="cc-badge"></span><span class="pi-txt"><b></b><small></small></span><svg class="chev${open ? ' down' : ''}" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button><input type="checkbox" class="switch">`;
+    row.querySelector('.cc-badge').textContent = cc === '-' ? '?' : cc.toUpperCase();
+    row.querySelector('b').textContent = Lists.countryName(cc);
+    row.querySelector('small').textContent = `${list.length} ${list.length === 1 ? 'Track' : 'Tracks'}` + (on === list.length ? '' : on ? ` · ${on} sichtbar` : ' · ausgeblendet');
+    const sw = row.querySelector('.switch');
+    sw.checked = on > 0;
+    sw.indeterminate = on > 0 && on < list.length;
+    sw.setAttribute('aria-label', 'Tracks in ' + Lists.countryName(cc) + ' zeigen');
+    sw.onchange = async () => {
+      // ein Schalter für alle Tracks des Landes
+      for (const t of list) if (t.visible !== sw.checked) { t.visible = sw.checked; await saveTrack(t); }
+      updateTracksSource();
+    };
+    row.querySelector('.cat-open').onclick = () => { openTrackCc = open ? '' : cc; renderDataCats(); };
+    box.appendChild(row);
+    if (open) for (const t of list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'de'))) {
+      const r = swipeTrackRow(t);
+      r.classList.add('in-cc');
+      box.appendChild(r);
+    }
+  }
+}
+
 /* Track-Zeile, nach links wischen löscht (in den Papierkorb) */
 function swipeTrackRow(t) { return Swipe.row(buildTrackRow(t), { onDelete: () => Trash.track(t) }); }
 
@@ -2240,12 +2302,12 @@ function renderDataCats() {
     const all = document.createElement('label');
     all.className = 'row';
     all.innerHTML = '<span><b>Tracks auf der Karte</b><small></small></span><input type="checkbox" class="switch">';
-    all.querySelector('small').textContent = tracks.length ? `${tracks.length} ${tracks.length === 1 ? 'Track' : 'Tracks'} · einzeln unten ein- und ausblenden` : 'Noch keine Tracks. Aufzeichnen oder importieren.';
+    all.querySelector('small').textContent = tracks.length ? `${tracks.length} ${tracks.length === 1 ? 'Track' : 'Tracks'} · nach Ländern unten` : 'Noch keine Tracks. Aufzeichnen oder importieren.';
     const sw = all.querySelector('.switch');
     sw.checked = !settings.hidden.includes('tracks');
     sw.onchange = () => setCatHidden('tracks', !sw.checked);
     tbox.appendChild(all);
-    for (const t of tracks) tbox.appendChild(swipeTrackRow(t));
+    renderTracksByCountry(tbox);
   }
   for (const c of CATS) {
     const n = catItems(c.id).length;
