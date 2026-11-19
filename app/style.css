@@ -1062,3 +1062,5 @@ body.card-open .maplibregl-ctrl-bottom-right, body.selecting .maplibregl-ctrl-bo
 .pi-why { display: block; font-style: normal; font-size: 12px; color: var(--accent-text); margin-top: 2px; }
 a.add-region { text-decoration: none; color: inherit; box-sizing: border-box; }
 #track-list .sw-row.in-cc { margin-left: 14px; }
+
+.diag{white-space:pre-wrap;font-size:12px;line-height:1.45;background:var(--line);border-radius:12px;padding:10px 12px;margin:8px 0 0;user-select:text;-webkit-user-select:text}

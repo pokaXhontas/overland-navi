@@ -1637,6 +1637,39 @@ async function updateStorage() {
 }
 
 /* ---------- Bedienelemente ---------- */
+/* Technik-Check: was auf diesem Gerät klappt (zum Eingrenzen von Problemen, v. a. in der iPhone-App) */
+async function runDiag() {
+  const out = $('#diag-out');
+  out.hidden = false;
+  out.textContent = 'Prüfe …';
+  const L = [];
+  const yes = (b) => (b ? 'ja' : 'nein');
+  L.push(((document.querySelector('.foot') || {}).textContent || '').replace(/^[\s\S]*(Version\s+\S+)[\s\S]*$/, '$1'));
+  L.push('Umgebung: ' + (Pack.native ? 'iPhone-App' : matchMedia('(display-mode: standalone)').matches || navigator.standalone ? 'Home-Bildschirm' : 'Browser') + ' · ' + navigator.userAgent.replace(/^.*?\(([^)]+)\).*$/, '$1'));
+  try { await Pack.load(); } catch (e) { /* steht unten */ }
+  L.push('Mitgelieferte Stimmen: ' + ((Pack.index && Pack.index.voices.length) || 0) + (Pack.loadError ? ' (' + Pack.loadError + ')' : ''));
+  L.push('Gewählte Stimme: ' + (store.get('navVoiceURI', '') || 'Standard') + ' → ' + (Nav.packVoice() || 'Gerätestimme'));
+  L.push('Audio-Sitzung (Stummschalter): ' + (navigator.audioSession ? navigator.audioSession.type : 'nicht vorhanden'));
+  const ctx = Pack.ac();
+  L.push('Web-Audio: ' + (ctx ? ctx.state : 'nicht vorhanden'));
+  const pv = Nav.packVoice();
+  if (pv) {
+    for (const w of ['webaudio', 'blob', 'files']) {
+      const t0 = Date.now();
+      try { await Pack['via_' + w](pv, ['voice_on'], 1, Pack.token); L.push('  Abspielweg ' + w + ': ok (' + (Date.now() - t0) + ' ms)'); await new Promise((r) => setTimeout(r, 1300)); }
+      catch (e) { L.push('  Abspielweg ' + w + ': FEHLER ' + (e.name || '') + ' ' + (e.message || e)); }
+      Pack.stop();
+    }
+  }
+  const vs = 'speechSynthesis' in window ? speechSynthesis.getVoices() : [];
+  L.push('Gerätestimmen: ' + vs.length + ', davon deutsch ' + vs.filter((v) => /^de/i.test(v.lang)).length);
+  L.push('Bildschirm anlassen: ' + ('wakeLock' in navigator ? (wakeLock ? 'aktiv' : 'möglich') : 'nicht vorhanden'));
+  L.push('Speicher (OPFS): ' + yes(navigator.storage && navigator.storage.getDirectory) + ' · Service Worker: ' + yes('serviceWorker' in navigator));
+  L.push('Standort: ' + (gps.pos ? 'ok' : 'noch keiner'));
+  L.push('Online: ' + yes(navigator.onLine) + ' · Zugang: ' + ((Access.saved() || {}).status || '?'));
+  out.textContent = L.join('\n');
+}
+
 function setupUI() {
   const sheet = $('#sheet');
   $('#btn-layers').onclick = () => { closeTrackInfo(); if (editor.open) closeEditor(); closeSearch(); renderRegions(); updateStorage(); closeCatPage(); renderDataCats(); Access.renderList(); Menu.reset(); sheet.hidden = false; };
@@ -1652,6 +1685,7 @@ function setupUI() {
     cacheManual();
   };
   $('#manual-close').onclick = () => { $('#manual').hidden = true; };
+  $('#btn-diag').onclick = () => runDiag();
   $('#add-back').onclick = () => { $('#add-page').hidden = true; };
   $('#add-close').onclick = closeSheet;
   $('#add-input').oninput = renderCountries;
@@ -2213,7 +2247,7 @@ async function ensureTrackCountries() {
   trackCcBusy = true;
   let cc = null;
   try { cc = await Lists.countryCoder(); } catch (e) { /* ohne Grenzen: „Ohne Land“ */ }
-  for (const t of tracks) {
+  try { for (const t of tracks) {
     if (trackCc.has(t.id)) continue;
     const pts = (t.segments || []).flat();
     const step = Math.max(1, Math.floor(pts.length / 40));
@@ -2226,8 +2260,7 @@ async function ensureTrackCountries() {
     }
     const best = Object.entries(votes).sort((a, b) => b[1] - a[1])[0];   // das Land, durch das der Track am längsten führt
     trackCc.set(t.id, best ? best[0] : '-');
-  }
-  trackCcBusy = false;
+  } } finally { trackCcBusy = false; }
   renderDataCats();
 }
 function renderTracksByCountry(box) {
@@ -2256,6 +2289,7 @@ function renderTracksByCountry(box) {
       // ein Schalter für alle Tracks des Landes
       for (const t of list) if (t.visible !== sw.checked) { t.visible = sw.checked; await saveTrack(t); }
       updateTracksSource();
+      renderDataCats();   // Zählung „x sichtbar“ und die einzelnen Schalter nachziehen
     };
     row.querySelector('.cat-open').onclick = () => { openTrackCc = open ? '' : cc; renderDataCats(); };
     box.appendChild(row);
