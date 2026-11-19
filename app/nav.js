@@ -124,6 +124,12 @@ const Pack = {
       this.playing.push(s);
     }
     this.endsAt = Date.now() + (t - ctx.currentTime) * 1000;
+    // in der iPhone-App den Ton danach wieder freigeben, damit Musik anderer Apps nicht gedämpft bleibt
+    if (this.native) {
+      const my = this.token;
+      clearTimeout(this.idleT);
+      this.idleT = setTimeout(() => { if (my === this.token && ctx.state === 'running') ctx.suspend().catch(() => {}); }, this.endsAt - Date.now() + 1500);
+    }
   },
   player() {
     if (!this.el) { this.el = new Audio(); this.el.setAttribute('playsinline', ''); this.el.preload = 'auto'; }

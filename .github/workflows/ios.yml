@@ -97,11 +97,11 @@ jobs:
           sips -s format jpeg "$ICON" --out /tmp/icon.jpg >/dev/null && sips -s format png /tmp/icon.jpg --out "$ICON" >/dev/null
           echo "Symbol: $ICON"
           plutil -p "$PL" | head -40
-          # Ton: Ansagen auch im Stummmodus hörbar, laufende Musik wird nur leiser (nicht gestoppt)
+          # Ton: Ansagen auch im Stummmodus hörbar, laufende Musik spielt weiter
           AD=App/AppDelegate.swift
           grep -q "import AVFoundation" "$AD" || sed -i '' 's/^import UIKit$/import UIKit\
           import AVFoundation/' "$AD"
-          perl -0pi -e 's/(\/\/ Override point for customization after application launch\.\n)/$1        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .voicePrompt, options: [.mixWithOthers, .duckOthers])\n/' "$AD"
+          perl -0pi -e 's/(\/\/ Override point for customization after application launch\.\n)/$1        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .voicePrompt, options: [.mixWithOthers])\n/' "$AD"
           grep -n "AVFoundation\|AVAudioSession" "$AD" || { echo "::error::AppDelegate nicht angepasst"; exit 1; }
 
       - name: Bauprobe für den Simulator (ohne Apple-Schlüssel)
