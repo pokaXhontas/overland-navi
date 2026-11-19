@@ -1657,17 +1657,20 @@ async function runDiag() {
     try { const r = await Native.call('speak', { voice: Nav.packVoice() || '', keys: ['voice_on'], text: 'Sprachansagen an.', rate: 1 }); L.push('  Nativ abspielen: ok (' + (r.how || '') + ', ' + (r.dur || 0).toFixed(1) + ' s)'); await new Promise((res) => setTimeout(res, 1600)); }
     catch (e) { L.push('  Nativ abspielen: FEHLER ' + ((e && e.message) || e)); }
   }
-  const ctx = Pack.ac();
-  L.push('Web-Audio: ' + (ctx ? ctx.state : 'nicht vorhanden') + ' · bevorzugter Weg: ' + (store.get('voiceWay', '') || 'noch keiner'));
-  const pv = Nav.packVoice();
-  if (pv) {
-    for (const w of ['webaudio', 'blob', 'files']) {
-      const t0 = Date.now();
-      try { await Pack['via_' + w](pv, ['voice_on'], 1, Pack.token); L.push('  Abspielweg ' + w + ': ok (' + (Date.now() - t0) + ' ms)'); await new Promise((r) => setTimeout(r, 1300)); }
-      catch (e) { L.push('  Abspielweg ' + w + ': FEHLER ' + (e.name || '') + ' ' + (e.message || e)); }
-      Pack.stop();
+  // Web-Abspielwege nur prüfen, wenn es keinen nativen Teil gibt (in der iPhone-App würden sie laufende Musik anhalten)
+  if (!Native.avail) {
+    const ctx = Pack.ac();
+    L.push('Web-Audio: ' + (ctx ? ctx.state : 'nicht vorhanden') + ' · bevorzugter Weg: ' + (store.get('voiceWay', '') || 'noch keiner'));
+    const pv = Nav.packVoice();
+    if (pv) {
+      for (const w of ['webaudio', 'blob', 'files']) {
+        const t0 = Date.now();
+        try { await Pack['via_' + w](pv, ['voice_on'], 1, Pack.token); L.push('  Abspielweg ' + w + ': ok (' + (Date.now() - t0) + ' ms)'); await new Promise((r) => setTimeout(r, 1300)); }
+        catch (e) { L.push('  Abspielweg ' + w + ': FEHLER ' + (e.name || '') + ' ' + (e.message || e)); }
+        Pack.stop();
+      }
     }
-  }
+  } else L.push('Web-Audio: nicht benutzt (die App spielt nativ)');
   const vs = 'speechSynthesis' in window ? speechSynthesis.getVoices() : [];
   L.push('Gerätestimmen: ' + vs.length + ', davon deutsch ' + vs.filter((v) => /^de/i.test(v.lang)).length);
   L.push('Bildschirm anlassen: ' + ('wakeLock' in navigator ? (wakeLock ? 'aktiv' : 'möglich') : 'nicht vorhanden'));

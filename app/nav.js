@@ -15,7 +15,7 @@ const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform 
 const Pack = {
   /* Stummschalter: „playback“ ist trotz Stummschalter hörbar (Musik pausiert kurz), „transient“ macht Musik nur leiser, schweigt aber im Stummmodus */
   session() {
-    if (typeof Native !== 'undefined' && Native.avail) return;   // die iPhone-App regelt den Ton selbst
+    if (this.native) return;   // die iPhone-App regelt den Ton selbst (sonst hält iOS laufende Musik an)
     try { if (navigator.audioSession) navigator.audioSession.type = store.get('voiceSilent', true) ? 'playback' : 'transient'; } catch (e) { /* älteres iOS */ }
   },
   index: null, ctx: null, raw: new Map(), dec: new Map(), playing: [], el: null, elReady: false,
@@ -41,6 +41,8 @@ const Pack = {
   },
   /* im Fingertipp aufrufen */
   unlock() {
+    // iPhone-App: nichts freischalten. Ein stummer Ton bei jedem Antippen würde dort laufende Musik anhalten.
+    if (this.native) return;
     this.session();
     const ctx = this.ac();
     if (ctx && ctx.state !== 'running') {
@@ -188,6 +190,7 @@ const Pack = {
     });
   },
   preload(voice) {
+    if (this.native) return;   // iPhone-App spielt nativ; Web-Audio hier gar nicht erst anlegen (würde Musik anhalten)
     for (const k of (this.index && this.index.keys) || []) this.bytes(voice, k).catch(() => {});
     if (this.ac()) for (const k of ['d300', 'right', 'hello']) this.decoded(voice, k).catch(() => {});
   }
