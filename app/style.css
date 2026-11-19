@@ -1052,3 +1052,7 @@ body.card-open .maplibregl-ctrl-bottom-right, body.selecting .maplibregl-ctrl-bo
 .lp-foot .btn[hidden] { display: none; }
 .lp-foot .btn:only-child, .lp-foot .btn[hidden] + .btn { grid-column: 1 / -1; }
 @media (prefers-reduced-motion: reduce) { .list-pop { animation: none; } }
+
+.spot-go { margin: 2px 0 6px; }
+.spot-go[hidden] { display: none; }
+.spot-go .muted { margin: 6px 2px 0; text-align: center; }

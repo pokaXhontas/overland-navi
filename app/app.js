@@ -1103,6 +1103,7 @@ function openEditor(place, at, opts = {}) {
   $('#spot-note').value = editor.draft.note;
   $('#spot-delete').hidden = isNew;
   $('#spot-nav').hidden = isNew;
+  $('#spot-go-box').hidden = !isNew;   // lange gedrückt: gleich hinfahren können, ohne zu speichern
   $('#spot-delete').textContent = 'Ort löschen';
   $('#spot-move').hidden = isNew;
   renderChips();
@@ -1257,6 +1258,12 @@ function setupEditorUI() {
     if (!p) return;
     closeEditor();
     Nav.choose({ lat: p.lat, lon: p.lon, name: p.name });
+  };
+  $('#spot-go').onclick = () => {
+    const d = editor.draft;
+    const name = ($('#spot-name').value || '').trim() || 'Markierter Punkt';
+    closeEditor();
+    Nav.choose({ lat: d.lat, lon: d.lon, name });
   };
   $('#spot-move').onclick = () => startPick();
   $('#pick-ok').onclick = () => endPick(true);
