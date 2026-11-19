@@ -199,12 +199,28 @@ for (const ev of ['touchend', 'click', 'keydown']) document.addEventListener(ev,
  * Im Browser und in älteren App-Versionen ohne diesen Teil bleibt alles wie bisher. */
 const Native = {
   avail: false, sent: null, sig: '', err: '',
+  via: '',
   async init() {
     const C = window.Capacitor;
-    if (!C || !C.nativePromise || !(C.isNativePlatform && C.isNativePlatform())) return;
-    try { this.info = await C.nativePromise('OvlNative', 'info', {}); this.avail = true; } catch (e) { this.err = (e && e.message) || String(e); }
+    if (!C || !(C.isNativePlatform && C.isNativePlatform())) return;
+    // je nach Capacitor-Version gibt es unterschiedliche Wege zum nativen Teil: der Reihe nach probieren
+    const ways = [];
+    if (typeof C.nativePromise === 'function') ways.push(['nativePromise', (m, o) => C.nativePromise('OvlNative', m, o)]);
+    if (typeof C.toNative === 'function') ways.push(['toNative', (m, o) => new Promise((resolve, reject) => C.toNative('OvlNative', m, o, { resolve, reject }))]);
+    if (C.Plugins && C.Plugins.OvlNative) ways.push(['Plugins', (m, o) => C.Plugins.OvlNative[m](o)]);
+    if (typeof C.registerPlugin === 'function') { try { const P = C.registerPlugin('OvlNative'); ways.push(['registerPlugin', (m, o) => P[m](o)]); } catch (e) { /* weiter */ } }
+    const errs = [];
+    for (const [name, fn] of ways) {
+      try {
+        this.info = await Promise.race([fn('info', {}), new Promise((res, rej) => setTimeout(() => rej(new Error('keine Antwort')), 3000))]);
+        this.fn = fn; this.via = name; this.avail = true; this.err = '';
+        return;
+      } catch (e) { errs.push(name + ': ' + ((e && e.message) || e)); }
+    }
+    const heads = (C.PluginHeaders || []).map((h) => h.name).join(', ');
+    this.err = (errs.join(' | ') || 'kein Weg (' + Object.keys(C).join(', ') + ')') + (heads ? ' · bekannt: ' + heads : '');
   },
-  call(method, opts) { return window.Capacitor.nativePromise('OvlNative', method, opts || {}); },
+  call(method, opts) { return this.fn(method, opts || {}); },
   voiceOpts(nav) {
     const pv = nav.packVoice();
     return { on: !!nav.voice, voice: pv || '', voiceId: pv ? '' : store.get('navVoiceURI', ''), rate: +store.get('navRate', 1) || 1 };
