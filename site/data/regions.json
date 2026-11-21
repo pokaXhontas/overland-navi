@@ -1,0 +1,329 @@
+{
+ "build": "20261121",
+ "sources": {
+  "base": "https://ovl-karte.y3m.workers.dev/20261121.pmtiles",
+  "dem": "https://download.mapterhorn.com/planet.pmtiles",
+  "hike": "https://ovl-karte.y3m.workers.dev/wander/{id}.pmtiles",
+  "sync": "https://ovl-karte.y3m.workers.dev/sync/",
+  "gkey": ""
+ },
+ "regions": [
+  {
+   "id": "berlin",
+   "name": "Berlin & Umgebung",
+   "group": "Test",
+   "boxes": [
+    [
+     12.9,
+     52.2,
+     14.0,
+     52.8
+    ]
+   ],
+   "maxzoom": 14,
+   "demMaxzoom": 11,
+   "sizes": {
+    "base": 47000000,
+    "dem": 4600000,
+    "search": 265960
+   },
+   "search": "data/berlin/search.json",
+   "bbox": [
+    12.9,
+    52.2,
+    14.0,
+    52.8
+   ]
+  },
+  {
+   "id": "kirgistan",
+   "iso": "KGZ",
+   "name": "Kirgistan",
+   "group": "Zentralasien",
+   "boxes": [
+    [
+     69.2,
+     39.1,
+     80.3,
+     43.3
+    ]
+   ],
+   "maxzoom": 14,
+   "demMaxzoom": 11,
+   "sizes": {
+    "base": 194000000,
+    "dem": 294000000,
+    "search": 1223424
+   },
+   "search": "data/kirgistan/search.json",
+   "bbox": [
+    69.2,
+    39.1,
+    80.3,
+    43.3
+   ]
+  },
+  {
+   "id": "tadschikistan",
+   "iso": "TJK",
+   "name": "Tadschikistan",
+   "group": "Zentralasien",
+   "boxes": [
+    [
+     67.3,
+     36.6,
+     75.2,
+     41.1
+    ]
+   ],
+   "maxzoom": 14,
+   "demMaxzoom": 11,
+   "sizes": {
+    "base": 160000000,
+    "dem": 248000000,
+    "search": 1065730
+   },
+   "search": "data/tadschikistan/search.json",
+   "bbox": [
+    67.3,
+    36.6,
+    75.2,
+    41.1
+   ]
+  },
+  {
+   "id": "usbekistan",
+   "iso": "UZB",
+   "name": "Usbekistan",
+   "group": "Zentralasien",
+   "boxes": [
+    [
+     55.9,
+     41.0,
+     62.0,
+     45.6
+    ],
+    [
+     60.0,
+     37.1,
+     73.2,
+     42.5
+    ]
+   ],
+   "maxzoom": 14,
+   "demMaxzoom": 11,
+   "sizes": {
+    "base": 255000000,
+    "dem": 412000000,
+    "search": 1680528
+   },
+   "search": "data/usbekistan/search.json",
+   "bbox": [
+    55.9,
+    37.1,
+    73.2,
+    45.6
+   ]
+  },
+  {
+   "id": "kasachstan",
+   "iso": "KAZ",
+   "name": "Kasachstan",
+   "group": "Zentralasien",
+   "boxes": [
+    [
+     46.4,
+     40.5,
+     58.0,
+     51.8
+    ],
+    [
+     58.0,
+     40.5,
+     87.4,
+     49.5
+    ],
+    [
+     58.0,
+     49.5,
+     84.0,
+     55.5
+    ]
+   ],
+   "maxzoom": 14,
+   "demMaxzoom": 10,
+   "sizes": {
+    "base": 1000000000,
+    "dem": 628000000,
+    "search": 4148998
+   },
+   "search": "data/kasachstan/search.json",
+   "bbox": [
+    46.4,
+    40.5,
+    87.4,
+    55.5
+   ]
+  },
+  {
+   "id": "tuerkei",
+   "iso": "TUR",
+   "name": "Türkei",
+   "group": "Europa & Kleinasien",
+   "boxes": [
+    [
+     25.6,
+     35.8,
+     44.9,
+     42.2
+    ]
+   ],
+   "maxzoom": 14,
+   "demMaxzoom": 11,
+   "sizes": {
+    "base": 857000000,
+    "dem": 545000000,
+    "search": 7514583
+   },
+   "search": "data/tuerkei/search.json",
+   "bbox": [
+    25.6,
+    35.8,
+    44.9,
+    42.2
+   ]
+  },
+  {
+   "id": "griechenland",
+   "iso": "GRC",
+   "name": "Griechenland",
+   "group": "Europa & Kleinasien",
+   "boxes": [
+    [
+     19.3,
+     34.7,
+     29.7,
+     41.8
+    ]
+   ],
+   "maxzoom": 14,
+   "demMaxzoom": 11,
+   "sizes": {
+    "base": 522000000,
+    "dem": 206000000,
+    "search": 4181174
+   },
+   "search": "data/griechenland/search.json",
+   "bbox": [
+    19.3,
+    34.7,
+    29.7,
+    41.8
+   ]
+  },
+  {
+   "id": "norwegen",
+   "iso": "NOR",
+   "name": "Norwegen",
+   "group": "Skandinavien",
+   "boxes": [
+    [
+     4.5,
+     57.9,
+     12.3,
+     62.0
+    ],
+    [
+     5.0,
+     62.0,
+     14.5,
+     64.8
+    ],
+    [
+     11.0,
+     64.8,
+     16.5,
+     67.5
+    ],
+    [
+     14.0,
+     67.5,
+     22.0,
+     70.4
+    ],
+    [
+     20.5,
+     68.5,
+     31.2,
+     71.2
+    ]
+   ],
+   "maxzoom": 14,
+   "demMaxzoom": 11,
+   "sizes": {
+    "base": 1900000000,
+    "dem": 719000000,
+    "search": 11471435
+   },
+   "search": "data/norwegen/search.json",
+   "bbox": [
+    4.5,
+    57.9,
+    31.2,
+    71.2
+   ]
+  },
+  {
+   "id": "schweden",
+   "iso": "SWE",
+   "name": "Schweden",
+   "group": "Skandinavien",
+   "boxes": [
+    [
+     10.9,
+     55.3,
+     19.5,
+     59.7
+    ],
+    [
+     11.8,
+     59.7,
+     19.0,
+     62.5
+    ],
+    [
+     12.5,
+     62.5,
+     24.2,
+     65.5
+    ],
+    [
+     14.5,
+     65.5,
+     24.2,
+     67.5
+    ],
+    [
+     17.5,
+     67.5,
+     24.2,
+     69.1
+    ]
+   ],
+   "maxzoom": 14,
+   "demMaxzoom": 10,
+   "sizes": {
+    "base": 1800000000,
+    "dem": 206000000,
+    "search": 13971947
+   },
+   "search": "data/schweden/search.json",
+   "bbox": [
+    10.9,
+    55.3,
+    24.2,
+    69.1
+   ]
+  }
+ ]
+}
